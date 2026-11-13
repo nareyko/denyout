@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://denyout.com/schemas/denyout-config.v1.json",
+  "title": "DenyOut Config v1",
+  "type": "object",
+  "required": ["apiVersion", "kind"],
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": { "const": "denyout/v1" },
+    "kind": { "const": "Config" },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["enforce", "audit", "blocklist", "ask"]
+    },
+    "preset": {
+      "type": "string",
+      "enum": ["models", "models+pkg", "strict", "none", "dev"]
+    },
+    "tls": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": { "type": "string", "enum": ["intercept", "passthrough"] },
+        "session_ca": { "type": "boolean" }
+      }
+    },
+    "listen": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "host": { "type": "string" },
+        "port": { "type": "integer", "minimum": 0, "maximum": 65535 }
+      }
+    },
+    "allow_private": { "type": "boolean" },
+    "allow_ip_literals": { "type": "boolean" },
+    "deny_on_dns_failure": { "type": "boolean" },
+    "insecure_allow_all": { "type": "boolean" },
+    "allowed_ports": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 1, "maximum": 65535 }
+    },
+    "allow": { "type": "array", "items": { "$ref": "#/$defs/rule" } },
+    "deny": { "type": "array", "items": { "$ref": "#/$defs/rule" } },
+    "scanners": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "hard_secrets_in_audit_mode": { "type": "boolean" },
+        "body_scan_max_bytes": { "type": "integer", "minimum": 0 },
+        "min_value_len": { "type": "integer", "minimum": 1 },
+        "named_query": {
+          "type": "object",
+          "properties": { "enabled": { "type": "boolean" } }
+        },
+        "high_entropy": {
+          "type": "object",
+          "properties": { "enabled": { "type": "boolean" } }
+        },
+        "canaries": { "type": "array", "items": { "type": "string" } },
+        "custom_regex": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "pattern"],
+            "properties": {
+              "id": { "type": "string" },
+              "pattern": { "type": "string" },
+              "redact": { "type": "boolean" }
+            }
+          }
+        },
+        "credential_destinations": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "per_host_rpm": { "type": "integer", "minimum": 0 },
+        "global_rpm": { "type": "integer", "minimum": 0 },
+        "per_host_burst": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "jsonl_path": { "type": "string" },
+        "stdout": { "type": "boolean" },
+        "include_headers": { "type": "boolean" }
+      }
+    },
+    "ui": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "notify": { "type": "boolean" },
+        "show_bypass_warning": { "type": "boolean" },
+        "ask_timeout_seconds": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "server": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "agent_id_header": { "type": "string" },
+        "metrics_listen": { "type": "string" }
+      }
+    }
+  },
+  "$defs": {
+    "rule": {
+      "type": "object",
+      "required": ["host"],
+      "additionalProperties": false,
+      "properties": {
+        "host": { "type": "string", "minLength": 1 },
+        "ports": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 1, "maximum": 65535 }
+        },
+        "methods": { "type": "array", "items": { "type": "string" } },
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "prefix": { "type": "string" },
+              "exact": { "type": "string" },
+              "regex": { "type": "string" }
+            }
+          }
+        },
+        "require_intercept": { "type": "boolean" },
+        "include_apex": { "type": "boolean" },
+        "reason": { "type": "string" }
+      }
+    }
+  }
+}

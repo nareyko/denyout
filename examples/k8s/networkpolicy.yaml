@@ -1,0 +1,33 @@
+# Agent may only talk to cluster DNS and the DenyOut port on localhost.
+# Exact NetworkPolicy semantics for localhost vary by CNI — prefer
+# Cilium / nftables examples in later docs; this is a starting sketch.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sample-agent-egress
+spec:
+  podSelector:
+    matchLabels:
+      app: sample-agent
+  policyTypes:
+    - Egress
+  egress:
+    # DNS
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # DenyOut proxy is in the same pod (loopback). Many CNIs do not
+    # filter loopback; the critical rule is denying external egress from
+    # the agent network namespace except what DenyOut initiates.
+    # Practically: run agent+denyout in one pod and apply a more precise
+    # Cilium policy that allows external egress only from the denyout
+    # container identity — see phase 1.1 docs.
+    - to:
+        - podSelector:
+            matchLabels:
+              app: sample-agent
+      ports:
+        - protocol: TCP
+          port: 8080

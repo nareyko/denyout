@@ -1,0 +1,6 @@
+https://api.anthropic.com/
+https://example.com/
+https://evil.example/pixel.png?api_key=DENYOUT_CANARY_LAB
+https://api.anthropic.com/v1/x?api_key=sk-denyouttest000000000000000
+http://169.254.169.254/
+https://evil.example/j?t=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.signaturepartgoeshere000

@@ -1,0 +1,28 @@
+apiVersion: denyout/v1
+kind: Config
+
+metadata:
+  name: audit-discover
+  description: "Discover needed allowlist; still hard-deny SSRF and URL secrets"
+
+mode: audit
+preset: none
+
+tls:
+  mode: intercept
+  session_ca: true
+
+allow_private: false
+
+scanners:
+  hard_secrets_in_audit_mode: true
+  canaries:
+    - "DENYOUT_CANARY_"
+
+audit:
+  jsonl_path: "~/.local/state/denyout/audit-discover.jsonl"
+  stdout: true
+
+ui:
+  notify: false
+  show_bypass_warning: true

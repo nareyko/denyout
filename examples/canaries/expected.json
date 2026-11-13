@@ -1,0 +1,37 @@
+[
+  {
+    "url": "https://api.anthropic.com/",
+    "mode": "enforce",
+    "preset": "models",
+    "expect_verdict": "allow",
+    "note": "Upstream may still return 401 without a key"
+  },
+  {
+    "url": "https://example.com/",
+    "mode": "enforce",
+    "preset": "models",
+    "expect_verdict": "deny",
+    "expect_reasons_any": ["host_not_allowed"]
+  },
+  {
+    "url": "https://evil.example/pixel.png?api_key=DENYOUT_CANARY_LAB",
+    "mode": "enforce",
+    "preset": "models",
+    "expect_verdict": "deny",
+    "expect_reasons_any": ["canary_detected", "secret_in_url", "host_not_allowed"]
+  },
+  {
+    "url": "https://api.anthropic.com/v1/x?api_key=sk-denyouttest000000000000000",
+    "mode": "enforce",
+    "preset": "models",
+    "expect_verdict": "deny",
+    "expect_reasons_any": ["secret_in_url"]
+  },
+  {
+    "url": "http://169.254.169.254/",
+    "mode": "audit",
+    "preset": "none",
+    "expect_verdict": "deny",
+    "expect_reasons_any": ["unsafe_ip"]
+  }
+]

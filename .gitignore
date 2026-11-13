@@ -1,0 +1,28 @@
+# Binaries / build
+/bin/
+/dist/
+/target/
+*.exe
+denyout
+!docs/
+!examples/
+
+# IDE / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Local secrets / CA material — never commit
+*.pem
+*.key
+/.denyout/
+/.config-denyout-local/
+
+# Audit logs
+*.jsonl
+/audit/
+
+# Env
+.env
+.env.*
