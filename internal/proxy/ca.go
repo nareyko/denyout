@@ -28,6 +28,49 @@ type SessionCA struct {
 
 // NewSessionCA creates a CA and writes PEM files under dir (0600).
 func NewSessionCA(dir string) (*SessionCA, error) {
+	return createCA(dir, "DenyOut Session CA", 24*time.Hour)
+}
+
+// LoadOrCreatePersistentCA loads an existing desktop CA from dir or creates one
+// with long validity (kept across Protect On/Off; removed only on uninstall).
+func LoadOrCreatePersistentCA(dir string) (*SessionCA, error) {
+	certPath := dir + "/ca.crt"
+	keyPath := dir + "/ca.key"
+	if _, err := os.Stat(certPath); err == nil {
+		if _, err := os.Stat(keyPath); err == nil {
+			certPEM, err := os.ReadFile(certPath)
+			if err != nil {
+				return nil, err
+			}
+			keyPEM, err := os.ReadFile(keyPath)
+			if err != nil {
+				return nil, err
+			}
+			tlsCert, err := tls.X509KeyPair(certPEM, keyPEM)
+			if err != nil {
+				return nil, err
+			}
+			cert, err := x509.ParseCertificate(tlsCert.Certificate[0])
+			if err != nil {
+				return nil, err
+			}
+			key, ok := tlsCert.PrivateKey.(*ecdsa.PrivateKey)
+			if !ok {
+				return nil, fmt.Errorf("persistent CA key must be ECDSA")
+			}
+			return &SessionCA{
+				cert:    cert,
+				key:     key,
+				tlsCert: tlsCert,
+				dir:     dir,
+				leaves:  map[string]tls.Certificate{},
+			}, nil
+		}
+	}
+	return createCA(dir, "DenyOut Desktop CA", 825*24*time.Hour)
+}
+
+func createCA(dir, cn string, validFor time.Duration) (*SessionCA, error) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, err
 	}
@@ -42,11 +85,11 @@ func NewSessionCA(dir string) (*SessionCA, error) {
 	tmpl := &x509.Certificate{
 		SerialNumber: serial,
 		Subject: pkix.Name{
-			Organization: []string{"DenyOut Session CA"},
-			CommonName:   "DenyOut Session CA",
+			Organization: []string{"DenyOut"},
+			CommonName:   cn,
 		},
 		NotBefore:             time.Now().Add(-time.Hour),
-		NotAfter:              time.Now().Add(24 * time.Hour),
+		NotAfter:              time.Now().Add(validFor),
 		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign | x509.KeyUsageDigitalSignature,
 		BasicConstraintsValid: true,
 		IsCA:                  true,

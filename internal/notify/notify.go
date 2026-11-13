@@ -47,6 +47,25 @@ func Deny(host string, reasons []string) {
 	}
 }
 
+// AskNotify informs the user that a new site was blocked under Ask mode.
+// Action buttons are OS-dependent; users can Allow from Settings.
+func AskNotify(host string) {
+	mu.Lock()
+	on := enabled
+	mu.Unlock()
+	if !on {
+		return
+	}
+	if host == "" {
+		host = "a website"
+	}
+	title := "DenyOut: new site blocked"
+	body := fmt.Sprintf("%s is not allowed yet. Open DenyOut Settings to Allow once or Always.", host)
+	if err := beeep.Notify(title, body, ""); err != nil {
+		fmt.Fprintf(os.Stderr, "denyout: notification: %v\n", err)
+	}
+}
+
 // HumanReasons turns stable reason codes into plain-language copy.
 func HumanReasons(reasons []string) string {
 	if len(reasons) == 0 {

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/nareyko/denyout/internal/notify"
+	"github.com/nareyko/denyout/internal/run"
 )
 
 //go:embed static/*
@@ -23,6 +24,18 @@ var staticFS embed.FS
 
 //go:embed icon.png
 var iconPNG []byte
+
+//go:embed icon-on.png
+var iconOnPNG []byte
+
+//go:embed icon-idle.png
+var iconIdlePNG []byte
+
+//go:embed icon-alert.png
+var iconAlertPNG []byte
+
+// Keep default icon referenced for older tray paths / tests.
+var _ = iconPNG
 
 // Options for denyout desktop.
 type Options struct {
@@ -34,7 +47,7 @@ type Options struct {
 	Listen     string // wizard HTTP listen; default 127.0.0.1:0
 }
 
-// App is the non-technical desktop entry (wizard + tray + notifications).
+// App is the non-technical desktop entry (wizard + tray + hostguard).
 type App struct {
 	opts Options
 
@@ -42,7 +55,8 @@ type App struct {
 	state    State
 	lastDeny string
 	status   string
-	protect  *exec.Cmd
+	protect  *exec.Cmd   // advanced process wrap
+	session  *run.Session // computer mode proxy
 }
 
 // Run starts the desktop experience and blocks until quit.
@@ -50,7 +64,7 @@ func Run(ctx context.Context, opts Options) error {
 	if opts.Listen == "" {
 		opts.Listen = "127.0.0.1:0"
 	}
-	a := &App{opts: opts, state: LoadState(), status: "Idle"}
+	a := &App{opts: opts, state: LoadState(), status: "Off"}
 	notify.SetEnabled(a.state.Notify)
 
 	wizardURL, err := a.startWizardServer(ctx)
@@ -62,13 +76,12 @@ func Run(ctx context.Context, opts Options) error {
 	needSetup := opts.ForceSetup || !a.state.SetupDone
 	if needSetup && !opts.NoOpen {
 		openBrowser(wizardURL)
-	} else if !opts.NoOpen && !a.state.SetupDone {
-		openBrowser(wizardURL)
 	}
 
 	if opts.NoTray {
 		fmt.Fprintln(os.Stderr, "denyout desktop: tray disabled (--no-tray); press Ctrl+C to quit")
 		<-ctx.Done()
+		a.stopComputer()
 		a.stopProtect()
 		return nil
 	}
@@ -84,7 +97,10 @@ func (a *App) startWizardServer(ctx context.Context) (string, error) {
 	mux := http.NewServeMux()
 	mux.Handle("/", http.FileServer(http.FS(sub)))
 	mux.HandleFunc("/api/setup", a.handleSetup)
+	mux.HandleFunc("/api/settings", a.handleSettings)
 	mux.HandleFunc("/api/protect", a.handleProtect)
+	mux.HandleFunc("/api/computer", a.handleComputer)
+	mux.HandleFunc("/api/allow", a.handleAllow)
 	mux.HandleFunc("/api/status", a.handleStatus)
 
 	ln, err := net.Listen("tcp", a.opts.Listen)
@@ -106,11 +122,15 @@ func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	writeJSON(w, map[string]any{
-		"setup_done": a.state.SetupDone,
-		"status":     a.status,
-		"last_deny":  a.lastDeny,
-		"notify":     a.state.Notify,
-		"agent":      a.state.PreferredAgent,
+		"setup_done":        a.state.SetupDone,
+		"status":            a.status,
+		"last_deny":         a.lastDeny,
+		"notify":            a.state.Notify,
+		"ask_mode":          a.state.AskMode,
+		"computer_enabled":  a.state.ComputerEnabled,
+		"agent":             a.state.PreferredAgent,
+		"always_allow":      a.state.AlwaysAllowHosts,
+		"version":           a.opts.Version,
 	})
 }
 
@@ -120,10 +140,9 @@ func (a *App) handleSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Agent         string `json:"agent"`
-		CustomCommand string `json:"custom_command"`
-		Notify        bool   `json:"notify"`
-		Skip          bool   `json:"skip"`
+		Notify  bool `json:"notify"`
+		AskMode bool `json:"ask_mode"`
+		Skip    bool `json:"skip"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, err, 400)
@@ -132,12 +151,7 @@ func (a *App) handleSetup(w http.ResponseWriter, r *http.Request) {
 	a.mu.Lock()
 	a.state.SetupDone = true
 	a.state.Notify = body.Notify
-	if !body.Skip {
-		a.state.PreferredAgent = body.Agent
-		a.state.CustomCommand = strings.TrimSpace(body.CustomCommand)
-	} else if a.state.PreferredAgent == "" {
-		a.state.PreferredAgent = "shell"
-	}
+	a.state.AskMode = body.AskMode
 	st := a.state
 	a.mu.Unlock()
 	notify.SetEnabled(st.Notify)
@@ -148,10 +162,110 @@ func (a *App) handleSetup(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"ok": true})
 }
 
+func (a *App) handleSettings(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var body struct {
+		Notify  *bool `json:"notify"`
+		AskMode *bool `json:"ask_mode"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeErr(w, err, 400)
+		return
+	}
+	a.mu.Lock()
+	if body.Notify != nil {
+		a.state.Notify = *body.Notify
+	}
+	if body.AskMode != nil {
+		a.state.AskMode = *body.AskMode
+	}
+	st := a.state
+	wasOn := a.session != nil
+	a.mu.Unlock()
+	notify.SetEnabled(st.Notify)
+	if err := SaveState(st); err != nil {
+		writeErr(w, err, 500)
+		return
+	}
+	if wasOn && body.AskMode != nil {
+		a.stopComputer()
+		if err := a.startComputer(); err != nil {
+			writeErr(w, err, 500)
+			return
+		}
+	}
+	writeJSON(w, map[string]any{"ok": true})
+}
+
+func (a *App) handleComputer(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var body struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeErr(w, err, 400)
+		return
+	}
+	if body.Enabled {
+		if err := a.startComputer(); err != nil {
+			writeErr(w, err, 500)
+			return
+		}
+	} else {
+		a.stopComputer()
+	}
+	a.mu.Lock()
+	st := a.status
+	a.mu.Unlock()
+	writeJSON(w, map[string]any{"ok": true, "status": st})
+}
+
+func (a *App) handleAllow(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var body struct {
+		Host  string `json:"host"`
+		Once  bool   `json:"once"`
+		Always bool  `json:"always"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeErr(w, err, 400)
+		return
+	}
+	if body.Always || !body.Once {
+		if err := a.allowHostAlways(strings.TrimSpace(body.Host)); err != nil {
+			writeErr(w, err, 500)
+			return
+		}
+	}
+	writeJSON(w, map[string]any{"ok": true})
+}
+
 func (a *App) handleProtect(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
+	}
+	var body struct {
+		Agent         string `json:"agent"`
+		CustomCommand string `json:"custom_command"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	if body.Agent != "" {
+		a.mu.Lock()
+		a.state.PreferredAgent = body.Agent
+		a.state.CustomCommand = strings.TrimSpace(body.CustomCommand)
+		st := a.state
+		a.mu.Unlock()
+		_ = SaveState(st)
 	}
 	if err := a.startProtect(); err != nil {
 		writeErr(w, err, 500)
@@ -170,7 +284,7 @@ func (a *App) agentCommand() ([]string, error) {
 		return []string{"agent"}, nil
 	case "custom":
 		if a.state.CustomCommand == "" {
-			return nil, fmt.Errorf("set a custom command in setup first")
+			return nil, fmt.Errorf("set a custom command in Advanced first")
 		}
 		return splitCommand(a.state.CustomCommand), nil
 	default:
@@ -187,7 +301,6 @@ func (a *App) agentCommand() ([]string, error) {
 }
 
 func splitCommand(s string) []string {
-	// Minimal split on spaces; enough for MVP custom commands.
 	fields := strings.Fields(s)
 	if len(fields) == 0 {
 		return []string{s}
@@ -205,7 +318,6 @@ func (a *App) startProtect() error {
 		a.mu.Unlock()
 		return fmt.Errorf("a protected agent is already running — stop it from the tray first")
 	}
-	a.status = "Starting…"
 	a.mu.Unlock()
 
 	self, err := os.Executable()
@@ -224,21 +336,16 @@ func (a *App) startProtect() error {
 	cmd.Stderr = os.Stderr
 	cmd.Env = append(os.Environ(), "DENYOUT_DESKTOP_NOTIFY=1")
 	if err := cmd.Start(); err != nil {
-		a.mu.Lock()
-		a.status = "Idle"
-		a.mu.Unlock()
 		return err
 	}
 	a.mu.Lock()
 	a.protect = cmd
-	a.status = "Protected"
 	a.mu.Unlock()
 
 	go func() {
 		_ = cmd.Wait()
 		a.mu.Lock()
 		a.protect = nil
-		a.status = "Idle"
 		a.mu.Unlock()
 	}()
 	return nil
@@ -248,7 +355,6 @@ func (a *App) stopProtect() {
 	a.mu.Lock()
 	cmd := a.protect
 	a.protect = nil
-	a.status = "Idle"
 	a.mu.Unlock()
 	if cmd != nil && cmd.Process != nil {
 		_ = cmd.Process.Kill()

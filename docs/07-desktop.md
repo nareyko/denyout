@@ -2,9 +2,10 @@
 
 ## 1. Goals
 
-- Protect P1 users who will not configure firewalls.  
-- Scope trust to the **child process tree** when possible.  
-- Avoid installing a system-wide root CA by default.
+- Protect P1 users who will not configure firewalls: **Protect this computer** is the primary GUI mode.  
+- Transparent redirect of this user’s HTTP/HTTPS into DenyOut while On (Linux nft / macOS pf / Windows WinDivert).  
+- Install DenyOut CA into the trust store when enabling Protect computer (one admin prompt).  
+- Advanced / CLI: scope trust to a **child process tree** via `denyout run` (no host redirect).
 
 ## 2. Supported platforms (MVP target)
 
@@ -17,7 +18,7 @@
 ## 3. Install (locked for MVP / M4–M6)
 
 **SoT of artifacts:** GitHub Releases (`nareyko/denyout`) with binaries for **linux, darwin, windows** + **SHA256SUMS** (goreleaser).  
-**Default trust:** no system-wide CA; session CA via child env only (see §5–§7).
+**Default trust:** process wrap uses session CA via child env only. **Protect this computer** installs a persistent desktop CA into the OS trust store (kept until uninstall).
 
 ### 3.1 Canonical recipes (≤5 minutes — M4)
 
@@ -58,6 +59,19 @@ Windows (MVP):
 | denyout.com hosts `install.sh` | Same script as repo; site may redirect to GitHub raw/Release |
 
 One release pipeline feeds every channel; package managers only re-point at Release assets.
+
+## 3.3 Protect this computer (hostguard)
+
+| OS | Redirect | CA | Elevation |
+| --- | --- | --- | --- |
+| Linux | nftables table `denyout` (UID filter, TCP 80/443 → local proxy) | `/usr/local/share/ca-certificates` + `update-ca-certificates` | `pkexec` / sudo |
+| macOS | pf anchor `com.denyout` | System keychain `security add-trusted-cert` | admin osascript |
+| Windows | WinDivert + `denyout-windivert.exe` — see [`hostguard-windows.md`](hostguard-windows.md) | `certutil` Root store | UAC |
+
+CLI helper: `denyout hostctl render|apply|remove --port N --ca PATH --uid N`.  
+Default policy: [`examples/policies/denyout.whole_device.yaml`](../examples/policies/denyout.whole_device.yaml) (allow web + scanners). Ask mode: `denyout.whole_device_ask.yaml`.
+
+Proxy accepts **transparent** connections (TLS SNI / HTTP Host), not only HTTP-proxy CONNECT.
 
 ## 4. Runtime algorithm (`denyout run`)
 

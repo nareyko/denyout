@@ -10,12 +10,14 @@ Updated: 2026-11-13.
 | Implementation language | **Go** (shipped MVP binary) |
 | Policy format | YAML `denyout/v1` only for MVP (OPA/Rego later optional) |
 | Default TLS mode | **`intercept`**; `passthrough` = degraded mode with explicit warning |
-| OS sandbox | **Optional** (`--sandbox`); desktop “supported” documents proxy-bypass residual |
-| Wrap model | One binary: `denyout run -- <command>`; deep editor hooks later |
-| UX | CLI **and** GUI; simplicity first-class |
-| GUI stack (MVP) | **`denyout desktop`**: system tray/menu bar + OS notifications + first-run setup wizard (same binary; pure-Go tray). `denyout gui` remains an advanced technical panel. |
-| Platforms (MVP) | Ubuntu, macOS, Windows **desktop** |
-| Install (MVP) | Releases + SHA256SUMS; `install.sh` → `~/.local/bin` (Linux/macOS); Windows zip + short EN doc; no system CA by default; Homebrew/winget after first release / stretch — [`07-desktop.md`](07-desktop.md) §3 |
+| OS sandbox | **Optional** (`--sandbox`); residual UDP/DoH/custom stacks always documented |
+| Wrap model | Advanced/CLI: `denyout run -- <command>`; deep editor hooks later |
+| UX | GUI primary for P1; CLI for power users |
+| GUI stack (MVP) | **`denyout desktop`**: **Protect this computer** (transparent HTTP/HTTPS redirect + CA trust) + tray + notifications + simple settings. Advanced = protect one program. `denyout gui` = technical panel. |
+| Hostguard | Linux nftables + pkexec; macOS pf + admin Keychain; Windows WinDivert companion + UAC (`denyout hostctl`) |
+| Whole-device policy | Default **allow web** + secret/canary/SSRF hard denies + notify; optional **Ask before new sites** |
+| Platforms (MVP) | Ubuntu, macOS, Windows **desktop** (computer mode on all three; mark OS unsupported if divert missing — no fake On) |
+| Install (MVP) | Releases + SHA256SUMS; `install.sh` → `~/.local/bin` (Linux/macOS); Windows zip + short EN doc; CA installed when Protect computer is enabled; Homebrew/winget stretch — [`07-desktop.md`](07-desktop.md) §3 |
 | Phone / mobile | Out of scope for MVP |
 | Server identity | One proxy instance = one policy (sidecar-per-workload) |
 | Release checksums | SHA256SUMS with releases; SBOM/cosign recommended when time allows |
@@ -25,7 +27,7 @@ Updated: 2026-11-13.
 
 ## Positioning
 
-> DenyOut is the free, local-first egress seatbelt you wrap around any agent in minutes — default-deny plus secret-in-URL blocking — not an enterprise access platform you buy to replace your SWG.
+> DenyOut is the free, local-first egress seatbelt for your laptop (Protect this computer) or a single agent process — secret-in-URL and unsafe destination blocking while On — not an enterprise SWG replacement.
 
 ## Claims
 

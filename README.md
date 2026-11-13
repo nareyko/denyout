@@ -1,29 +1,29 @@
 # DenyOut
 
-**Free seatbelt for AI agents: outbound denied by default, secret-looking URLs blocked — on your laptop or beside your server process.**
+**Free seatbelt for your laptop or AI agents: Protect this computer (outbound web while On) or wrap one process — secret-looking URLs and unsafe destinations blocked.**
 
 Site: [https://denyout.com](https://denyout.com) · Canon GitHub (planned): [`nareyko/denyout`](https://github.com/nareyko/denyout)
 
 Agents that can read untrusted text, see sensitive data, and reach the network form a [lethal trifecta](https://arviser.com/guides/lethal-trifecta). DenyOut removes the easy outbound path: every connection goes through a local policy proxy that **denies by default**, blocks secret-bearing URLs, and leaves an audit trail the agent cannot edit.
 
 ```bash
-# Linux / macOS (after a GitHub Release exists)
+# Linux / macOS
 curl -fsSL https://raw.githubusercontent.com/nareyko/denyout/main/install.sh | sh
-denyout version
-denyout init
+denyout desktop          # Protect this computer (GUI) — primary for most users
+
+# Advanced / CI — wrap one process
 denyout run -- curl -I https://api.anthropic.com
 
 # from this repo (dev)
 go run ./cmd/denyout version
 go run ./cmd/denyout check 'https://evil.example/x?api_key=DENYOUT_CANARY_LAB'
-go run ./cmd/denyout -- run -- curl -I https://api.anthropic.com
 ```
 
 Windows: download the zip from [Releases](https://github.com/nareyko/denyout/releases) and follow [`docs/install-windows.md`](docs/install-windows.md).
 
 ## Status
 
-**v0.1.0 released.** Policy proxy (`run` / `check` / `test` / `desktop` / `gui` / `serve`), tray + notifications + setup wizard, M3 script, `install.sh` / Windows `Start-DenyOut.cmd`. Next: timed M4 install smokes on Ubuntu / macOS / Windows; M5 README/boundaries ship-check.
+**v0.1.0 + Protect this computer (hostguard).** Desktop GUI defaults to whole-user transparent HTTP(S) protection; Advanced wraps one process. Next: timed M4 smokes on three OS; M5 ship-check; Windows WinDivert bridge packaging.
 
 **Language:** English only.
 
@@ -60,9 +60,14 @@ Agent playbooks: thin stubs in [`prompts/`](prompts/) → sibling [`agent-prompt
 
 Examples: [`examples/`](examples/). Schema: [`schemas/`](schemas/).
 
+## Security boundaries
+
+Honest claims and non-claims: [`docs/10-security-boundaries.md`](docs/10-security-boundaries.md).  
+While **Protect this computer** is On, DenyOut protects **this user’s outbound web** — it is **not** unbypassable.
+
 ## One-line pitch
 
-> DenyOut is a free seatbelt for AI agents: outbound network is denied by default, and secret-looking URLs are blocked — on your laptop or beside your server process.
+> DenyOut is a free seatbelt for your computer or AI agents: secret-looking URLs and unsafe destinations are blocked while protection is On.
 
 ## Author
 

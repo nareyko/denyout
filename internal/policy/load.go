@@ -98,7 +98,7 @@ func validateSchema(yamlRaw []byte) error {
 
 // DefaultEnforceModels returns a built-in enforce+models config for `denyout check` without --config.
 func DefaultEnforceModels() (*Config, error) {
-	path, err := findPresetOrExample()
+	path, err := findExamplePolicy("denyout.enforce.models.yaml")
 	if err == nil {
 		return LoadFile(path)
 	}
@@ -119,20 +119,81 @@ scanners:
 	return LoadBytes(minimal)
 }
 
-func findPresetOrExample() (string, error) {
+// DefaultWholeDevice returns allow-web + secret/canary/SSRF hard denies (Protect this computer).
+func DefaultWholeDevice() (*Config, error) {
+	path, err := findExamplePolicy("denyout.whole_device.yaml")
+	if err == nil {
+		return LoadFile(path)
+	}
+	minimal := []byte(`
+apiVersion: denyout/v1
+kind: Config
+mode: blocklist
+preset: none
+allow_private: false
+allow_ip_literals: false
+allowed_ports: [443, 80]
+deny:
+  - host: pastebin.com
+scanners:
+  min_value_len: 6
+  named_query:
+    enabled: true
+  canaries:
+    - "DENYOUT_CANARY_"
+    - "ARVISER_CANARY_"
+`)
+	return LoadBytes(minimal)
+}
+
+// DefaultWholeDeviceAsk returns deny-unknown hosts until Allow once/Always (Ask mode).
+func DefaultWholeDeviceAsk(extraAllow []Rule) (*Config, error) {
+	path, err := findExamplePolicy("denyout.whole_device_ask.yaml")
+	var cfg *Config
+	if err == nil {
+		cfg, err = LoadFile(path)
+	} else {
+		minimal := []byte(`
+apiVersion: denyout/v1
+kind: Config
+mode: enforce
+preset: none
+allow_private: false
+allow_ip_literals: false
+allowed_ports: [443, 80]
+allow: []
+deny:
+  - host: pastebin.com
+scanners:
+  min_value_len: 6
+  named_query:
+    enabled: true
+  canaries:
+    - "DENYOUT_CANARY_"
+    - "ARVISER_CANARY_"
+`)
+		cfg, err = LoadBytes(minimal)
+	}
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range extraAllow {
+		cfg.Allow = append(cfg.Allow, r)
+	}
+	return cfg, nil
+}
+
+func findExamplePolicy(name string) (string, error) {
 	candidates := []string{
-		"examples/policies/denyout.enforce.models.yaml",
-		filepath.Join("..", "examples", "policies", "denyout.enforce.models.yaml"),
-		filepath.Join("..", "..", "examples", "policies", "denyout.enforce.models.yaml"),
+		filepath.Join("examples", "policies", name),
+		filepath.Join("..", "examples", "policies", name),
+		filepath.Join("..", "..", "examples", "policies", name),
 	}
 	if wd, err := os.Getwd(); err == nil {
-		candidates = append(candidates,
-			filepath.Join(wd, "examples", "policies", "denyout.enforce.models.yaml"),
-		)
-		// Walk up a few levels from cwd (e.g. running from repo root or cmd/).
+		candidates = append(candidates, filepath.Join(wd, "examples", "policies", name))
 		dir := wd
 		for i := 0; i < 4; i++ {
-			candidates = append(candidates, filepath.Join(dir, "examples", "policies", "denyout.enforce.models.yaml"))
+			candidates = append(candidates, filepath.Join(dir, "examples", "policies", name))
 			dir = filepath.Dir(dir)
 		}
 	}
@@ -141,7 +202,7 @@ func findPresetOrExample() (string, error) {
 			return c, nil
 		}
 	}
-	return "", fmt.Errorf("example policy not found")
+	return "", fmt.Errorf("example policy %s not found", name)
 }
 
 func mergePreset(cfg *Config) error {

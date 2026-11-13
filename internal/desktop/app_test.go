@@ -55,7 +55,7 @@ func TestWizardAPISetup(t *testing.T) {
 		t.Fatalf("wizard up: %v", last)
 	}
 
-	body := []byte(`{"agent":"claude","notify":true}`)
+	body := []byte(`{"notify":true,"ask_mode":false}`)
 	resp, err := http.Post(base+"/api/setup", "application/json", bytes.NewReader(body))
 	if err != nil {
 		t.Fatal(err)
@@ -66,7 +66,7 @@ func TestWizardAPISetup(t *testing.T) {
 	}
 
 	st := desktop.LoadState()
-	if !st.SetupDone || st.PreferredAgent != "claude" || !st.Notify {
+	if !st.SetupDone || !st.Notify || st.AskMode {
 		t.Fatalf("state=%+v", st)
 	}
 
@@ -79,7 +79,7 @@ func TestWizardAPISetup(t *testing.T) {
 	if err := json.NewDecoder(sresp.Body).Decode(&status); err != nil {
 		t.Fatal(err)
 	}
-	if status["setup_done"] != true || status["agent"] != "claude" {
+	if status["setup_done"] != true || status["ask_mode"] != false {
 		t.Fatalf("%v", status)
 	}
 
@@ -94,8 +94,7 @@ func TestWizardAPISetup(t *testing.T) {
 	}
 }
 
-func TestSplitCommandViaProtectSetup(t *testing.T) {
-	// Custom agent command is persisted through setup API.
+func TestAskModeSettings(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
 
@@ -122,7 +121,7 @@ func TestSplitCommandViaProtectSetup(t *testing.T) {
 		time.Sleep(30 * time.Millisecond)
 	}
 
-	payload := []byte(`{"agent":"custom","custom_command":"echo hello","notify":false}`)
+	payload := []byte(`{"notify":false,"ask_mode":true}`)
 	resp, err := http.Post(base+"/api/setup", "application/json", bytes.NewReader(payload))
 	if err != nil {
 		t.Fatal(err)
@@ -130,7 +129,7 @@ func TestSplitCommandViaProtectSetup(t *testing.T) {
 	resp.Body.Close()
 
 	st := desktop.LoadState()
-	if st.PreferredAgent != "custom" || st.CustomCommand != "echo hello" || st.Notify {
+	if st.Notify || !st.AskMode {
 		t.Fatalf("%+v", st)
 	}
 	cancel()

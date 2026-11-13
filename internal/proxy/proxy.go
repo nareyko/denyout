@@ -33,16 +33,17 @@ type DenyHook func(host string, reasons []string)
 
 // Config for the local proxy.
 type Config struct {
-	Engine     *policy.Engine
-	Audit      *audit.Sink
-	SessionID  string
-	PolicyHash string
-	Version    string
-	TLSMode    TLSMode
-	CA         *SessionCA
-	ListenHost string // default 127.0.0.1
-	ListenPort int    // 0 = ephemeral
-	OnDeny     DenyHook
+	Engine      *policy.Engine
+	Audit       *audit.Sink
+	SessionID   string
+	PolicyHash  string
+	Version     string
+	TLSMode     TLSMode
+	CA          *SessionCA
+	ListenHost  string // default 127.0.0.1
+	ListenPort  int    // 0 = ephemeral
+	OnDeny      DenyHook
+	Transparent bool // accept redirected raw TCP (SNI/Host), not only HTTP-proxy protocol
 }
 
 // Server is the HTTP proxy.
@@ -72,9 +73,13 @@ func Start(ctx context.Context, cfg Config) (*Server, error) {
 		Handler:           s,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
-	go func() {
-		_ = s.httpSrv.Serve(ln)
-	}()
+	if cfg.Transparent {
+		go s.serveTransparent()
+	} else {
+		go func() {
+			_ = s.httpSrv.Serve(ln)
+		}()
+	}
 	go func() {
 		<-ctx.Done()
 		_ = s.Close()
@@ -102,7 +107,9 @@ func (s *Server) Close() error {
 	s.closed = true
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	_ = s.httpSrv.Shutdown(ctx)
+	if s.httpSrv != nil && !s.cfg.Transparent {
+		_ = s.httpSrv.Shutdown(ctx)
+	}
 	return s.ln.Close()
 }
 

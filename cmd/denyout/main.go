@@ -11,6 +11,7 @@ import (
 	"github.com/nareyko/denyout/internal/check"
 	"github.com/nareyko/denyout/internal/desktop"
 	"github.com/nareyko/denyout/internal/gui"
+	"github.com/nareyko/denyout/internal/hostguard"
 	"github.com/nareyko/denyout/internal/lab"
 	"github.com/nareyko/denyout/internal/policy"
 	"github.com/nareyko/denyout/internal/proxy"
@@ -52,6 +53,8 @@ func runMain(args []string) int {
 		return cmdGUI(args[1:])
 	case "desktop":
 		return cmdDesktop(args[1:])
+	case "hostctl":
+		return cmdHostctl(args[1:])
 	case "serve":
 		return cmdServe(args[1:])
 	default:
@@ -75,7 +78,8 @@ Commands:
   policy validate <f>  Validate a denyout/v1 YAML config
   test [--db path]     Run lab SQLite fixtures (denyout test)
   run [flags] -- <cmd> Wrap command with local policy proxy
-  desktop              Tray + setup wizard (recommended for non-technical use)
+  desktop              Tray + Protect this computer (recommended)
+  hostctl              Privileged helper for transparent redirect + CA (elevated)
   gui                  Advanced localhost UI (technical)
   serve -c <file>      Long-running sidecar proxy (pair with NetworkPolicy)
 
@@ -324,6 +328,98 @@ func cmdRun(args []string) int {
 	return code
 }
 
+func cmdHostctl(args []string) int {
+	if len(args) == 0 || args[0] == "--help" || args[0] == "-h" {
+		fmt.Println(`Usage: denyout hostctl apply|remove|render [flags]
+
+  Privileged helper for Protect this computer (transparent redirect + CA trust).
+  Normally invoked via pkexec / osascript / UAC from denyout desktop.
+
+Flags:
+  --port N     local DenyOut proxy port
+  --ca PATH    CA certificate PEM to trust
+  --uid N      desktop user uid (Unix)
+  --no-elevate already running elevated (internal)`)
+		return 0
+	}
+	action := args[0]
+	port := 0
+	ca := ""
+	uid := 0
+	noElevate := false
+	for i := 1; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case a == "--no-elevate":
+			noElevate = true
+		case strings.HasPrefix(a, "--port="):
+			fmt.Sscanf(strings.TrimPrefix(a, "--port="), "%d", &port)
+		case a == "--port":
+			i++
+			if i < len(args) {
+				fmt.Sscanf(args[i], "%d", &port)
+			}
+		case strings.HasPrefix(a, "--ca="):
+			ca = strings.TrimPrefix(a, "--ca=")
+		case a == "--ca":
+			i++
+			if i < len(args) {
+				ca = args[i]
+			}
+		case strings.HasPrefix(a, "--uid="):
+			fmt.Sscanf(strings.TrimPrefix(a, "--uid="), "%d", &uid)
+		case a == "--uid":
+			i++
+			if i < len(args) {
+				fmt.Sscanf(args[i], "%d", &uid)
+			}
+		default:
+			fmt.Fprintf(os.Stderr, "denyout hostctl: unknown flag %q\n", a)
+			return 2
+		}
+	}
+	spec := hostguard.Spec{ProxyPort: port, UID: uid, CACert: ca}
+	switch action {
+	case "render":
+		out, err := hostguard.Render(spec)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "denyout hostctl: %v\n", err)
+			return 2
+		}
+		fmt.Print(out)
+		return 0
+	case "apply":
+		if !noElevate {
+			if err := hostguard.ElevateApply(port, ca, uid); err != nil {
+				fmt.Fprintf(os.Stderr, "denyout hostctl: %v\n", err)
+				return 2
+			}
+			return 0
+		}
+		if err := hostguard.Apply(spec); err != nil {
+			fmt.Fprintf(os.Stderr, "denyout hostctl: %v\n", err)
+			return 2
+		}
+		return 0
+	case "remove":
+		if !noElevate {
+			if err := hostguard.ElevateRemove(port, uid); err != nil {
+				fmt.Fprintf(os.Stderr, "denyout hostctl: %v\n", err)
+				return 2
+			}
+			return 0
+		}
+		if err := hostguard.Remove(spec); err != nil {
+			fmt.Fprintf(os.Stderr, "denyout hostctl: %v\n", err)
+			return 2
+		}
+		return 0
+	default:
+		fmt.Fprintf(os.Stderr, "denyout hostctl: unknown action %q\n", action)
+		return 2
+	}
+}
+
 func cmdDesktop(args []string) int {
 	cfgPath := ""
 	forceSetup := false
@@ -337,8 +433,8 @@ func cmdDesktop(args []string) int {
 		case a == "--help" || a == "-h":
 			fmt.Println(`Usage: denyout desktop [--setup] [--no-tray] [--no-open] [--config path]
 
-  Recommended entry for non-technical use: setup wizard + system tray/menu bar
-  + desktop notifications when something is blocked.
+  Recommended entry: Protect this computer (transparent redirect) + tray + notifications.
+  Advanced: protect a single program (same as denyout run).
 
   Install paths:
     CLI:  install.sh finishes with optional "denyout desktop"

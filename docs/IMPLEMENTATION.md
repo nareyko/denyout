@@ -42,7 +42,8 @@ Engineering tasks for the DenyOut MVP. Product deadlines and internal bets are t
 ## E. Audit + UX
 
 - [x] JSONL audit schema v1 ([`09-audit-and-ops.md`](09-audit-and-ops.md))
-- [x] Desktop UX: `denyout desktop` (tray + notifications + setup wizard); `denyout gui` advanced panel
+- [x] Desktop UX: `denyout desktop` Protect this computer (hostguard) + tray/notify/settings; Advanced process wrap; `denyout gui` technical panel
+- [x] `denyout hostctl` + `internal/hostguard` (linux nft / darwin pf / windows WinDivert bridge); whole_device policy + Ask mode
 - [x] Denial copy never prints raw secrets; OS notifications on deny (default)
 - [x] Install entries: `install.sh` optional desktop launch; Windows `Start-DenyOut.cmd` in release zip
 

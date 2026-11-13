@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>DenyOut Setup</title>
+  <title>DenyOut</title>
+  <link rel="icon" href="logo.svg" type="image/svg+xml" />
   <style>
     :root {
       --bg: #f7f5f1;
@@ -28,24 +29,17 @@
         radial-gradient(ellipse 50% 40% at 100% 10%, #e8e2d6 0%, transparent 50%),
         var(--bg);
     }
-    main {
-      max-width: 36rem;
-      margin: 0 auto;
-      padding: 2.25rem 1.25rem 3rem;
-    }
+    main { max-width: 36rem; margin: 0 auto; padding: 2rem 1.25rem 3rem; }
+    .hero { display: flex; align-items: center; gap: 0.85rem; margin-bottom: 0.35rem; }
+    .hero img { width: 3rem; height: 3rem; }
     .brand {
       font-family: var(--display);
       font-size: 2.35rem;
       font-weight: 600;
       letter-spacing: -0.03em;
-      margin: 0 0 0.35rem;
+      margin: 0;
     }
-    .lead {
-      color: var(--muted);
-      font-size: 1.05rem;
-      line-height: 1.45;
-      margin: 0 0 1.75rem;
-    }
+    .lead { color: var(--muted); font-size: 1.05rem; line-height: 1.45; margin: 0 0 1.5rem; }
     .panel {
       background: var(--card);
       border: 1px solid var(--line);
@@ -53,149 +47,105 @@
       padding: 1.15rem 1.2rem 1.25rem;
       margin-bottom: 1rem;
     }
-    h2 {
-      font-size: 1.05rem;
-      margin: 0 0 0.65rem;
+    h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
+    p.hint { margin: 0 0 1rem; color: var(--muted); font-size: 0.95rem; line-height: 1.4; }
+    label.row {
+      display: flex; gap: 0.55rem; align-items: flex-start;
+      font-size: 0.95rem; margin: 0.75rem 0 0;
     }
-    p.hint {
-      margin: 0 0 1rem;
-      color: var(--muted);
-      font-size: 0.95rem;
-      line-height: 1.4;
-    }
-    .choices {
-      display: grid;
-      gap: 0.55rem;
-    }
-    button.choice, button.primary, button.secondary {
-      font-family: var(--sans);
-      font-size: 1rem;
-      border-radius: 8px;
-      padding: 0.8rem 1rem;
-      cursor: pointer;
-      text-align: left;
-    }
-    button.choice {
-      background: #fafafa;
-      border: 1px solid var(--line);
-      color: var(--ink);
-    }
-    button.choice:hover, button.choice.selected {
-      border-color: var(--accent);
-      background: #f0faf4;
-    }
-    button.choice small {
-      display: block;
-      color: var(--muted);
-      font-size: 0.85rem;
-      margin-top: 0.2rem;
+    button.primary, button.secondary, button.choice {
+      font-family: var(--sans); font-size: 1rem; border-radius: 8px;
+      padding: 0.8rem 1rem; cursor: pointer;
     }
     button.primary {
-      background: var(--accent);
-      color: var(--accent-ink);
-      border: none;
-      font-weight: 600;
-      text-align: center;
-      width: 100%;
+      background: var(--accent); color: var(--accent-ink); border: none;
+      font-weight: 600; text-align: center; width: 100%;
     }
     button.primary:disabled { opacity: 0.45; cursor: not-allowed; }
     button.secondary {
-      background: transparent;
-      border: 1px solid var(--line);
-      width: 100%;
-      text-align: center;
-      margin-top: 0.5rem;
+      background: transparent; border: 1px solid var(--line);
+      width: 100%; text-align: center; margin-top: 0.5rem;
     }
-    label.row {
-      display: flex;
-      gap: 0.55rem;
-      align-items: flex-start;
-      font-size: 0.95rem;
-      margin: 0.75rem 0 0;
+    button.danger {
+      background: transparent; border: 1px solid var(--line); color: var(--warn);
+      width: 100%; margin-top: 0.5rem; border-radius: 8px; padding: 0.8rem 1rem; cursor: pointer;
     }
+    .status {
+      font-weight: 600; margin: 0.5rem 0 0; font-size: 0.95rem;
+    }
+    .status.on { color: var(--accent); }
+    .status.warn { color: var(--warn); }
+    details.advanced { margin-top: 0.5rem; }
+    details.advanced summary {
+      cursor: pointer; color: var(--muted); font-size: 0.95rem; margin-bottom: 0.75rem;
+    }
+    .choices { display: grid; gap: 0.55rem; }
+    button.choice {
+      background: #fafafa; border: 1px solid var(--line); color: var(--ink); text-align: left;
+    }
+    button.choice:hover, button.choice.selected {
+      border-color: var(--accent); background: #f0faf4;
+    }
+    button.choice small { display: block; color: var(--muted); font-size: 0.85rem; margin-top: 0.2rem; }
     input[type="text"] {
-      width: 100%;
-      margin-top: 0.5rem;
-      padding: 0.65rem 0.7rem;
-      border: 1px solid var(--line);
-      border-radius: 7px;
-      font-size: 0.95rem;
-    }
-    .cmd {
-      font-family: ui-monospace, monospace;
-      font-size: 0.85rem;
-      background: #f3f1ec;
-      border-radius: 6px;
-      padding: 0.7rem 0.8rem;
-      margin-top: 0.75rem;
-      word-break: break-all;
-    }
-    .ok {
-      color: var(--accent);
-      font-weight: 600;
+      width: 100%; margin-top: 0.5rem; padding: 0.65rem 0.7rem;
+      border: 1px solid var(--line); border-radius: 7px; font-size: 0.95rem;
     }
     .hidden { display: none; }
-    footer {
-      margin-top: 1.5rem;
-      color: var(--muted);
-      font-size: 0.85rem;
-      line-height: 1.4;
-    }
+    footer { margin-top: 1.25rem; color: var(--muted); font-size: 0.85rem; line-height: 1.4; }
   </style>
 </head>
 <body>
   <main>
-    <h1 class="brand">DenyOut</h1>
-    <p class="lead">Keeps your AI agent from sending data to random websites. Setup takes about a minute.</p>
+    <div class="hero">
+      <img src="logo.svg" alt="" width="48" height="48" />
+      <h1 class="brand">DenyOut</h1>
+    </div>
+    <p class="lead">Protects your outbound web while it is On — blocks secret-looking links and unsafe destinations. Not a full OS lockdown.</p>
 
-    <section class="panel" id="step-choose">
-      <h2>What do you want to protect?</h2>
-      <p class="hint">DenyOut starts your agent for you and blocks unexpected outbound requests.</p>
-      <div class="choices">
-        <button type="button" class="choice" data-agent="claude">Claude Code<small>Runs: claude</small></button>
-        <button type="button" class="choice" data-agent="cursor">Cursor agent<small>Runs: agent (Cursor CLI)</small></button>
-        <button type="button" class="choice" data-agent="shell">Terminal shell<small>Opens a protected shell</small></button>
-        <button type="button" class="choice" data-agent="custom">Something else<small>Enter your own command</small></button>
-      </div>
-      <div id="custom-wrap" class="hidden">
-        <input type="text" id="custom-cmd" placeholder="e.g. python my_agent.py" />
-      </div>
+    <section class="panel" id="panel-main">
+      <h2>Protect this computer</h2>
+      <p class="hint">Turns on for your user account. Needs an admin password once. Your browser keeps working; risky URLs are still blocked.</p>
+      <p class="status" id="status-line">Status: …</p>
+      <button type="button" class="primary" id="btn-on">Turn protection on</button>
+      <button type="button" class="danger hidden" id="btn-off">Turn protection off</button>
+
       <label class="row">
         <input type="checkbox" id="notify" checked />
-        <span>Show a desktop notification when something is blocked</span>
+        <span>Notify me when something is blocked</span>
       </label>
-      <div style="margin-top:1rem">
-        <button type="button" class="primary" id="btn-finish" disabled>Finish setup</button>
-        <button type="button" class="secondary" id="btn-skip">Skip for now — just use the menu</button>
-      </div>
+      <label class="row">
+        <input type="checkbox" id="ask" />
+        <span>Ask before allowing new sites (stricter)</span>
+      </label>
+      <button type="button" class="secondary" id="btn-save">Save settings</button>
     </section>
 
-    <section class="panel hidden" id="step-done">
-      <h2 class="ok">You're set</h2>
-      <p class="hint">DenyOut stays in your system tray / menu bar. Use it to start a protected agent anytime.</p>
-      <div class="cmd" id="done-cmd"></div>
-      <button type="button" class="primary" id="btn-run" style="margin-top:1rem">Protect and start now</button>
-      <button type="button" class="secondary" id="btn-close">Close this window</button>
+    <section class="panel">
+      <details class="advanced" id="advanced">
+        <summary>Advanced — protect a program only</summary>
+        <p class="hint">For developers and admins. Wraps one process with DenyOut (same as <code>denyout run</code>).</p>
+        <div class="choices">
+          <button type="button" class="choice" data-agent="claude">Claude Code<small>denyout run -- claude</small></button>
+          <button type="button" class="choice" data-agent="cursor">Cursor agent<small>denyout run -- agent</small></button>
+          <button type="button" class="choice" data-agent="shell">Terminal shell<small>Protected shell</small></button>
+          <button type="button" class="choice" data-agent="custom">Custom command<small>Your own command</small></button>
+        </div>
+        <div id="custom-wrap" class="hidden">
+          <input type="text" id="custom-cmd" placeholder="e.g. python my_agent.py" />
+        </div>
+        <button type="button" class="secondary" id="btn-wrap" style="margin-top:0.85rem" disabled>Start protected program</button>
+      </details>
     </section>
 
     <footer>
-      Advanced users can keep using the terminal: <code>denyout run -- &lt;command&gt;</code>.
-      This setup does not change your whole computer’s network — only the agent DenyOut starts.
+      While On, DenyOut protects this user’s outbound web (HTTP/HTTPS). It is not unbypassable.
+      CLI: <code>denyout run -- &lt;cmd&gt;</code> · <code>denyout hostctl</code>
     </footer>
   </main>
   <script>
     let agent = "";
     const $ = (id) => document.getElementById(id);
-
-    document.querySelectorAll("button.choice").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        document.querySelectorAll("button.choice").forEach((b) => b.classList.remove("selected"));
-        btn.classList.add("selected");
-        agent = btn.dataset.agent;
-        $("custom-wrap").classList.toggle("hidden", agent !== "custom");
-        $("btn-finish").disabled = false;
-      });
-    });
 
     async function api(path, body) {
       const r = await fetch(path, {
@@ -208,49 +158,68 @@
       return j;
     }
 
-    function commandPreview() {
-      if (agent === "claude") return "denyout run -- claude";
-      if (agent === "cursor") return "denyout run -- agent";
-      if (agent === "shell") return "denyout run -- $SHELL";
-      return "denyout run -- " + ($("custom-cmd").value || "<your command>");
+    function paintStatus(s) {
+      const el = $("status-line");
+      el.textContent = "Status: " + (s.status || "Off");
+      el.className = "status";
+      const on = !!s.computer_enabled || /protecting/i.test(s.status || "");
+      if (on) el.classList.add("on");
+      if (/needs|error/i.test(s.status || "")) el.classList.add("warn");
+      $("btn-on").classList.toggle("hidden", on);
+      $("btn-off").classList.toggle("hidden", !on);
+      if (typeof s.notify === "boolean") $("notify").checked = s.notify;
+      if (typeof s.ask_mode === "boolean") $("ask").checked = s.ask_mode;
     }
 
-    $("btn-finish").onclick = async () => {
+    async function refresh() {
+      const r = await fetch("/api/status");
+      const s = await r.json();
+      paintStatus(s);
+    }
+
+    $("btn-on").onclick = async () => {
       try {
-        await api("/api/setup", {
-          agent,
-          custom_command: $("custom-cmd").value,
-          notify: $("notify").checked,
-        });
-        $("step-choose").classList.add("hidden");
-        $("step-done").classList.remove("hidden");
-        $("done-cmd").textContent = commandPreview();
-      } catch (e) {
-        alert(e.message);
-      }
+        await api("/api/setup", { notify: $("notify").checked, ask_mode: $("ask").checked });
+        await api("/api/computer", { enabled: true });
+        await refresh();
+      } catch (e) { alert(e.message); await refresh(); }
+    };
+    $("btn-off").onclick = async () => {
+      try {
+        await api("/api/computer", { enabled: false });
+        await refresh();
+      } catch (e) { alert(e.message); }
+    };
+    $("btn-save").onclick = async () => {
+      try {
+        await api("/api/setup", { notify: $("notify").checked, ask_mode: $("ask").checked });
+        await api("/api/settings", { notify: $("notify").checked, ask_mode: $("ask").checked });
+        alert("Settings saved");
+        await refresh();
+      } catch (e) { alert(e.message); }
     };
 
-    $("btn-skip").onclick = async () => {
+    document.querySelectorAll("button.choice").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("button.choice").forEach((b) => b.classList.remove("selected"));
+        btn.classList.add("selected");
+        agent = btn.dataset.agent;
+        $("custom-wrap").classList.toggle("hidden", agent !== "custom");
+        $("btn-wrap").disabled = false;
+      });
+    });
+    $("btn-wrap").onclick = async () => {
       try {
-        await api("/api/setup", { agent: "shell", notify: $("notify").checked, skip: true });
-        $("step-choose").classList.add("hidden");
-        $("step-done").classList.remove("hidden");
-        $("done-cmd").textContent = "Use the DenyOut tray menu → Protect…";
-      } catch (e) {
-        alert(e.message);
-      }
+        await api("/api/protect", { agent, custom_command: $("custom-cmd").value });
+        alert("Protected program starting — check the tray.");
+      } catch (e) { alert(e.message); }
     };
 
-    $("btn-run").onclick = async () => {
-      try {
-        await api("/api/protect", {});
-        $("done-cmd").textContent = "Starting… check the tray menu for status.";
-      } catch (e) {
-        alert(e.message);
-      }
-    };
-
-    $("btn-close").onclick = () => window.close();
+    if (location.hash === "#advanced") {
+      $("advanced").open = true;
+    }
+    refresh();
+    setInterval(refresh, 3000);
   </script>
 </body>
 </html>

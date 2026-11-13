@@ -1,0 +1,67 @@
+package policy_test
+
+import (
+	"testing"
+
+	"github.com/nareyko/denyout/internal/policy"
+)
+
+func TestWholeDeviceAllowsWebBlocksSecretsAndSSRF(t *testing.T) {
+	cfg, err := policy.DefaultWholeDevice()
+	if err != nil {
+		t.Fatal(err)
+	}
+	eng := policy.NewEngine(cfg)
+
+	allow, err := eng.EvaluateURL("https://example.com/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if allow.Verdict != "allow" {
+		t.Fatalf("example.com: want allow, got %+v", allow)
+	}
+
+	secret, err := eng.EvaluateURL("https://example.com/?api_key=sk-ant-testvalue123456")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if secret.Verdict != "deny" {
+		t.Fatalf("secret URL: want deny, got %+v", secret)
+	}
+
+	meta, err := eng.EvaluateURL("http://169.254.169.254/latest/meta-data/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if meta.Verdict != "deny" {
+		t.Fatalf("metadata: want deny, got %+v", meta)
+	}
+}
+
+func TestWholeDeviceAskDeniesUnknownUntilAllow(t *testing.T) {
+	cfg, err := policy.DefaultWholeDeviceAsk(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	eng := policy.NewEngine(cfg)
+	d, err := eng.EvaluateURL("https://example.com/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Verdict != "deny" {
+		t.Fatalf("ask mode unknown host: want deny, got %+v", d)
+	}
+
+	cfg2, err := policy.DefaultWholeDeviceAsk([]policy.Rule{{Host: "example.com", Reason: "user_always"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	eng2 := policy.NewEngine(cfg2)
+	d2, err := eng2.EvaluateURL("https://example.com/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d2.Verdict != "allow" {
+		t.Fatalf("after allow: want allow, got %+v", d2)
+	}
+}

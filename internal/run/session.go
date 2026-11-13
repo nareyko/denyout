@@ -20,10 +20,15 @@ import (
 // SessionOptions starts a proxy wrap without necessarily spawning a child.
 type SessionOptions struct {
 	ConfigPath string
+	Config     *policy.Config // if set, used instead of ConfigPath / default models
 	TLSMode    proxy.TLSMode
 	Version    string
 	Sandbox    string
 	OnDeny     proxy.DenyHook
+	ListenPort  int    // 0 = ephemeral
+	CADir       string // empty = temp session CA
+	PersistCA   bool   // if true, do not shred CA on Stop
+	Transparent bool   // raw TCP redirect mode for hostguard
 }
 
 // Status is a snapshot of an active wrap session.
@@ -41,12 +46,13 @@ type Status struct {
 
 // Session holds a live local proxy for GUI / programmatic wrap.
 type Session struct {
-	mu     sync.Mutex
-	cancel context.CancelFunc
-	srv    *proxy.Server
-	sink   *audit.Sink
-	ca     *proxy.SessionCA
-	status Status
+	mu        sync.Mutex
+	cancel    context.CancelFunc
+	srv       *proxy.Server
+	sink      *audit.Sink
+	ca        *proxy.SessionCA
+	persistCA bool
+	status    Status
 }
 
 // StartSession starts the policy proxy (same engine as denyout run).
@@ -60,13 +66,17 @@ func StartSession(opts SessionOptions) (*Session, error) {
 		raw []byte
 		err error
 	)
-	if opts.ConfigPath != "" {
+	switch {
+	case opts.Config != nil:
+		cfg = opts.Config
+		raw = []byte("inline-config")
+	case opts.ConfigPath != "":
 		raw, err = os.ReadFile(opts.ConfigPath)
 		if err != nil {
 			return nil, err
 		}
 		cfg, err = policy.LoadBytes(raw)
-	} else {
+	default:
 		cfg, err = policy.DefaultEnforceModels()
 		if err == nil {
 			raw = []byte("preset:models")
@@ -95,8 +105,15 @@ func StartSession(opts SessionOptions) (*Session, error) {
 
 	var ca *proxy.SessionCA
 	if opts.TLSMode == proxy.TLSIntercept {
-		caDir := filepath.Join(os.TempDir(), "denyout-ca-"+sessionID)
-		ca, err = proxy.NewSessionCA(caDir)
+		caDir := opts.CADir
+		if caDir == "" {
+			caDir = filepath.Join(os.TempDir(), "denyout-ca-"+sessionID)
+		}
+		if opts.PersistCA {
+			ca, err = proxy.LoadOrCreatePersistentCA(caDir)
+		} else {
+			ca, err = proxy.NewSessionCA(caDir)
+		}
 		if err != nil {
 			_ = sink.Close()
 			return nil, fmt.Errorf("session CA: %w", err)
@@ -117,13 +134,14 @@ func StartSession(opts SessionOptions) (*Session, error) {
 		Version:    opts.Version,
 		TLSMode:    opts.TLSMode,
 		CA:         ca,
-		ListenHost: "127.0.0.1",
-		ListenPort: 0,
-		OnDeny:     opts.OnDeny,
+		ListenHost:  "127.0.0.1",
+		ListenPort:  opts.ListenPort,
+		OnDeny:      opts.OnDeny,
+		Transparent: opts.Transparent,
 	})
 	if err != nil {
 		cancel()
-		if ca != nil {
+		if ca != nil && !opts.PersistCA {
 			ca.Shred()
 		}
 		_ = sink.Close()
@@ -154,10 +172,11 @@ func StartSession(opts SessionOptions) (*Session, error) {
 	})
 
 	s := &Session{
-		cancel: cancel,
-		srv:    srv,
-		sink:   sink,
-		ca:     ca,
+		cancel:    cancel,
+		srv:       srv,
+		sink:      sink,
+		ca:        ca,
+		persistCA: opts.PersistCA,
 		status: Status{
 			Running:    true,
 			SessionID:  sessionID,
@@ -171,6 +190,26 @@ func StartSession(opts SessionOptions) (*Session, error) {
 		},
 	}
 	return s, nil
+}
+
+// CACertFile returns the active CA PEM path, if any.
+func (s *Session) CACertFile() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.ca == nil {
+		return ""
+	}
+	return s.ca.CertFile()
+}
+
+// Port returns the proxy listen port.
+func (s *Session) Port() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.srv == nil {
+		return 0
+	}
+	return s.srv.Port()
 }
 
 // Status returns a copy of the session snapshot.
@@ -211,7 +250,7 @@ func (s *Session) Stop() error {
 		DenyOutVersion: "",
 	})
 	_ = s.sink.Close()
-	if s.ca != nil {
+	if s.ca != nil && !s.persistCA {
 		s.ca.Shred()
 	}
 	s.status.Running = false
