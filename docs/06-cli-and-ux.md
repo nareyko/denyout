@@ -61,8 +61,10 @@ denyout policy validate -c denyout.yaml
 ### 3.4 `denyout audit tail`
 
 ```bash
-denyout audit tail -f ~/.local/state/denyout/audit.jsonl
+denyout audit tail [-n 50] [--denials] [--path FILE]
 ```
+
+Defaults to the desktop audit path (`~/.local/state/denyout/audit.jsonl`). `--denials` filters to deny / would_deny only.
 
 ### 3.5 `denyout init`
 
@@ -82,7 +84,7 @@ denyout desktop [--install] [--setup] [--no-tray] [--web-ui] [--no-open]
 
 - `--install` — autostart, try **Computer** once, fallback **Session**, detach tray (used by `install.sh`).
 - Scopes: **Computer** (hostguard + admin) vs **Session** (proxy env, no admin).
-- Tray: scope toggle, notify/Ask settings, Open logs.
+- Tray: scope toggle (checkmark on active mode), notify/Ask settings, **Open activity…** (local denial history + settings), **Open diagnostics…**, Copy last error.
 
 `install.sh` auto-detects Desktop vs Server; force with `--desktop` / `--server`. Windows zip includes `Start-DenyOut.cmd`.
 

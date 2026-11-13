@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DenyOut — Activity</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a222c;
+      --text: #e7ecf1;
+      --muted: #8b98a5;
+      --accent: #3d9a6a;
+      --warn: #c9a227;
+      --line: #2a3542;
+      --deny: #d4544a;
+      --font: "IBM Plex Sans", "Segoe UI", sans-serif;
+      --mono: "IBM Plex Mono", "Consolas", monospace;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: var(--font);
+      color: var(--text);
+      background:
+        radial-gradient(ellipse 80% 50% at 10% -10%, #1e3a2f 0%, transparent 55%),
+        radial-gradient(ellipse 60% 40% at 100% 0%, #243044 0%, transparent 50%),
+        var(--bg);
+    }
+    main {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 2rem 1.25rem 3rem;
+    }
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin: 0 0 0.25rem;
+    }
+    .sub { color: var(--muted); margin: 0 0 1.75rem; font-size: 0.95rem; }
+    section { margin-bottom: 1.75rem; }
+    h2 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin: 0 0 0.65rem;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 1rem 1.1rem;
+    }
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem 1.25rem;
+      align-items: baseline;
+      margin-bottom: 0.5rem;
+    }
+    .row:last-child { margin-bottom: 0; }
+    .k { color: var(--muted); min-width: 7rem; font-size: 0.85rem; }
+    .v { font-family: var(--mono); font-size: 0.9rem; }
+    .mode-btns, .toggles { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+    button {
+      font: inherit;
+      cursor: pointer;
+      border: 1px solid var(--line);
+      background: #121820;
+      color: var(--text);
+      border-radius: 8px;
+      padding: 0.45rem 0.85rem;
+    }
+    button:hover { border-color: var(--muted); }
+    button.active {
+      border-color: var(--accent);
+      background: #163028;
+      color: #b8e6c8;
+    }
+    button:disabled { opacity: 0.45; cursor: default; }
+    label.toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.9rem;
+      padding: 0.35rem 0.6rem;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    ul.denials {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      max-height: 22rem;
+      overflow: auto;
+    }
+    ul.denials li {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      padding: 0.55rem 0;
+      border-bottom: 1px solid var(--line);
+      line-height: 1.4;
+    }
+    ul.denials li:last-child { border-bottom: none; }
+    .host { color: var(--deny); }
+    .empty { color: var(--muted); margin: 0; font-size: 0.9rem; }
+    .hints { margin: 0.75rem 0 0; padding: 0; list-style: none; }
+    .hints li {
+      font-size: 0.85rem;
+      color: var(--warn);
+      margin-bottom: 0.4rem;
+      padding-left: 0.85rem;
+      border-left: 2px solid var(--warn);
+    }
+    .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+    a.link {
+      color: #7eb8ff;
+      font-size: 0.85rem;
+      text-decoration: none;
+    }
+    a.link:hover { text-decoration: underline; }
+    footer { color: var(--muted); font-size: 0.8rem; margin-top: 2rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>DenyOut</h1>
+    <p class="sub">Activity &amp; settings — local only (127.0.0.1)</p>
+
+    <section>
+      <h2>Status</h2>
+      <div class="panel">
+        <div class="row"><span class="k">Mode</span><span class="v" id="mode">—</span></div>
+        <div class="row"><span class="k">Protection</span><span class="v" id="protection">—</span></div>
+        <div class="row"><span class="k">Version</span><span class="v" id="version">—</span></div>
+        <div class="row"><span class="k">Last block</span><span class="v" id="last-deny">none</span></div>
+        <div class="row"><span class="k">Audit</span><span class="v" id="audit-path">—</span></div>
+        <div class="row"><span class="k">Diagnostics</span><span class="v" id="diag-dir">—</span></div>
+        <ul class="hints" id="hints"></ul>
+        <div class="mode-btns">
+          <button type="button" id="btn-computer" data-mode="computer">Computer</button>
+          <button type="button" id="btn-session" data-mode="session">Session</button>
+          <button type="button" id="btn-off" data-mode="off">Off</button>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Settings</h2>
+      <div class="panel">
+        <div class="toggles">
+          <label class="toggle"><input type="checkbox" id="notify" /> Notifications</label>
+          <label class="toggle"><input type="checkbox" id="ask" /> Ask before new sites</label>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Activity</h2>
+      <div class="panel">
+        <ul class="denials" id="denials"></ul>
+        <p class="empty" id="denials-empty">No deny events yet.</p>
+        <div class="actions">
+          <button type="button" id="btn-refresh">Refresh</button>
+          <a class="link" id="open-audit" href="#">Open audit folder</a>
+        </div>
+      </div>
+    </section>
+
+    <footer>Tray stays the fast control. This page is for history and settings.</footer>
+  </main>
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    async function api(path, opts) {
+      const r = await fetch(path, opts);
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || r.statusText);
+      return j;
+    }
+
+    function renderStatus(s) {
+      $("mode").textContent = s.mode_label || s.mode || "—";
+      $("protection").textContent = s.protection_on ? "on" : "off";
+      $("version").textContent = s.version || "—";
+      const last = s.last_deny_host
+        ? s.last_deny_host + (s.last_deny_summary ? " — " + s.last_deny_summary : "")
+        : "none";
+      $("last-deny").textContent = last;
+      $("audit-path").textContent = s.audit_path || "—";
+      $("diag-dir").textContent = s.diagnostics_dir || "—";
+      $("notify").checked = !!s.notify;
+      $("ask").checked = !!s.ask_mode;
+
+      const mode = s.mode || "off";
+      ["computer", "session", "off"].forEach((m) => {
+        const btn = $("btn-" + m);
+        btn.classList.toggle("active", mode === m);
+        btn.disabled = mode === m;
+      });
+
+      const hints = $("hints");
+      hints.innerHTML = "";
+      (s.hints || []).forEach((h) => {
+        const li = document.createElement("li");
+        li.textContent = h;
+        hints.appendChild(li);
+      });
+
+      $("open-audit").onclick = (ev) => {
+        ev.preventDefault();
+        const dir = (s.diagnostics_dir || "").replace(/[/\\][^/\\]*$/, "") || s.diagnostics_dir;
+        // Path is shown; folder open is via tray Open diagnostics.
+        navigator.clipboard?.writeText(s.audit_path || "").catch(() => {});
+        alert("Audit path copied (if clipboard allowed):\n" + (s.audit_path || ""));
+      };
+    }
+
+    function renderDenials(list) {
+      const ul = $("denials");
+      const empty = $("denials-empty");
+      ul.innerHTML = "";
+      if (!list || !list.length) {
+        empty.hidden = false;
+        return;
+      }
+      empty.hidden = true;
+      list.slice().reverse().forEach((e) => {
+        const li = document.createElement("li");
+        const host = (e.network && e.network.dest_host) || "?";
+        const reasons = (e.reasons || []).join(", ") || "-";
+        const mode = e.mode || "";
+        li.innerHTML =
+          (e.ts || "") +
+          '  <span class="host">' +
+          host +
+          "</span>  [" +
+          reasons +
+          "]" +
+          (mode ? "  · " + mode : "");
+        ul.appendChild(li);
+      });
+    }
+
+    async function refresh() {
+      const s = await api("/api/desktop/status");
+      renderStatus(s);
+      const d = await api("/api/desktop/denials?limit=80");
+      renderDenials(d.events || []);
+    }
+
+    document.querySelectorAll("[data-mode]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        try {
+          await api("/api/desktop/mode", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ mode: btn.dataset.mode }),
+          });
+          await refresh();
+        } catch (e) {
+          alert(e.message);
+        }
+      });
+    });
+
+    async function saveSettings() {
+      try {
+        await api("/api/desktop/settings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            notify: $("notify").checked,
+            ask_mode: $("ask").checked,
+          }),
+        });
+        await refresh();
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+    $("notify").onchange = saveSettings;
+    $("ask").onchange = saveSettings;
+    $("btn-refresh").onclick = () => refresh().catch((e) => alert(e.message));
+
+    refresh().catch((e) => {
+      $("denials-empty").textContent = "Failed to load: " + e.message;
+    });
+    setInterval(() => refresh().catch(() => {}), 5000);
+  </script>
+</body>
+</html>

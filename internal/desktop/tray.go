@@ -15,7 +15,7 @@ import (
 func (a *App) runTray(ctx context.Context) error {
 	tray := systray.New()
 	tray.SetIcon(iconIdlePNG)
-	tray.SetTooltip("DenyOut")
+	tray.SetTooltip("DenyOut — Off")
 	tray.SetAppName("DenyOut")
 
 	menu := systray.NewMenu()
@@ -25,18 +25,34 @@ func (a *App) runTray(ctx context.Context) error {
 	lastItem.SetDisabled(true)
 	menu.AddSeparator()
 
-	menu.Add("Protect whole computer", func() {
-		a.enableComputerFromTray()
+	computerItem := menu.Add("Computer", func() {
+		_ = a.enableComputerFromTray()
 	})
-	menu.Add("Protect this session (proxy)", func() {
-		a.enableSessionFromTray()
+	sessionItem := menu.Add("Session (proxy)", func() {
+		_ = a.enableSessionFromTray()
 	})
-	menu.Add("Turn protection off", func() {
-		a.stopProtection()
+	offItem := menu.Add("Off", func() {
+		a.stopProtectionFromTray()
 	})
 	menu.AddSeparator()
 
-	menu.Add("Settings: toggle notifications", func() {
+	menu.Add("Open activity…", func() {
+		u := a.activityPageURL()
+		if u == "" {
+			notify.Info("DenyOut", "Activity page not ready yet.")
+			return
+		}
+		openBrowser(u)
+	})
+	menu.Add("Open diagnostics…", func() {
+		openLogsOrPrint()
+	})
+	menu.Add("Copy last error", func() {
+		copyLastErrorOrPrint()
+	})
+	menu.AddSeparator()
+
+	notifyItem := menu.Add("Notifications", func() {
 		a.mu.Lock()
 		a.state.Notify = !a.state.Notify
 		on := a.state.Notify
@@ -46,7 +62,7 @@ func (a *App) runTray(ctx context.Context) error {
 		notify.SetEnabled(on)
 		fmt.Fprintf(os.Stderr, "denyout desktop: notifications=%v\n", on)
 	})
-	menu.Add("Settings: toggle Ask before new sites", func() {
+	askItem := menu.Add("Ask before new sites", func() {
 		a.mu.Lock()
 		a.state.AskMode = !a.state.AskMode
 		ask := a.state.AskMode
@@ -58,12 +74,6 @@ func (a *App) runTray(ctx context.Context) error {
 		if wasOn {
 			a.restartActiveProtector()
 		}
-	})
-	menu.Add("Open logs…", func() {
-		openLogsOrPrint()
-	})
-	menu.Add("Copy last error", func() {
-		copyLastErrorOrPrint()
 	})
 	menu.AddSeparator()
 	menu.Add("Advanced: protect shell", func() {
@@ -102,26 +112,24 @@ func (a *App) runTray(ctx context.Context) error {
 		for {
 			select {
 			case <-ctx.Done():
-				a.stopProtection()
+				// Signal / reinstall: stop processes but keep ProtectionOn for next restore.
+				// (Quit menu still calls stopProtection() to clear restore preference.)
+				a.stopAll()
 				a.stopProtect()
 				tray.Remove()
 				return
 			case <-t.C:
+				mode := a.currentMode()
 				a.mu.Lock()
 				st := a.status
 				last := a.lastDeny
-				on := a.session != nil || a.proxyd != nil
-				scope := a.state.Scope
+				notifyOn := a.state.Notify
+				askOn := a.state.AskMode
 				avail := a.state.ComputerAvailable
 				a.mu.Unlock()
-				label := st
-				if on && scope == ScopeSession {
-					label = "Session (proxy)"
-				}
-				if on && scope == ScopeComputer {
-					label = "Computer"
-				}
-				if !avail && !on {
+
+				label := modeLabel(mode)
+				if mode == ModeOff && !avail {
 					label = "Off (computer unavailable)"
 				}
 				statusItem.SetLabel("Status: " + label)
@@ -130,10 +138,23 @@ func (a *App) runTray(ctx context.Context) error {
 				} else {
 					lastItem.SetLabel("Last block: " + last)
 				}
+
+				computerItem.SetLabel(checkedLabel("Computer", mode == ModeComputer))
+				computerItem.SetDisabled(mode == ModeComputer)
+				sessionItem.SetLabel(checkedLabel("Session (proxy)", mode == ModeSession))
+				sessionItem.SetDisabled(mode == ModeSession)
+				offItem.SetLabel(checkedLabel("Off", mode == ModeOff))
+				offItem.SetDisabled(mode == ModeOff)
+
+				notifyItem.SetLabel(checkedLabel("Notifications", notifyOn))
+				askItem.SetLabel(checkedLabel("Ask before new sites", askOn))
+
+				tray.SetTooltip("DenyOut — " + modeLabel(mode))
+
 				switch {
 				case strings.Contains(strings.ToLower(st), "error"), strings.Contains(st, "Needs"):
 					tray.SetIcon(iconAlertPNG)
-				case on:
+				case mode != ModeOff:
 					tray.SetIcon(iconOnPNG)
 				default:
 					tray.SetIcon(iconIdlePNG)
@@ -142,19 +163,26 @@ func (a *App) runTray(ctx context.Context) error {
 		}
 	}()
 
-	fmt.Fprintln(os.Stderr, "denyout desktop: tray ready — Computer / Session / Logs / Quit")
+	fmt.Fprintln(os.Stderr, "denyout desktop: tray ready — Computer / Session / Activity / Quit")
 	errCh := make(chan error, 1)
 	go func() { errCh <- tray.Run() }()
 
 	select {
 	case <-ctx.Done():
-		a.stopProtection()
+		a.stopAll()
 		a.stopProtect()
 		tray.Remove()
 		return nil
 	case err := <-errCh:
-		a.stopProtection()
+		a.stopAll()
 		a.stopProtect()
 		return err
 	}
+}
+
+func checkedLabel(base string, on bool) string {
+	if on {
+		return base + " ✓"
+	}
+	return base
 }

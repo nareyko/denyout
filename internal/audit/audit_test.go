@@ -48,3 +48,72 @@ func TestLogJSONLRequiredFields(t *testing.T) {
 		t.Fatalf("RecentDenials=%v", evs)
 	}
 }
+
+func TestRotateAndTail(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "audit.jsonl")
+	s, err := audit.Open(path, false, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// ~300+ bytes per event → rotate after a few lines, then keep headroom for a final deny.
+	s.SetMaxBytes(900)
+	for i := 0; i < 20; i++ {
+		if err := s.Log(audit.Event{
+			SessionID:  "s1",
+			Verdict:    "allow",
+			Reasons:    []string{"ok"},
+			Mode:       "enforce",
+			Network:    audit.Network{DestHost: "ok.example", DestPort: 443},
+			PolicyHash: "sha256:abc",
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	baks := 0
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".bak") {
+			baks++
+		}
+	}
+	if baks < 1 {
+		t.Fatalf("expected rotated .bak after bulk allows, entries=%v", entries)
+	}
+	s.SetMaxBytes(-1) // keep final deny in the active file
+	if err := s.Log(audit.Event{
+		SessionID:  "s1",
+		Verdict:    "deny",
+		Reasons:    []string{"host_not_allowed"},
+		Mode:       "enforce",
+		Network:    audit.Network{DestHost: "evil.example", DestPort: 443},
+		PolicyHash: "sha256:abc",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	_ = s.Close()
+
+	all, err := audit.TailEvents(path, 100, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all) == 0 {
+		t.Fatal("expected events in current file after rotate")
+	}
+	denies, err := audit.TailEvents(path, 10, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, ev := range denies {
+		if ev.Network.DestHost == "evil.example" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("deny missing in tail: %+v", denies)
+	}
+}

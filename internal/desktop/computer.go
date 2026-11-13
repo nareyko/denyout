@@ -52,6 +52,12 @@ func (a *App) startComputer() error {
 		RecordError("hostguard.ElevateApply", err.Error())
 		return err
 	}
+	// Chrome/Electron use NSS, not only the system trust store.
+	if err := hostguard.TrustCAForUserBrowsers(caPath); err != nil {
+		AppendDesktopLog("WARN browser CA trust (NSS): %v — Chrome may show SSL errors", err)
+	} else {
+		AppendDesktopLog("INFO browser CA trusted in user NSS DB")
+	}
 
 	self, err := os.Executable()
 	if err != nil {
@@ -235,7 +241,11 @@ func (a *App) allowHostAlways(host string) error {
 	return nil
 }
 
-func (a *App) enableComputerFromTray() {
+func (a *App) enableComputerFromTray() error {
+	if a.currentMode() == ModeComputer {
+		notify.Info("DenyOut", "Already protecting whole computer.")
+		return nil
+	}
 	a.stopSession()
 	a.mu.Lock()
 	a.state.ComputerAvailable = true // user explicitly retries
@@ -245,22 +255,43 @@ func (a *App) enableComputerFromTray() {
 	if err := a.startComputer(); err != nil {
 		fmt.Fprintf(os.Stderr, "denyout desktop: %v\n", err)
 		a.setStatus("Needs admin")
-		notify.Info("DenyOut", "Admin failed — tray → Copy last error / Open logs. Session mode on.")
+		notify.Info("DenyOut", "Admin failed — tray → Copy last error / Open diagnostics. Session mode on.")
 		_ = a.startSession()
-		return
+		return err
 	}
 	AppendDesktopLog("INFO computer mode on")
+	if !certutilAvailable() {
+		AppendDesktopLog("INFO hint: install libnss3-tools (certutil) for Chrome/Chromium trust")
+	}
+	if !clipboardAvailable() {
+		AppendDesktopLog("INFO hint: install wl-clipboard for Copy last error")
+	}
 	notify.Info("DenyOut", "Protect whole computer is on.")
+	return nil
 }
 
-func (a *App) enableSessionFromTray() {
+func (a *App) enableSessionFromTray() error {
+	if a.currentMode() == ModeSession {
+		notify.Info("DenyOut", "Already in session mode.")
+		return nil
+	}
 	a.stopComputerOpts(false, true) // leaving computer → Remove once
 	if err := a.startSession(); err != nil {
 		fmt.Fprintf(os.Stderr, "denyout desktop: %v\n", err)
 		a.setStatus("Error")
-		return
+		return err
 	}
 	notify.Info("DenyOut", "Session mode: apps that use system proxy. Browsers may ignore it.")
+	return nil
+}
+
+func (a *App) stopProtectionFromTray() {
+	if a.currentMode() == ModeOff {
+		notify.Info("DenyOut", "Protection is already off.")
+		return
+	}
+	a.stopProtection()
+	notify.Info("DenyOut", "Protection is off.")
 }
 
 func (a *App) restartActiveProtector() {
@@ -308,7 +339,7 @@ func (a *App) restoreProtection() {
 			st := a.state
 			a.mu.Unlock()
 			_ = SaveState(st)
-			notify.Info("DenyOut", "Admin failed — Open logs / Copy last error. Using Session mode.")
+			notify.Info("DenyOut", "Admin failed — Open diagnostics / Copy last error. Using Session mode.")
 			if err := a.startSession(); err != nil {
 				RecordError("restore.session", err.Error())
 			}

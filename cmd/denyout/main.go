@@ -9,10 +9,12 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/nareyko/denyout/internal/audit"
 	"github.com/nareyko/denyout/internal/check"
 	"github.com/nareyko/denyout/internal/desktop"
 	"github.com/nareyko/denyout/internal/gui"
@@ -63,6 +65,8 @@ func runMain(args []string) int {
 		return cmdHostctl(args[1:])
 	case "serve":
 		return cmdServe(args[1:])
+	case "audit":
+		return cmdAudit(args[1:])
 	default:
 		fmt.Fprintf(os.Stderr, "denyout: unknown command %q\n\n", args[0])
 		printHelp(os.Stderr)
@@ -88,6 +92,7 @@ Commands:
   hostctl              Privileged helper for transparent redirect + CA (elevated)
   gui                  Advanced localhost UI (technical)
   serve -c <file>      Long-running sidecar proxy (pair with NetworkPolicy)
+  audit tail           Show recent audit.jsonl events (desktop path by default)
 
 Install and security boundaries: https://denyout.com · docs in this repo.
 `)
@@ -517,11 +522,10 @@ func cmdHostctlProxyd(args []string) int {
 					break
 				}
 			}
-			if controlURL != "" {
-				go postControlDenyEvent(controlURL, host, reasons)
-			}
 			if ask && hostNotAllowed {
 				if controlURL != "" {
+					// Update tray last-deny without toast; Ask dialog follows.
+					go postControlDenyEvent(controlURL, host, reasons, false)
 					action := askViaControl(controlURL, host)
 					switch action {
 					case "once":
@@ -541,6 +545,11 @@ func cmdHostctlProxyd(args []string) int {
 					go notify.Ask(notify.AskOptions{Host: host, OpenURL: u})
 					return
 				}
+			}
+			if controlURL != "" {
+				// Tray process owns toast + LastDenySummary (avoid duplicate notify).
+				go postControlDenyEvent(controlURL, host, reasons, true)
+				return
 			}
 			notify.Deny(host, reasons)
 		},
@@ -590,14 +599,80 @@ func postControlAlways(base, host string) {
 	}
 }
 
-func postControlDenyEvent(base, host string, reasons []string) {
+func postControlDenyEvent(base, host string, reasons []string, doNotify bool) {
 	u := strings.TrimRight(base, "/") + "/deny-event"
-	body, _ := json.Marshal(map[string]any{"host": host, "reasons": reasons})
+	body, _ := json.Marshal(map[string]any{"host": host, "reasons": reasons, "notify": doNotify})
 	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Post(u, "application/json", bytes.NewReader(body))
 	if err == nil {
 		resp.Body.Close()
 	}
+}
+
+func cmdAudit(args []string) int {
+	if len(args) == 0 || args[0] == "--help" || args[0] == "-h" {
+		fmt.Println(`Usage: denyout audit tail [-n N] [--denials] [--path FILE]
+
+  Show recent events from audit.jsonl (desktop path by default).
+  --denials  only deny / would_deny
+  -n N       number of events (default 50)`)
+		return 0
+	}
+	if args[0] != "tail" {
+		fmt.Fprintf(os.Stderr, "denyout audit: unknown subcommand %q (want: tail)\n", args[0])
+		return 2
+	}
+	limit := 50
+	denialsOnly := false
+	path := ""
+	for i := 1; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case a == "--denials":
+			denialsOnly = true
+		case a == "-n" || a == "--limit":
+			i++
+			if i >= len(args) {
+				fmt.Fprintln(os.Stderr, "denyout audit tail: -n requires a number")
+				return 2
+			}
+			n, err := strconv.Atoi(args[i])
+			if err != nil || n <= 0 {
+				fmt.Fprintf(os.Stderr, "denyout audit tail: invalid -n %q\n", args[i])
+				return 2
+			}
+			limit = n
+		case a == "--path":
+			i++
+			if i >= len(args) {
+				fmt.Fprintln(os.Stderr, "denyout audit tail: --path requires a file")
+				return 2
+			}
+			path = args[i]
+		case a == "--help" || a == "-h":
+			return cmdAudit(nil)
+		default:
+			fmt.Fprintf(os.Stderr, "denyout audit tail: unknown flag %q\n", a)
+			return 2
+		}
+	}
+	if path == "" {
+		path = desktop.AuditLogPath()
+	}
+	events, err := audit.TailEvents(path, limit, denialsOnly)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "denyout audit tail: %v\n", err)
+		return 1
+	}
+	if len(events) == 0 {
+		fmt.Fprintln(os.Stderr, "denyout audit tail: no events")
+		return 0
+	}
+	enc := json.NewEncoder(os.Stdout)
+	for _, ev := range events {
+		_ = enc.Encode(ev)
+	}
+	return 0
 }
 
 func cmdDesktop(args []string) int {

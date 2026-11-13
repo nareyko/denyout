@@ -71,7 +71,8 @@ Prometheus-style:
 
 ## 5. Retention
 
-Default desktop: rotate JSONL at 50MB, keep 7 days.  
+Default desktop: rotate `audit.jsonl` at ~32 MiB; keep the last 3 rotated `*.bak` files.  
+CLI: `denyout audit tail [-n N] [--denials] [--path FILE]`.  
 Server: rely on platform logging stack; local file optional.
 
 ## 6. Operational runbooks (outline)

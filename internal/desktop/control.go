@@ -8,18 +8,26 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/nareyko/denyout/internal/notify"
 )
 
-// startControlServer listens on 127.0.0.1 for proxyd Ask IPC.
+// startControlServer listens on 127.0.0.1 for proxyd Ask IPC and the Activity page.
 // GET/POST /ask?host=… → native dialog → {"action":"once|always|deny"}
 // POST /always {"host":"…"} persists Always allow.
+// GET /activity + /api/desktop/* for local Activity/Settings UI.
 func (a *App) startControlServer(ctx context.Context) (string, error) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ask", a.handleControlAsk)
 	mux.HandleFunc("/always", a.handleControlAlways)
 	mux.HandleFunc("/deny-event", a.handleControlDenyEvent)
+	a.registerActivityRoutes(mux)
 
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	listen := "127.0.0.1:0"
+	if a.opts.ControlListen != "" {
+		listen = a.opts.ControlListen
+	}
+	ln, err := net.Listen("tcp", listen)
 	if err != nil {
 		return "", err
 	}
@@ -35,6 +43,7 @@ func (a *App) startControlServer(ctx context.Context) (string, error) {
 	a.mu.Lock()
 	a.controlURL = url
 	a.mu.Unlock()
+	AppendDesktopLog("INFO activity page %s/activity", url)
 	return url, nil
 }
 
@@ -96,15 +105,31 @@ func (a *App) handleControlDenyEvent(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Host    string   `json:"host"`
 		Reasons []string `json:"reasons"`
+		Notify  *bool    `json:"notify"` // default true; false when Ask dialog follows
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
+	doNotify := body.Notify == nil || *body.Notify
 	if body.Host != "" {
+		summary := notify.HumanReasons(body.Reasons)
 		a.mu.Lock()
 		a.lastDeny = body.Host
 		a.state.LastDenyHost = body.Host
+		a.state.LastDenySummary = summary
+		ask := a.state.AskMode
 		st := a.state
 		a.mu.Unlock()
 		_ = SaveState(st)
+
+		hostNotAllowed := false
+		for _, rsn := range body.Reasons {
+			if rsn == "host_not_allowed" {
+				hostNotAllowed = true
+				break
+			}
+		}
+		if doNotify && !(ask && hostNotAllowed) {
+			notify.Deny(body.Host, body.Reasons)
+		}
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = fmt.Fprint(w, `{"ok":true}`)

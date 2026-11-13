@@ -38,11 +38,15 @@ func ReadmePath() string {
 	return filepath.Join(LogDir(), "README.txt")
 }
 
-const logsReadme = `DenyOut logs — which file to send
+const logsReadme = `DenyOut diagnostics — which file to send
 
 1) last-error.txt  ← SEND THIS for admin / protect failures
 2) desktop.log     ← send if last-error is empty or unclear
 3) audit.jsonl     ← traffic decisions (allow/deny). NOT an admin error log.
+   Rotates when large (~32 MiB). Use: denyout audit tail --denials
+
+Tray → "Open activity…" for denial history + settings.
+Tray → "Open diagnostics…" opens this folder (last-error / desktop.log).
 
 If last-error.txt says "No errors recorded yet", Protect is OK or the
 failure was not recorded. Prefer tray → "Copy last error".
@@ -62,7 +66,7 @@ func AppendDesktopLog(format string, args ...any) {
 	fmt.Fprint(os.Stderr, line)
 }
 
-// RecordError persists the last error for tray "Open logs" / "Copy last error".
+// RecordError persists the last error for tray "Open diagnostics" / "Copy last error".
 func RecordError(kind, detail string) {
 	AppendDesktopLog("ERROR [%s] %s", kind, detail)
 	_ = os.MkdirAll(LogDir(), 0o755)
@@ -167,25 +171,37 @@ func copyToClipboard(text string) error {
 }
 
 func openLogsOrPrint() {
-	AppendDesktopLog("INFO open logs dir=%s", LogDir())
+	AppendDesktopLog("INFO open diagnostics dir=%s", LogDir())
 	if err := OpenLogs(); err != nil {
-		fmt.Fprintf(os.Stderr, "denyout desktop: open logs: %v\n  dir: %s\n", err, LogDir())
+		fmt.Fprintf(os.Stderr, "denyout desktop: open diagnostics: %v\n  dir: %s\n", err, LogDir())
 		notifyLogHint()
 	}
 }
 
 func copyLastErrorOrPrint() {
+	raw := strings.TrimSpace(ReadLastError())
+	noErr := raw == "" || raw == "No errors recorded yet."
 	text, err := CopyLastErrorToClipboard()
+	if noErr {
+		if err != nil {
+			AppendDesktopLog("INFO clipboard unavailable (%v); no DenyOut error recorded", err)
+			notify.Info("DenyOut", "No error recorded. Install wl-clipboard to copy status. Logs: "+LogDir())
+			return
+		}
+		AppendDesktopLog("INFO copied status (no error) to clipboard")
+		notify.Info("DenyOut", "No DenyOut error recorded — status OK.")
+		return
+	}
 	if err != nil {
 		AppendDesktopLog("WARN clipboard: %v — print last error instead", err)
 		fmt.Fprintln(os.Stderr, "----- DenyOut last error (copy from here) -----")
 		fmt.Fprintln(os.Stderr, text)
 		fmt.Fprintln(os.Stderr, "----- end -----")
-		notify.Info("DenyOut", "Could not copy — last error printed to terminal. Logs: "+LogDir())
+		notify.Info("DenyOut", "Could not copy — see terminal or "+LastErrorPath())
 		return
 	}
 	AppendDesktopLog("INFO copied last error to clipboard (%d bytes)", len(text))
-	notify.Info("DenyOut", "Last error copied to clipboard. Also in "+LastErrorPath())
+	notify.Info("DenyOut", "Last error copied to clipboard.")
 }
 
 func notifyLogHint() {

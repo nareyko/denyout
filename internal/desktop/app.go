@@ -44,8 +44,9 @@ type Options struct {
 	ForceSetup bool
 	NoTray     bool
 	NoOpen     bool
-	WebUI      bool   // optional localhost settings UI (advanced / tests only)
-	Listen     string // web UI listen when WebUI; default 127.0.0.1:0
+	WebUI         bool   // optional localhost settings UI (advanced / tests only)
+	Listen        string // web UI listen when WebUI; default 127.0.0.1:0
+	ControlListen string // activity/control listen; default 127.0.0.1:0 (tests may pin)
 }
 
 // App is the non-technical desktop entry (tray + hostguard / session proxy).
@@ -69,9 +70,12 @@ type App struct {
 func Run(ctx context.Context, opts Options) error {
 	a := &App{opts: opts, state: LoadState(), status: "Off"}
 	notify.SetEnabled(a.state.Notify)
+	if a.state.LastDenyHost != "" {
+		a.lastDeny = a.state.LastDenyHost
+	}
 
 	if _, err := a.startControlServer(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "denyout desktop: control server: %v\n", err)
+		fmt.Fprintf(os.Stderr, "denyout desktop: control/activity server: %v\n", err)
 	}
 
 	// Optional legacy/web first-run only when --web-ui or explicit --setup with WebUI.
@@ -121,7 +125,7 @@ func Run(ctx context.Context, opts Options) error {
 	if opts.NoTray {
 		fmt.Fprintln(os.Stderr, "denyout desktop: tray disabled (--no-tray); press Ctrl+C to quit")
 		<-ctx.Done()
-		a.stopProtection()
+		a.stopAll()
 		a.stopProtect()
 		return nil
 	}
@@ -255,11 +259,11 @@ func (a *App) handleComputer(w http.ResponseWriter, r *http.Request) {
 	}
 	switch {
 	case body.Scope == ScopeSession || (body.Enabled && body.Scope == ScopeSession):
-		a.enableSessionFromTray()
+		_ = a.enableSessionFromTray()
 	case body.Scope == "off" || (!body.Enabled && body.Scope == ""):
-		a.stopProtection()
+		a.stopProtectionFromTray()
 	case body.Enabled || body.Scope == ScopeComputer:
-		a.enableComputerFromTray()
+		_ = a.enableComputerFromTray()
 	}
 	a.mu.Lock()
 	st := a.status

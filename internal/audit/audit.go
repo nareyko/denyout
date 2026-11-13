@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -50,13 +52,20 @@ type HTTPInfo struct {
 	QueryRedacted string `json:"query_redacted,omitempty"`
 }
 
+// DefaultMaxBytes is the audit.jsonl size before rotation (~32 MiB).
+const DefaultMaxBytes int64 = 32 << 20
+
+// DefaultKeepRotated is how many rotated *.bak files to keep.
+const DefaultKeepRotated = 3
+
 // Sink writes JSONL events.
 type Sink struct {
-	mu      sync.Mutex
-	path    string
-	stdout  bool
-	version string
-	file    *os.File
+	mu       sync.Mutex
+	path     string
+	stdout   bool
+	version  string
+	file     *os.File
+	maxBytes int64 // 0 → DefaultMaxBytes; <0 disables rotation
 }
 
 // Open creates a sink. Empty path disables file output.
@@ -73,6 +82,16 @@ func Open(path string, stdout bool, version string) (*Sink, error) {
 		s.file = f
 	}
 	return s, nil
+}
+
+// SetMaxBytes overrides rotation threshold (bytes). Negative disables rotation.
+func (s *Sink) SetMaxBytes(n int64) {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	s.maxBytes = n
+	s.mu.Unlock()
 }
 
 // Close closes the file.
@@ -111,11 +130,72 @@ func (s *Sink) Log(ev Event) error {
 		if _, err := s.file.Write(line); err != nil {
 			return err
 		}
+		s.maybeRotateLocked()
 	}
 	if s.stdout {
 		_, _ = os.Stdout.Write(line)
 	}
 	return nil
+}
+
+// maybeRotateLocked rotates the file when over maxBytes. Caller holds s.mu.
+func (s *Sink) maybeRotateLocked() {
+	if s.file == nil || s.path == "" {
+		return
+	}
+	max := s.maxBytes
+	if max == 0 {
+		max = DefaultMaxBytes
+	}
+	if max < 0 {
+		return
+	}
+	fi, err := s.file.Stat()
+	if err != nil || fi.Size() < max {
+		return
+	}
+	_ = s.file.Close()
+	s.file = nil
+	rotated := s.path + "." + time.Now().UTC().Format("20060102T150405") + ".bak"
+	if err := os.Rename(s.path, rotated); err != nil {
+		// Re-open original path if rename failed.
+		f, openErr := os.OpenFile(s.path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+		if openErr == nil {
+			s.file = f
+		}
+		return
+	}
+	f, err := os.OpenFile(s.path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		return
+	}
+	s.file = f
+	pruneRotated(s.path, DefaultKeepRotated)
+}
+
+func pruneRotated(path string, keep int) {
+	dir := filepath.Dir(path)
+	base := filepath.Base(path)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	var baks []string
+	prefix := base + "."
+	for _, e := range entries {
+		name := e.Name()
+		if strings.HasPrefix(name, prefix) && strings.HasSuffix(name, ".bak") {
+			baks = append(baks, filepath.Join(dir, name))
+		}
+	}
+	if len(baks) <= keep {
+		return
+	}
+	// Lexicographic order matches timestamp suffix YYYYMMDDThhmmss.
+	sort.Strings(baks)
+	for _, old := range baks[:len(baks)-keep] {
+		_ = os.Remove(old)
+	}
 }
 
 // ExpandPath replaces leading ~/ with home.
@@ -158,6 +238,11 @@ func MustOpen(path string, stdout bool, version string) *Sink {
 
 // RecentDenials returns up to limit recent deny / would_deny events from a JSONL file (newest last).
 func RecentDenials(path string, limit int) ([]Event, error) {
+	return TailEvents(path, limit, true)
+}
+
+// TailEvents returns up to limit recent events (newest last). If denialsOnly, only deny / would_deny.
+func TailEvents(path string, limit int, denialsOnly bool) ([]Event, error) {
 	if path == "" || limit <= 0 {
 		return nil, nil
 	}
@@ -182,9 +267,10 @@ func RecentDenials(path string, limit int) ([]Event, error) {
 		if err := json.Unmarshal(line, &ev); err != nil {
 			continue
 		}
-		if ev.Verdict == "deny" || ev.WouldDeny {
-			all = append(all, ev)
+		if denialsOnly && !(ev.Verdict == "deny" || ev.WouldDeny) {
+			continue
 		}
+		all = append(all, ev)
 	}
 	if err := sc.Err(); err != nil {
 		return nil, err
