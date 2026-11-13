@@ -13,24 +13,24 @@ import (
 
 // Event is schema_version 1 JSONL (D09).
 type Event struct {
-	SchemaVersion   int               `json:"schema_version"`
-	EventID         string            `json:"event_id"`
-	TS              string            `json:"ts"`
-	SessionID       string            `json:"session_id"`
-	AgentID         *string           `json:"agent_id"`
-	Verdict         string            `json:"verdict"`
-	Reasons         []string          `json:"reasons"`
-	RuleID          *string           `json:"rule_id"`
-	Mode            string            `json:"mode"`
-	Inspection      string            `json:"inspection,omitempty"`
-	Network         Network           `json:"network"`
-	HTTP            *HTTPInfo         `json:"http,omitempty"`
-	Detectors       []string          `json:"detectors,omitempty"`
-	BytesOut        int64             `json:"bytes_out"`
-	LatencyMS       int64             `json:"latency_ms"`
-	PolicyHash      string            `json:"policy_hash"`
-	DenyOutVersion  string            `json:"denyout_version"`
-	WouldDeny       bool              `json:"would_deny,omitempty"`
+	SchemaVersion  int       `json:"schema_version"`
+	EventID        string    `json:"event_id"`
+	TS             string    `json:"ts"`
+	SessionID      string    `json:"session_id"`
+	AgentID        *string   `json:"agent_id"`
+	Verdict        string    `json:"verdict"`
+	Reasons        []string  `json:"reasons"`
+	RuleID         *string   `json:"rule_id"`
+	Mode           string    `json:"mode"`
+	Inspection     string    `json:"inspection,omitempty"`
+	Network        Network   `json:"network"`
+	HTTP           *HTTPInfo `json:"http,omitempty"`
+	Detectors      []string  `json:"detectors,omitempty"`
+	BytesOut       int64     `json:"bytes_out"`
+	LatencyMS      int64     `json:"latency_ms"`
+	PolicyHash     string    `json:"policy_hash"`
+	DenyOutVersion string    `json:"denyout_version"`
+	WouldDeny      bool      `json:"would_deny,omitempty"`
 }
 
 // Network fields.
@@ -51,11 +51,11 @@ type HTTPInfo struct {
 
 // Sink writes JSONL events.
 type Sink struct {
-	mu       sync.Mutex
-	path     string
-	stdout   bool
-	version  string
-	file     *os.File
+	mu      sync.Mutex
+	path    string
+	stdout  bool
+	version string
+	file    *os.File
 }
 
 // Open creates a sink. Empty path disables file output.

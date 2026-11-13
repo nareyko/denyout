@@ -13,7 +13,7 @@ import (
 
 // Decision is the policy verdict.
 type Decision struct {
-	Verdict   string   // allow | deny
+	Verdict   string // allow | deny
 	Reasons   []string
 	Detectors []string
 	WouldDeny bool // audit mode: would have denied in enforce

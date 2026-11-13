@@ -23,14 +23,14 @@ var namedQueryParams = map[string]struct{}{
 }
 
 var (
-	reOpenAI   = regexp.MustCompile(`sk-[A-Za-z0-9_\-]{20,}`)
+	reOpenAI    = regexp.MustCompile(`sk-[A-Za-z0-9_\-]{20,}`)
 	reAnthropic = regexp.MustCompile(`sk-ant-[A-Za-z0-9_\-]{10,}`)
-	reGitHub   = regexp.MustCompile(`gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}`)
-	reAWS      = regexp.MustCompile(`AKIA[0-9A-Z]{16}`)
-	reGoogle   = regexp.MustCompile(`AIza[0-9A-Za-z\-_]{35}`)
-	reSlack    = regexp.MustCompile(`xox[baprs]-[A-Za-z0-9\-]{10,}`)
-	reJWT      = regexp.MustCompile(`eyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}`)
-	rePEM      = regexp.MustCompile(`-----BEGIN (RSA |OPENSSH |EC )?PRIVATE KEY-----`)
+	reGitHub    = regexp.MustCompile(`gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}`)
+	reAWS       = regexp.MustCompile(`AKIA[0-9A-Z]{16}`)
+	reGoogle    = regexp.MustCompile(`AIza[0-9A-Za-z\-_]{35}`)
+	reSlack     = regexp.MustCompile(`xox[baprs]-[A-Za-z0-9\-]{10,}`)
+	reJWT       = regexp.MustCompile(`eyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}`)
+	rePEM       = regexp.MustCompile(`-----BEGIN (RSA |OPENSSH |EC )?PRIVATE KEY-----`)
 )
 
 // Options controls optional detectors.

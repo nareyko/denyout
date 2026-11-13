@@ -2,21 +2,21 @@ package policy
 
 // Config is the in-memory denyout/v1 policy (subset needed for check stub).
 type Config struct {
-	APIVersion string `yaml:"apiVersion" json:"apiVersion"`
-	Kind       string `yaml:"kind" json:"kind"`
-	Mode       string `yaml:"mode" json:"mode"`
-	Preset     string `yaml:"preset" json:"preset"`
-	Allow      []Rule `yaml:"allow" json:"allow"`
-	Deny       []Rule `yaml:"deny" json:"deny"`
-	Scanners   Scanners `yaml:"scanners" json:"scanners"`
-	AllowPrivate     bool   `yaml:"allow_private" json:"allow_private"`
-	AllowIPLiterals  bool   `yaml:"allow_ip_literals" json:"allow_ip_literals"`
-	DenyOnDNSFailure *bool  `yaml:"deny_on_dns_failure" json:"deny_on_dns_failure"`
-	InsecureAllowAll bool   `yaml:"insecure_allow_all" json:"insecure_allow_all"`
-	AllowedPorts     []int  `yaml:"allowed_ports" json:"allowed_ports"`
-	Limits           Limits `yaml:"limits" json:"limits"`
-	Audit            Audit  `yaml:"audit" json:"audit"`
-	TLS              TLS    `yaml:"tls" json:"tls"`
+	APIVersion       string   `yaml:"apiVersion" json:"apiVersion"`
+	Kind             string   `yaml:"kind" json:"kind"`
+	Mode             string   `yaml:"mode" json:"mode"`
+	Preset           string   `yaml:"preset" json:"preset"`
+	Allow            []Rule   `yaml:"allow" json:"allow"`
+	Deny             []Rule   `yaml:"deny" json:"deny"`
+	Scanners         Scanners `yaml:"scanners" json:"scanners"`
+	AllowPrivate     bool     `yaml:"allow_private" json:"allow_private"`
+	AllowIPLiterals  bool     `yaml:"allow_ip_literals" json:"allow_ip_literals"`
+	DenyOnDNSFailure *bool    `yaml:"deny_on_dns_failure" json:"deny_on_dns_failure"`
+	InsecureAllowAll bool     `yaml:"insecure_allow_all" json:"insecure_allow_all"`
+	AllowedPorts     []int    `yaml:"allowed_ports" json:"allowed_ports"`
+	Limits           Limits   `yaml:"limits" json:"limits"`
+	Audit            Audit    `yaml:"audit" json:"audit"`
+	TLS              TLS      `yaml:"tls" json:"tls"`
 }
 
 // Limits are optional RPM caps.
