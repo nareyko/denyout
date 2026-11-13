@@ -69,3 +69,25 @@ Agent playbooks: thin stubs in [`prompts/`](prompts/) → sibling [`agent-prompt
 | [docs/14-testing.md](docs/14-testing.md) | Test plan, canaries, CI gates |
 
 Examples: [`examples/`](examples/). Schema: [`schemas/`](schemas/).
+
+## Security boundaries
+
+Normative claims: [`docs/10-security-boundaries.md`](docs/10-security-boundaries.md).
+
+- **May claim:** with Protect this computer **On**, DenyOut protects **this user’s outbound web (HTTP/HTTPS)**; blocks secret-in-URL / canaries / hard SSRF patterns it can see; optional Ask mode for new hosts.
+- **Must not claim:** unbypassable, prompt-injection cure, phone coverage, or protection while Off / when hostguard failed (Needs admin). Session mode only covers apps that honor `HTTP(S)_PROXY`.
+- Residual: UDP, DoH, custom stacks; Windows needs WinDivert bridge for computer mode.
+
+## One-line pitch
+
+> DenyOut is a free seatbelt for your computer or AI agents: secret-looking URLs and unsafe destinations are blocked while protection is On.
+
+## Author
+
+**Vadim Nareyko** — founder of [Arviser](https://arviser.com).  
+DenyOut (https://denyout.com) is a separate product brand; Arviser may recommend it as an egress control (e.g. R-20).
+
+## License
+
+**Apache License 2.0** — [`LICENSE`](LICENSE), [`NOTICE`](NOTICE).  
+Copyright 2026 Vadim Nareyko. SPDX: `Apache-2.0`.
