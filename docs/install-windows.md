@@ -40,7 +40,7 @@ Ensure `denyout.exe` is directly under that folder (or adjust the path to the ex
 
 ## 4. Start (UI or CLI)
 
-**UI (recommended for non-technical use):** double-click `Start-DenyOut.cmd` in the extracted folder (or run `denyout desktop --setup`). This opens a short setup wizard and keeps DenyOut in the system tray.
+**UI (recommended for non-technical use):** double-click `Start-DenyOut.cmd` in the extracted folder (or run `denyout desktop --install`). Silent setup: login autostart, try whole-computer Protect once, fall back to Session mode, start tray in the background.
 
 **CLI:**
 
