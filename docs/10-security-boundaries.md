@@ -50,10 +50,21 @@ DenyOut **must not** claim that it:
 
 ## 5. Disclosure requirements
 
-README **MUST** include a “Security boundaries” section linking here.  
-`denyout run` first-use warning **SHOULD** mention desktop bypass residual.
+README **MUST** include a “Security boundaries” section linking here (ship-check M5).  
+`denyout run` **SHOULD** print a one-line residual when wrapping without an OS sandbox.  
+Marketing one-liners **MUST** match §1–§2 (no “unbypassable”).
 
 ## 6. Vulnerability reporting
 
-Planned: `security@denyout.com` (or GitHub Security Advisories).  
+GitHub Security Advisories on [`nareyko/denyout`](https://github.com/nareyko/denyout); mailbox `security@denyout.com` when DNS mail is live.  
 Fix policy: fail-closed bugs prioritized over UX bugs.
+
+## 7. Ship-check (M5)
+
+Last verified against public tree: 2026-11-13.
+
+- [x] README links this doc and states Protect-On / not-unbypassable  
+- [x] Pitch lines do not claim unbypassable or prompt-injection cure  
+- [x] Process wrap vs Protect this computer claims distinguished  
+- [x] Windows WinDivert residual documented  
+- [x] Forbidden browser claim removed for Protect-On (browser is in scope when On)

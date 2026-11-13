@@ -25,8 +25,14 @@ func TestRenderRulesContainsPort(t *testing.T) {
 		if !strings.Contains(out, "skuid 1000") {
 			t.Fatalf("linux rules missing uid:\n%s", out)
 		}
-		if !strings.Contains(out, "table ip denyout") {
-			t.Fatalf("linux rules missing table:\n%s", out)
+		if !strings.Contains(out, "table inet denyout") {
+			t.Fatalf("linux rules missing inet table:\n%s", out)
+		}
+		if !strings.Contains(out, "ip6 daddr") {
+			t.Fatalf("linux rules missing ipv6:\n%s", out)
+		}
+		if !strings.Contains(out, "meta mark") {
+			t.Fatalf("linux rules missing mark skip:\n%s", out)
 		}
 	case "darwin":
 		if !strings.Contains(out, "user 1000") {

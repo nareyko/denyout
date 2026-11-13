@@ -122,7 +122,23 @@ func (e *Engine) Evaluate(rv RequestView) Decision {
 			Detectors: uniq(detectors),
 		}
 	}
-	return verdictByMode(cfg, host, reasons, detectors)
+	return e.verdictByMode(host, reasons, detectors)
+}
+
+// AllowHost adds a host to the in-memory allowlist (Ask once / Always without full restart).
+func (e *Engine) AllowHost(host, reason string) {
+	host = normalizeHost(host)
+	if host == "" {
+		return
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	for _, r := range e.Cfg.Allow {
+		if strings.EqualFold(r.Host, host) {
+			return
+		}
+	}
+	e.Cfg.Allow = append(e.Cfg.Allow, Rule{Host: host, Reason: reason})
 }
 
 func denyForbiddenWildcards(cfg *Config) *Decision {
@@ -226,9 +242,13 @@ func denyListedHost(cfg *Config, host string, reasons, detectors []string) *Deci
 	return nil
 }
 
-func verdictByMode(cfg *Config, host string, reasons, detectors []string) Decision {
+func (e *Engine) verdictByMode(host string, reasons, detectors []string) Decision {
+	e.mu.Lock()
+	cfg := e.Cfg
 	allowed := HostAllowed(cfg, host) || cfg.InsecureAllowAll
-	switch cfg.Mode {
+	mode := cfg.Mode
+	e.mu.Unlock()
+	switch mode {
 	case "audit":
 		would := !allowed
 		if would {

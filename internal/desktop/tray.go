@@ -69,7 +69,7 @@ func (a *App) runTray(ctx context.Context, wizardURL string) error {
 				a.mu.Lock()
 				st := a.status
 				last := a.lastDeny
-				on := a.session != nil
+				on := a.session != nil || a.proxyd != nil
 				a.mu.Unlock()
 				statusItem.SetLabel("Status: " + st)
 				if last == "" {

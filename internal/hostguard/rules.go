@@ -21,12 +21,16 @@ func renderRules(spec Spec) (string, error) {
 }
 
 func renderLinuxNFT(spec Spec) string {
-	// Redirect this user's TCP 80/443 to local proxy; skip loopback and proxy port itself.
+	// Redirect this user's TCP 80/443 (IPv4+IPv6) to local proxy; skip loopback.
+	// Skip mark 0x646e79 ('dny') so DenyOut upstream dials are not redirected (loop).
+	const mark = 0x646e79
 	var b strings.Builder
-	fmt.Fprintf(&b, "table ip denyout {\n")
+	fmt.Fprintf(&b, "table inet denyout {\n")
 	fmt.Fprintf(&b, "  chain output {\n")
 	fmt.Fprintf(&b, "    type nat hook output priority -100; policy accept;\n")
+	fmt.Fprintf(&b, "    meta mark %d return\n", mark)
 	fmt.Fprintf(&b, "    meta skuid %d tcp dport { 80, 443 } ip daddr != 127.0.0.0/8 redirect to :%d\n", spec.UID, spec.ProxyPort)
+	fmt.Fprintf(&b, "    meta skuid %d tcp dport { 80, 443 } ip6 daddr != ::1 redirect to :%d\n", spec.UID, spec.ProxyPort)
 	fmt.Fprintf(&b, "  }\n")
 	fmt.Fprintf(&b, "}\n")
 	return b.String()

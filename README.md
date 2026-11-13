@@ -4,7 +4,7 @@
 
 Site: [https://denyout.com](https://denyout.com) · Canon GitHub (planned): [`nareyko/denyout`](https://github.com/nareyko/denyout)
 
-Agents that can read untrusted text, see sensitive data, and reach the network form a [lethal trifecta](https://arviser.com/guides/lethal-trifecta). DenyOut removes the easy outbound path: every connection goes through a local policy proxy that **denies by default**, blocks secret-bearing URLs, and leaves an audit trail the agent cannot edit.
+Agents that can read untrusted text, see sensitive data, and reach the network form a [lethal trifecta](https://arviser.com/guides/lethal-trifecta). DenyOut puts a local policy proxy on the path: **Protect this computer** allows normal web while blocking secret-bearing URLs and unsafe destinations; **Advanced / `denyout run`** default-denies except an allowlist (e.g. model APIs). Audit stays out of the agent’s reach.
 
 ```bash
 # Linux / macOS
@@ -23,13 +23,11 @@ Windows: download the zip from [Releases](https://github.com/nareyko/denyout/rel
 
 ## Status
 
-**v0.1.0 + Protect this computer (hostguard).** Desktop GUI defaults to whole-user transparent HTTP(S) protection; Advanced wraps one process. Next: timed M4 smokes on three OS; M5 ship-check; Windows WinDivert bridge packaging.
+**Protect this computer** is the primary desktop path (transparent HTTP/S + CA). Advanced wraps one process. First Release: [`v0.1.0`](https://github.com/nareyko/denyout/releases/tag/v0.1.0). Remaining for the Dec 1 bet: timed **M4** install on three OS; Windows WinDivert bridge packaging.
 
-**Language:** English only.
+**Language:** English only · **License:** Apache-2.0 · **Platforms:** Ubuntu, macOS, Windows.
 
-**MVP intent:** Simple install on **Ubuntu, macOS, and Windows**; CLI + GUI; Go binary; Apache-2.0. See [`docs/12-mvp-and-roadmap.md`](docs/12-mvp-and-roadmap.md) and [`docs/IMPLEMENTATION.md`](docs/IMPLEMENTATION.md).
-
-**Install:** GitHub Releases + SHA256SUMS; Linux/macOS via [`install.sh`](install.sh) → `~/.local/bin`; Windows via zip + [`docs/install-windows.md`](docs/install-windows.md). Details: [`docs/07-desktop.md`](docs/07-desktop.md) §3.
+**Install:** GitHub Releases + SHA256SUMS; Linux/macOS [`install.sh`](install.sh) → `~/.local/bin`; Windows zip + [`docs/install-windows.md`](docs/install-windows.md). See [`docs/07-desktop.md`](docs/07-desktop.md).
 
 Internal Bet Tree / monetization / full decision log live in a **private HQ** sibling (`denyout-hq`), not in this repo.
 
@@ -62,8 +60,11 @@ Examples: [`examples/`](examples/). Schema: [`schemas/`](schemas/).
 
 ## Security boundaries
 
-Honest claims and non-claims: [`docs/10-security-boundaries.md`](docs/10-security-boundaries.md).  
-While **Protect this computer** is On, DenyOut protects **this user’s outbound web** — it is **not** unbypassable.
+Normative claims: [`docs/10-security-boundaries.md`](docs/10-security-boundaries.md).
+
+- **May claim:** with Protect this computer **On**, DenyOut protects **this user’s outbound web (HTTP/HTTPS)**; blocks secret-in-URL / canaries / hard SSRF patterns it can see; optional Ask mode for new hosts.
+- **Must not claim:** unbypassable, prompt-injection cure, phone coverage, or protection while Off / when hostguard failed (Needs admin).
+- Residual: UDP, DoH, custom stacks; Windows needs WinDivert bridge for computer mode.
 
 ## One-line pitch
 

@@ -20,25 +20,25 @@ func applyRedirect(spec Spec) error {
 	if err := os.WriteFile(path, []byte(rules), 0o600); err != nil {
 		return err
 	}
-	// Replace prior table if present.
+	// Replace prior tables if present (legacy ip + current inet).
 	_ = exec.Command("nft", "delete", "table", "ip", "denyout").Run()
+	_ = exec.Command("nft", "delete", "table", "inet", "denyout").Run()
 	cmd := exec.Command("nft", "-f", path)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("nft apply: %w (need root / CAP_NET_ADMIN)", err)
 	}
+	// Allow DenyOut to SO_MARK upstream dials so nft can skip them (needs setcap).
+	if exe, err := os.Executable(); err == nil {
+		_ = exec.Command("setcap", "cap_net_admin=ep", exe).Run()
+	}
 	return nil
 }
 
 func removeRedirect(spec Spec) error {
 	_ = spec
-	cmd := exec.Command("nft", "delete", "table", "ip", "denyout")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		// Already gone is OK.
-		return nil
-	}
+	_ = exec.Command("nft", "delete", "table", "ip", "denyout").Run()
+	_ = exec.Command("nft", "delete", "table", "inet", "denyout").Run()
 	return nil
 }

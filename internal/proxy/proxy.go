@@ -268,10 +268,7 @@ func (s *Server) roundTripIntercept(client io.ReadWriteCloser, req *http.Request
 		return
 	}
 	addr := net.JoinHostPort(ip.String(), fmt.Sprintf("%d", port))
-	up, err := tls.DialWithDialer(&net.Dialer{Timeout: 15 * time.Second}, "tcp", addr, &tls.Config{
-		ServerName: host,
-		MinVersion: tls.VersionTLS12,
-	})
+	raw, err := s.dialTCP(addr, 15*time.Second)
 	if err != nil {
 		resp := &http.Response{
 			StatusCode: http.StatusBadGateway,
@@ -281,6 +278,14 @@ func (s *Server) roundTripIntercept(client io.ReadWriteCloser, req *http.Request
 			Body:       io.NopCloser(strings.NewReader("upstream dial failed\n")),
 		}
 		_ = resp.Write(client)
+		return
+	}
+	up := tls.Client(raw, &tls.Config{
+		ServerName: host,
+		MinVersion: tls.VersionTLS12,
+	})
+	if err := up.Handshake(); err != nil {
+		_ = raw.Close()
 		return
 	}
 	defer up.Close()
@@ -360,7 +365,7 @@ func (s *Server) tunnel(client net.Conn, host, port string, ips []net.IP, allowP
 		return
 	}
 	addr := net.JoinHostPort(ip.String(), port)
-	up, err := net.DialTimeout("tcp", addr, 15*time.Second)
+	up, err := s.dialTCP(addr, 15*time.Second)
 	if err != nil {
 		return
 	}

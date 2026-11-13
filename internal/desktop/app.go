@@ -51,12 +51,15 @@ type Options struct {
 type App struct {
 	opts Options
 
-	mu       sync.Mutex
-	state    State
-	lastDeny string
-	status   string
-	protect  *exec.Cmd   // advanced process wrap
-	session  *run.Session // computer mode proxy
+	mu        sync.Mutex
+	state     State
+	lastDeny  string
+	status    string
+	protect   *exec.Cmd    // advanced process wrap
+	session   *run.Session // legacy in-process session (tests)
+	proxyd    *exec.Cmd    // computer-mode transparent proxy subprocess
+	proxyPort int
+	wizardURL string
 }
 
 // Run starts the desktop experience and blocks until quit.
@@ -71,6 +74,7 @@ func Run(ctx context.Context, opts Options) error {
 	if err != nil {
 		return err
 	}
+	a.wizardURL = wizardURL
 	fmt.Fprintf(os.Stderr, "denyout desktop: setup UI %s (localhost only)\n", wizardURL)
 
 	needSetup := opts.ForceSetup || !a.state.SetupDone
@@ -232,21 +236,34 @@ func (a *App) handleAllow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Host  string `json:"host"`
-		Once  bool   `json:"once"`
-		Always bool  `json:"always"`
+		Host   string `json:"host"`
+		Once   bool   `json:"once"`
+		Always bool   `json:"always"`
+		Deny   bool   `json:"deny"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, err, 400)
 		return
 	}
-	if body.Always || !body.Once {
-		if err := a.allowHostAlways(strings.TrimSpace(body.Host)); err != nil {
+	host := strings.TrimSpace(body.Host)
+	switch {
+	case body.Deny:
+		writeJSON(w, map[string]any{"ok": true, "action": "deny"})
+	case body.Always:
+		if err := a.allowHostAlways(host); err != nil {
 			writeErr(w, err, 500)
 			return
 		}
+		writeJSON(w, map[string]any{"ok": true, "action": "always"})
+	case body.Once:
+		if err := a.allowHostOnce(host); err != nil {
+			writeErr(w, err, 500)
+			return
+		}
+		writeJSON(w, map[string]any{"ok": true, "action": "once"})
+	default:
+		writeErr(w, fmt.Errorf("specify once, always, or deny"), 400)
 	}
-	writeJSON(w, map[string]any{"ok": true})
 }
 
 func (a *App) handleProtect(w http.ResponseWriter, r *http.Request) {

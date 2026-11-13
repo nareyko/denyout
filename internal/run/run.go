@@ -45,6 +45,7 @@ func Exec(opts Options) (int, error) {
 	st := sess.Status()
 	fmt.Fprintf(os.Stderr, "denyout: mode=%s preset=%s tls=%s proxy=%s session=%s\n",
 		st.Mode, st.Preset, st.TLSMode, st.ProxyURL, st.SessionID)
+	fmt.Fprintln(os.Stderr, "denyout: note — without OS sandbox / Protect this computer, some tools can bypass the proxy (see docs/10-security-boundaries.md)")
 
 	cmd := exec.Command(opts.Command[0], opts.Command[1:]...)
 	cmd.Stdin = os.Stdin

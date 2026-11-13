@@ -51,6 +51,7 @@ type Session struct {
 	srv       *proxy.Server
 	sink      *audit.Sink
 	ca        *proxy.SessionCA
+	eng       *policy.Engine
 	persistCA bool
 	status    Status
 }
@@ -176,6 +177,7 @@ func StartSession(opts SessionOptions) (*Session, error) {
 		srv:       srv,
 		sink:      sink,
 		ca:        ca,
+		eng:       eng,
 		persistCA: opts.PersistCA,
 		status: Status{
 			Running:    true,
@@ -210,6 +212,16 @@ func (s *Session) Port() int {
 		return 0
 	}
 	return s.srv.Port()
+}
+
+// AllowHost updates the live policy allowlist (Ask once / Always).
+func (s *Session) AllowHost(host, reason string) {
+	s.mu.Lock()
+	eng := s.eng
+	s.mu.Unlock()
+	if eng != nil {
+		eng.AllowHost(host, reason)
+	}
 }
 
 // Status returns a copy of the session snapshot.

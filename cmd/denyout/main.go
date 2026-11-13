@@ -13,6 +13,7 @@ import (
 	"github.com/nareyko/denyout/internal/gui"
 	"github.com/nareyko/denyout/internal/hostguard"
 	"github.com/nareyko/denyout/internal/lab"
+	"github.com/nareyko/denyout/internal/notify"
 	"github.com/nareyko/denyout/internal/policy"
 	"github.com/nareyko/denyout/internal/proxy"
 	"github.com/nareyko/denyout/internal/run"
@@ -330,19 +331,25 @@ func cmdRun(args []string) int {
 
 func cmdHostctl(args []string) int {
 	if len(args) == 0 || args[0] == "--help" || args[0] == "-h" {
-		fmt.Println(`Usage: denyout hostctl apply|remove|render [flags]
+		fmt.Println(`Usage: denyout hostctl apply|remove|render|proxyd [flags]
 
   Privileged helper for Protect this computer (transparent redirect + CA trust).
-  Normally invoked via pkexec / osascript / UAC from denyout desktop.
+  proxyd runs the transparent proxy (started after setcap so SO_MARK works).
 
 Flags:
   --port N     local DenyOut proxy port
   --ca PATH    CA certificate PEM to trust
+  --ca-dir D   persistent CA directory (proxyd)
   --uid N      desktop user uid (Unix)
+  --ask        Ask mode policy (proxyd)
+  --allow-base URL  wizard base for Ask allow page (proxyd)
   --no-elevate already running elevated (internal)`)
 		return 0
 	}
 	action := args[0]
+	if action == "proxyd" {
+		return cmdHostctlProxyd(args[1:])
+	}
 	port := 0
 	ca := ""
 	uid := 0
@@ -418,6 +425,102 @@ Flags:
 		fmt.Fprintf(os.Stderr, "denyout hostctl: unknown action %q\n", action)
 		return 2
 	}
+}
+
+func cmdHostctlProxyd(args []string) int {
+	port := 0
+	caDir := ""
+	ask := false
+	allowBase := ""
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case a == "--ask":
+			ask = true
+		case strings.HasPrefix(a, "--port="):
+			fmt.Sscanf(strings.TrimPrefix(a, "--port="), "%d", &port)
+		case a == "--port":
+			i++
+			if i < len(args) {
+				fmt.Sscanf(args[i], "%d", &port)
+			}
+		case strings.HasPrefix(a, "--ca-dir="):
+			caDir = strings.TrimPrefix(a, "--ca-dir=")
+		case a == "--ca-dir":
+			i++
+			if i < len(args) {
+				caDir = args[i]
+			}
+		case strings.HasPrefix(a, "--allow-base="):
+			allowBase = strings.TrimPrefix(a, "--allow-base=")
+		case a == "--allow-base":
+			i++
+			if i < len(args) {
+				allowBase = args[i]
+			}
+		default:
+			fmt.Fprintf(os.Stderr, "denyout hostctl proxyd: unknown flag %q\n", a)
+			return 2
+		}
+	}
+	if port <= 0 || caDir == "" {
+		fmt.Fprintln(os.Stderr, "denyout hostctl proxyd: --port and --ca-dir required")
+		return 2
+	}
+	var cfg *policy.Config
+	var err error
+	if ask {
+		var rules []policy.Rule
+		if raw := os.Getenv("DENYOUT_ALWAYS_ALLOW"); raw != "" {
+			for _, h := range strings.Split(raw, ",") {
+				h = strings.TrimSpace(h)
+				if h != "" {
+					rules = append(rules, policy.Rule{Host: h, Reason: "user_always"})
+				}
+			}
+		}
+		cfg, err = policy.DefaultWholeDeviceAsk(rules)
+	} else {
+		cfg, err = policy.DefaultWholeDevice()
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "denyout hostctl proxyd: %v\n", err)
+		return 2
+	}
+	sess, err := run.StartSession(run.SessionOptions{
+		Config:      cfg,
+		TLSMode:     proxy.TLSIntercept,
+		Version:     version,
+		CADir:       caDir,
+		PersistCA:   true,
+		Transparent: true,
+		ListenPort:  port,
+		OnDeny: func(host string, reasons []string) {
+			hostNotAllowed := false
+			for _, r := range reasons {
+				if r == "host_not_allowed" {
+					hostNotAllowed = true
+					break
+				}
+			}
+			if ask && hostNotAllowed && allowBase != "" {
+				u := strings.TrimRight(allowBase, "/") + "/allow.html?host=" + host
+				go notify.Ask(notify.AskOptions{Host: host, OpenURL: u})
+				return
+			}
+			notify.Deny(host, reasons)
+		},
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "denyout hostctl proxyd: %v\n", err)
+		return 2
+	}
+	fmt.Fprintf(os.Stderr, "denyout hostctl proxyd: listening :%d transparent\n", sess.Port())
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	<-ctx.Done()
+	_ = sess.Stop()
+	return 0
 }
 
 func cmdDesktop(args []string) int {

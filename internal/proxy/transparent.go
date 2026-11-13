@@ -37,17 +37,25 @@ func (s *Server) handleTransparent(conn net.Conn) {
 	defer conn.Close()
 	_ = conn.SetDeadline(time.Now().Add(15 * time.Second))
 
-	br := bufio.NewReader(conn)
+	br := bufio.NewReaderSize(conn, 65536)
 	peek, err := br.Peek(1)
 	if err != nil {
 		return
 	}
 
 	if peek[0] == 0x16 {
-		hello, _ := br.Peek(min(br.Buffered()+2048, 8192))
-		if br.Buffered() < 43 {
-			more, _ := br.Peek(4096)
-			hello = more
+		hello, err := br.Peek(5)
+		if err != nil {
+			return
+		}
+		recLen := int(hello[3])<<8 | int(hello[4])
+		need := 5 + recLen
+		if need > 65536 {
+			need = 65536
+		}
+		hello, err = br.Peek(need)
+		if err != nil && len(hello) < 43 {
+			return
 		}
 		host := parseSNI(hello)
 		port := 443
@@ -79,12 +87,12 @@ func (s *Server) handleTransparent(conn net.Conn) {
 
 func (s *Server) serveTransparentTLS(conn net.Conn, host string, port int) {
 	start := time.Now()
-	ips, _ := lookupIPs(host)
+	// Host-only pre-check without DNS so we can complete the TLS handshake promptly
+	// (clients time out if ServerHello is delayed by a slow resolver).
 	rv := policy.RequestView{
 		SessionID:  s.cfg.SessionID,
 		DestHost:   host,
 		DestPort:   uint16(port),
-		DestIPs:    ips,
 		Protocol:   "https",
 		ServerName: host,
 		Method:     http.MethodConnect,
@@ -97,6 +105,7 @@ func (s *Server) serveTransparentTLS(conn net.Conn, host string, port int) {
 		return
 	}
 	if s.cfg.TLSMode == TLSPassthrough || s.cfg.CA == nil {
+		ips, _ := lookupIPs(host)
 		s.tunnel(conn, host, fmt.Sprintf("%d", port), ips, s.cfg.Engine.Cfg.AllowPrivate)
 		s.logDecision(rv, d, start)
 		return
@@ -114,6 +123,7 @@ func (s *Server) serveTransparentTLS(conn net.Conn, host string, port int) {
 		return
 	}
 	defer tlsClient.Close()
+	ips, _ := lookupIPs(host)
 	br := bufio.NewReader(tlsClient)
 	for {
 		req, err := http.ReadRequest(br)
@@ -147,7 +157,7 @@ func (s *Server) handleTransparentHTTP(conn net.Conn, req *http.Request, host st
 		fmt.Fprintf(conn, "HTTP/1.1 403 Forbidden\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n%s\n", redactDenyMsg(d))
 		return
 	}
-	out, err := net.DialTimeout("tcp", net.JoinHostPort(host, fmt.Sprintf("%d", port)), 10*time.Second)
+	out, err := s.dialTCP(net.JoinHostPort(host, fmt.Sprintf("%d", port)), 10*time.Second)
 	if err != nil {
 		return
 	}
