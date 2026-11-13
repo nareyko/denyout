@@ -23,7 +23,7 @@ Windows: download the zip from [Releases](https://github.com/nareyko/denyout/rel
 
 ## Status
 
-**Working Go CLI + desktop UX + `serve` + release packaging.** Policy proxy (`run` / `check` / `test` / `desktop` / `gui` / `serve`), tray + notifications + setup wizard, M3 script, `install.sh` / Windows `Start-DenyOut.cmd`, GoReleaser. First tagged Release and timed M4 OS smokes are next.
+**v0.1.0 released.** Policy proxy (`run` / `check` / `test` / `desktop` / `gui` / `serve`), tray + notifications + setup wizard, M3 script, `install.sh` / Windows `Start-DenyOut.cmd`. Next: timed M4 install smokes on Ubuntu / macOS / Windows; M5 README/boundaries ship-check.
 
 **Language:** English only.
 
