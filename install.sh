@@ -4,10 +4,12 @@
 #   curl -fsSL https://raw.githubusercontent.com/nareyko/denyout/main/install.sh | sh
 #   DENYOUT_VERSION=v0.1.0 sh install.sh
 # Env:
-#   DENYOUT_VERSION   — tag (default: latest GitHub release)
-#   DENYOUT_INSTALL_DIR — default ~/.local/bin
-#   DENYOUT_REPO      — default nareyko/denyout
-#   DENYOUT_BASE_URL  — override asset base (tests / mirrors)
+#   DENYOUT_VERSION      — tag (default: latest GitHub release)
+#   DENYOUT_INSTALL_DIR  — default ~/.local/bin
+#   DENYOUT_REPO         — default nareyko/denyout
+#   DENYOUT_BASE_URL     — override asset base (tests / mirrors)
+#   DENYOUT_INSTALL_MODE — desktop | server (skip prompt; for CI / scripts)
+#   DENYOUT_NO_DESKTOP=1 — same as server mode (compat)
 set -eu
 
 REPO="${DENYOUT_REPO:-nareyko/denyout}"
@@ -165,27 +167,90 @@ esac
 
 echo "denyout install: done"
 echo ""
-echo "Two ways to continue:"
-echo "  UI (recommended):  denyout desktop"
-echo "  CLI:               denyout init && denyout run -- <your-agent>"
-echo ""
 
-# Optional interactive launch of the desktop wizard (TTY only; skip with DENYOUT_NO_DESKTOP=1).
-if [ -n "${DENYOUT_NO_DESKTOP:-}" ]; then
-  exit 0
+# --- Install mode: Desktop (native tray UI) vs Server (CLI only, no web) ---
+# Always try /dev/tty so `curl | sh` can still prompt interactively.
+MODE="${DENYOUT_INSTALL_MODE:-}"
+if [ -n "${DENYOUT_NO_DESKTOP:-}" ] && [ -z "$MODE" ]; then
+  MODE=server
 fi
-if [ ! -t 0 ] || [ ! -t 1 ]; then
-  # Non-interactive pipe install (curl | sh) — print hint only.
-  echo "denyout install: run 'denyout desktop' when you are ready for the setup wizard"
-  exit 0
+
+ask_mode() {
+  # Prefer controlling TTY (works under curl|sh). Fall back to stdin if interactive.
+  tty_dev=""
+  if [ -r /dev/tty ] && [ -w /dev/tty ]; then
+    tty_dev=/dev/tty
+  elif [ -t 0 ] && [ -t 1 ]; then
+    tty_dev=""
+  else
+    return 1
+  fi
+
+  echo "Choose install type:" >&2
+  echo "  1) Desktop — native tray + Protect this computer (no browser UI)" >&2
+  echo "  2) Server  — CLI only (denyout init / run / serve); no tray, no web services" >&2
+  if [ -n "$tty_dev" ]; then
+    printf "Install type [1=Desktop / 2=Server] (default 1): " >/dev/tty
+    IFS= read -r ans </dev/tty || ans=1
+  else
+    printf "Install type [1=Desktop / 2=Server] (default 1): "
+    IFS= read -r ans || ans=1
+  fi
+  case "$ans" in
+    ""|1|d|D|desktop|Desktop|DESKTOP) echo desktop ;;
+    2|s|S|server|Server|SERVER) echo server ;;
+    *)
+      echo "denyout install: unknown choice '$ans' — using desktop" >&2
+      echo desktop
+      ;;
+  esac
+  return 0
+}
+
+if [ -z "$MODE" ]; then
+  if MODE=$(ask_mode); then
+    :
+  else
+    echo "denyout install: no TTY — defaulting to server (CLI only)." >&2
+    echo "  Re-run with DENYOUT_INSTALL_MODE=desktop to launch the native UI," >&2
+    echo "  or later: denyout desktop" >&2
+    MODE=server
+  fi
 fi
-printf "Open DenyOut setup now? [Y/n] "
-read -r ans || ans=y
-case "$ans" in
-  ""|y|Y|yes|YES)
-    exec "${INSTALL_DIR}/denyout" desktop --setup
+
+case "$MODE" in
+  desktop|Desktop|DESKTOP)
+    MODE=desktop
+    ;;
+  server|Server|SERVER)
+    MODE=server
     ;;
   *)
-    echo "denyout install: skipped desktop; run 'denyout desktop' later"
+    echo "denyout install: DENYOUT_INSTALL_MODE must be desktop or server (got '$MODE')" >&2
+    exit 1
     ;;
 esac
+
+CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+mkdir -p "${CONFIG_HOME}/denyout"
+echo "$MODE" >"${CONFIG_HOME}/denyout/install-mode"
+echo "denyout install: mode=${MODE}"
+
+if [ "$MODE" = "server" ]; then
+  echo ""
+  echo "Server install — no tray, no localhost web UI."
+  echo "  denyout init"
+  echo "  denyout run -- <your-agent>"
+  echo "  denyout serve --config ~/.config/denyout/config.yaml   # optional long-running"
+  echo ""
+  exit 0
+fi
+
+echo ""
+echo "Desktop install — native UI (tray + dialogs). No browser wizard."
+echo "  Later: denyout desktop"
+echo "  Advanced/tests only: denyout desktop --web-ui"
+echo ""
+
+# Launch native first-run setup + tray (not a web server).
+exec "${INSTALL_DIR}/denyout" desktop --setup

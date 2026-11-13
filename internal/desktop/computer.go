@@ -63,6 +63,7 @@ func (a *App) startComputer() error {
 		args = append(args, "--ask")
 	}
 	if wizard != "" {
+		// Optional --web-ui only; native Ask uses dialogs / notify-send actions.
 		args = append(args, "--allow-base", strings.TrimRight(wizard, "/"))
 	}
 	cmd := exec.Command(self, args...)
@@ -135,22 +136,35 @@ func (a *App) onComputerDeny(host string, reasons []string, wizard string) {
 		}
 	}
 	if ask && hostNotAllowed {
-		allowURL := ""
-		if wizard != "" {
-			allowURL = strings.TrimRight(wizard, "/") + "/allow.html?host=" + url.QueryEscape(host)
-		}
-		go notify.Ask(notify.AskOptions{
-			Host:    host,
-			OpenURL: allowURL,
-			OnAction: func(h string, action notify.AskAction) {
-				switch action {
-				case notify.AskOnce:
-					_ = a.allowHostOnce(h)
-				case notify.AskAlways:
-					_ = a.allowHostAlways(h)
-				}
-			},
-		})
+		go func() {
+			// Prefer native dialog; "" = no toolkit → notify-send / optional web allow page.
+			switch nativeAllowDialog(host) {
+			case "once":
+				_ = a.allowHostOnce(host)
+				return
+			case "always":
+				_ = a.allowHostAlways(host)
+				return
+			case "deny":
+				return
+			}
+			allowURL := ""
+			if wizard != "" {
+				allowURL = strings.TrimRight(wizard, "/") + "/allow.html?host=" + url.QueryEscape(host)
+			}
+			notify.Ask(notify.AskOptions{
+				Host:    host,
+				OpenURL: allowURL,
+				OnAction: func(h string, act notify.AskAction) {
+					switch act {
+					case notify.AskOnce:
+						_ = a.allowHostOnce(h)
+					case notify.AskAlways:
+						_ = a.allowHostAlways(h)
+					}
+				},
+			})
+		}()
 		return
 	}
 	notify.Deny(host, reasons)

@@ -12,7 +12,7 @@ import (
 	"github.com/nareyko/denyout/internal/notify"
 )
 
-func (a *App) runTray(ctx context.Context, wizardURL string) error {
+func (a *App) runTray(ctx context.Context) error {
 	tray := systray.New()
 	tray.SetIcon(iconIdlePNG)
 	tray.SetTooltip("DenyOut")
@@ -35,15 +35,53 @@ func (a *App) runTray(ctx context.Context, wizardURL string) error {
 		a.stopComputer()
 	})
 	menu.AddSeparator()
-	menu.Add("Settings…", func() {
-		openBrowser(wizardURL)
+
+	menu.Add("Toggle notifications", func() {
+		a.mu.Lock()
+		a.state.Notify = !a.state.Notify
+		on := a.state.Notify
+		st := a.state
+		a.mu.Unlock()
+		_ = SaveState(st)
+		notify.SetEnabled(on)
+		fmt.Fprintf(os.Stderr, "denyout desktop: notifications=%v\n", on)
 	})
-	menu.Add("Advanced: protect a program…", func() {
-		openBrowser(wizardURL + "#advanced")
+	menu.Add("Toggle Ask before new sites", func() {
+		a.mu.Lock()
+		a.state.AskMode = !a.state.AskMode
+		ask := a.state.AskMode
+		st := a.state
+		wasOn := a.proxyd != nil || a.session != nil
+		a.mu.Unlock()
+		_ = SaveState(st)
+		fmt.Fprintf(os.Stderr, "denyout desktop: ask_mode=%v\n", ask)
+		if wasOn {
+			a.stopComputer()
+			if err := a.startComputer(); err != nil {
+				fmt.Fprintf(os.Stderr, "denyout desktop: %v\n", err)
+			}
+		}
+	})
+	menu.AddSeparator()
+	menu.Add("Advanced: protect shell", func() {
+		a.mu.Lock()
+		a.state.PreferredAgent = "shell"
+		st := a.state
+		a.mu.Unlock()
+		_ = SaveState(st)
+		if err := a.startProtect(); err != nil {
+			fmt.Fprintf(os.Stderr, "denyout desktop: %v\n", err)
+		}
 	})
 	menu.Add("Stop protected program", func() {
 		a.stopProtect()
 	})
+	if a.opts.WebUI && a.wizardURL != "" {
+		menu.AddSeparator()
+		menu.Add("Open web settings…", func() {
+			openBrowser(a.wizardURL)
+		})
+	}
 	menu.AddSeparator()
 	menu.Add("Quit DenyOut", func() {
 		a.stopComputer()
@@ -85,12 +123,11 @@ func (a *App) runTray(ctx context.Context, wizardURL string) error {
 				default:
 					tray.SetIcon(iconIdlePNG)
 				}
-				_ = notify.Enabled()
 			}
 		}
 	}()
 
-	fmt.Fprintln(os.Stderr, "denyout desktop: tray ready — Protect this computer / Settings / Quit")
+	fmt.Fprintln(os.Stderr, "denyout desktop: tray ready — Protect this computer / Quit (no browser UI)")
 	errCh := make(chan error, 1)
 	go func() { errCh <- tray.Run() }()
 

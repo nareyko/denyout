@@ -31,6 +31,7 @@ func TestWizardAPISetup(t *testing.T) {
 		errCh <- desktop.Run(ctx, desktop.Options{
 			NoTray: true,
 			NoOpen: true,
+			WebUI:  true,
 			Listen: addr,
 		})
 	}()
@@ -108,7 +109,7 @@ func TestAllowAPIOnceAndAlways(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go func() {
-		_ = desktop.Run(ctx, desktop.Options{NoTray: true, NoOpen: true, Listen: addr})
+		_ = desktop.Run(ctx, desktop.Options{NoTray: true, NoOpen: true, WebUI: true, Listen: addr})
 	}()
 
 	base := "http://" + addr
@@ -171,7 +172,7 @@ func TestAskModeSettings(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go func() {
-		_ = desktop.Run(ctx, desktop.Options{NoTray: true, NoOpen: true, Listen: addr})
+		_ = desktop.Run(ctx, desktop.Options{NoTray: true, NoOpen: true, WebUI: true, Listen: addr})
 	}()
 
 	base := "http://" + addr

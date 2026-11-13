@@ -528,20 +528,24 @@ func cmdDesktop(args []string) int {
 	forceSetup := false
 	noTray := false
 	noOpen := false
+	webUI := false
 	listen := "127.0.0.1:0"
 
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch {
 		case a == "--help" || a == "-h":
-			fmt.Println(`Usage: denyout desktop [--setup] [--no-tray] [--no-open] [--config path]
+			fmt.Println(`Usage: denyout desktop [--setup] [--no-tray] [--web-ui] [--no-open] [--config path]
 
-  Recommended entry: Protect this computer (transparent redirect) + tray + notifications.
-  Advanced: protect a single program (same as denyout run).
+  Default: native first-run dialogs + system tray (no localhost web server).
+  Protect this computer = transparent host redirect + notifications.
+  Advanced: tray → protect a single program (same as denyout run).
 
-  Install paths:
-    CLI:  install.sh finishes with optional "denyout desktop"
-    UI:   Windows — double-click Start-DenyOut.cmd from the zip`)
+  --web-ui   optional localhost settings page (tests / advanced only)
+  --no-open  with --web-ui, do not open a browser
+  --setup    re-run first-run setup
+
+  Install: install.sh asks Desktop vs Server; Desktop runs this (native).`)
 			return 0
 		case a == "--setup":
 			forceSetup = true
@@ -549,6 +553,8 @@ func cmdDesktop(args []string) int {
 			noTray = true
 		case a == "--no-open":
 			noOpen = true
+		case a == "--web-ui":
+			webUI = true
 		case a == "--config" || a == "-c":
 			i++
 			if i >= len(args) {
@@ -558,6 +564,7 @@ func cmdDesktop(args []string) int {
 			cfgPath = args[i]
 		case strings.HasPrefix(a, "--listen="):
 			listen = strings.TrimPrefix(a, "--listen=")
+			webUI = true
 		case a == "--listen":
 			i++
 			if i >= len(args) {
@@ -565,15 +572,18 @@ func cmdDesktop(args []string) int {
 				return 2
 			}
 			listen = args[i]
+			webUI = true
 		default:
 			fmt.Fprintf(os.Stderr, "denyout desktop: unknown flag %q\n", a)
 			return 2
 		}
 	}
 
-	if !strings.HasPrefix(listen, "127.0.0.1:") && !strings.HasPrefix(listen, "localhost:") {
-		fmt.Fprintln(os.Stderr, "denyout desktop: --listen must be 127.0.0.1 or localhost")
-		return 2
+	if webUI {
+		if !strings.HasPrefix(listen, "127.0.0.1:") && !strings.HasPrefix(listen, "localhost:") {
+			fmt.Fprintln(os.Stderr, "denyout desktop: --listen must be 127.0.0.1 or localhost")
+			return 2
+		}
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -584,6 +594,7 @@ func cmdDesktop(args []string) int {
 		ForceSetup: forceSetup,
 		NoTray:     noTray,
 		NoOpen:     noOpen,
+		WebUI:      webUI,
 		Listen:     listen,
 	}); err != nil {
 		fmt.Fprintf(os.Stderr, "denyout desktop: %v\n", err)

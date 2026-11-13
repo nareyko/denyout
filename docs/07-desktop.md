@@ -30,9 +30,16 @@
 
 ```bash
 # Unix (Linux / macOS) — preferred
+# Prompts (via /dev/tty, works with curl|sh):
+#   1) Desktop — native tray + dialogs (no localhost web wizard)
+#   2) Server  — CLI only; no tray, no extra web services
 curl -fsSL https://denyout.com/install.sh | sh
+# DENYOUT_INSTALL_MODE=desktop|server  # skip prompt
+
+denyout desktop          # native UI
+# denyout desktop --web-ui   # optional / advanced / tests only
 denyout version
-denyout init
+denyout init             # server / advanced path
 denyout run -- curl -I https://api.anthropic.com
 ```
 

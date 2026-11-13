@@ -44,10 +44,11 @@ type Options struct {
 	ForceSetup bool
 	NoTray     bool
 	NoOpen     bool
-	Listen     string // wizard HTTP listen; default 127.0.0.1:0
+	WebUI      bool   // optional localhost settings UI (advanced / tests only)
+	Listen     string // web UI listen when WebUI; default 127.0.0.1:0
 }
 
-// App is the non-technical desktop entry (wizard + tray + hostguard).
+// App is the non-technical desktop entry (native setup + tray + hostguard).
 type App struct {
 	opts Options
 
@@ -59,27 +60,36 @@ type App struct {
 	session   *run.Session // legacy in-process session (tests)
 	proxyd    *exec.Cmd    // computer-mode transparent proxy subprocess
 	proxyPort int
-	wizardURL string
+	wizardURL string // only set when WebUI is enabled
 }
 
 // Run starts the desktop experience and blocks until quit.
+// Default path: native first-run dialogs + system tray — no localhost web server.
 func Run(ctx context.Context, opts Options) error {
-	if opts.Listen == "" {
-		opts.Listen = "127.0.0.1:0"
-	}
 	a := &App{opts: opts, state: LoadState(), status: "Off"}
 	notify.SetEnabled(a.state.Notify)
 
-	wizardURL, err := a.startWizardServer(ctx)
-	if err != nil {
-		return err
-	}
-	a.wizardURL = wizardURL
-	fmt.Fprintf(os.Stderr, "denyout desktop: setup UI %s (localhost only)\n", wizardURL)
-
 	needSetup := opts.ForceSetup || !a.state.SetupDone
-	if needSetup && !opts.NoOpen {
-		openBrowser(wizardURL)
+	if needSetup && !opts.WebUI {
+		if err := a.nativeSetup(); err != nil {
+			return err
+		}
+	}
+
+	if opts.WebUI {
+		if opts.Listen == "" {
+			opts.Listen = "127.0.0.1:0"
+		}
+		a.opts = opts
+		wizardURL, err := a.startWizardServer(ctx)
+		if err != nil {
+			return err
+		}
+		a.wizardURL = wizardURL
+		fmt.Fprintf(os.Stderr, "denyout desktop: optional web UI %s (--web-ui)\n", wizardURL)
+		if needSetup && !opts.NoOpen {
+			openBrowser(wizardURL)
+		}
 	}
 
 	if opts.NoTray {
@@ -90,7 +100,7 @@ func Run(ctx context.Context, opts Options) error {
 		return nil
 	}
 
-	return a.runTray(ctx, wizardURL)
+	return a.runTray(ctx)
 }
 
 func (a *App) startWizardServer(ctx context.Context) (string, error) {
@@ -126,15 +136,15 @@ func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	writeJSON(w, map[string]any{
-		"setup_done":        a.state.SetupDone,
-		"status":            a.status,
-		"last_deny":         a.lastDeny,
-		"notify":            a.state.Notify,
-		"ask_mode":          a.state.AskMode,
-		"computer_enabled":  a.state.ComputerEnabled,
-		"agent":             a.state.PreferredAgent,
-		"always_allow":      a.state.AlwaysAllowHosts,
-		"version":           a.opts.Version,
+		"setup_done":       a.state.SetupDone,
+		"status":           a.status,
+		"last_deny":        a.lastDeny,
+		"notify":           a.state.Notify,
+		"ask_mode":         a.state.AskMode,
+		"computer_enabled": a.state.ComputerEnabled,
+		"agent":            a.state.PreferredAgent,
+		"always_allow":     a.state.AlwaysAllowHosts,
+		"version":          a.opts.Version,
 	})
 }
 
@@ -187,7 +197,7 @@ func (a *App) handleSettings(w http.ResponseWriter, r *http.Request) {
 		a.state.AskMode = *body.AskMode
 	}
 	st := a.state
-	wasOn := a.session != nil
+	wasOn := a.proxyd != nil || a.session != nil
 	a.mu.Unlock()
 	notify.SetEnabled(st.Notify)
 	if err := SaveState(st); err != nil {

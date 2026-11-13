@@ -7,9 +7,14 @@ Site: [https://denyout.com](https://denyout.com) · Canon GitHub (planned): [`na
 Agents that can read untrusted text, see sensitive data, and reach the network form a [lethal trifecta](https://arviser.com/guides/lethal-trifecta). DenyOut puts a local policy proxy on the path: **Protect this computer** allows normal web while blocking secret-bearing URLs and unsafe destinations; **Advanced / `denyout run`** default-denies except an allowlist (e.g. model APIs). Audit stays out of the agent’s reach.
 
 ```bash
-# Linux / macOS
+# Linux / macOS — asks Desktop (native tray) vs Server (CLI only)
 curl -fsSL https://raw.githubusercontent.com/nareyko/denyout/main/install.sh | sh
-denyout desktop          # Protect this computer (GUI) — primary for most users
+# or non-interactive:
+#   DENYOUT_INSTALL_MODE=desktop sh install.sh
+#   DENYOUT_INSTALL_MODE=server  sh install.sh
+
+denyout desktop          # native tray + Protect this computer (no browser)
+# denyout desktop --web-ui   # optional localhost UI for tests only
 
 # Advanced / CI — wrap one process
 denyout run -- curl -I https://api.anthropic.com
