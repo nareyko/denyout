@@ -7,18 +7,25 @@ Site: [https://denyout.com](https://denyout.com) · Canon GitHub (planned): [`na
 Agents that can read untrusted text, see sensitive data, and reach the network form a [lethal trifecta](https://arviser.com/guides/lethal-trifecta). DenyOut removes the easy outbound path: every connection goes through a local policy proxy that **denies by default**, blocks secret-bearing URLs, and leaves an audit trail the agent cannot edit.
 
 ```bash
-denyout run -- claude
+# from this repo (dev)
+go run ./cmd/denyout version
+go run ./cmd/denyout check 'https://evil.example/x?api_key=DENYOUT_CANARY_LAB'
+
+# wrap any agent (dev build)
+go run ./cmd/denyout -- run -- claude
 denyout run -- cursor-agent
 denyout run -- python my_agent.py
 ```
 
 ## Status
 
-**Spec-first.** This repository is the **public** product tree: technical specification, examples, and (soon) code. Implementation has not started.
+**Spec-first + working Go CLI.** This repository is the **public** product tree: specs, examples, and a Go binary with `check`, policy load, TLS-intercept proxy, and `denyout run`. Lab expansion, GUI, and install scripts are next.
 
 **Language:** English only.
 
 **MVP intent:** Simple install on **Ubuntu, macOS, and Windows**; CLI + GUI; Go binary; Apache-2.0. See [`docs/12-mvp-and-roadmap.md`](docs/12-mvp-and-roadmap.md) and [`docs/IMPLEMENTATION.md`](docs/IMPLEMENTATION.md).
+
+**Install (locked):** GitHub Releases + SHA256SUMS; Linux/macOS via `install.sh` → `~/.local/bin`; Windows via zip + short EN doc. Details: [`docs/07-desktop.md`](docs/07-desktop.md) §3.
 
 Internal Bet Tree / monetization / full decision log live in a **private HQ** sibling (`denyout-hq`), not in this repo.
 

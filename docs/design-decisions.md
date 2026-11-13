@@ -14,6 +14,7 @@ Updated: 2026-11-13.
 | Wrap model | One binary: `denyout run -- <command>`; deep editor hooks later |
 | UX | CLI **and** GUI; simplicity first-class |
 | Platforms (MVP) | Ubuntu, macOS, Windows **desktop** |
+| Install (MVP) | Releases + SHA256SUMS; `install.sh` → `~/.local/bin` (Linux/macOS); Windows zip + short EN doc; no system CA by default; Homebrew/winget after first release / stretch — [`07-desktop.md`](07-desktop.md) §3 |
 | Phone / mobile | Out of scope for MVP |
 | Server identity | One proxy instance = one policy (sidecar-per-workload) |
 | Release checksums | SHA256SUMS with releases; SBOM/cosign recommended when time allows |

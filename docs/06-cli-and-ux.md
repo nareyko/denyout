@@ -7,7 +7,7 @@
 ## 2. Binary
 
 - Name: `denyout`
-- Install channels (planned): `curl | sh`, Homebrew, apt/yum later, `go install`, container image.
+- Install channels: see locked table in [`07-desktop.md`](07-desktop.md) §3 — **Must** for Dec 1: GitHub Releases + SHA256SUMS, `install.sh` (Linux/macOS), Windows zip + short doc. Homebrew / winget / apt / `go install` / container = later or stretch.
 
 ## 3. Command reference (MVP target)
 

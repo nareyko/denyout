@@ -1,0 +1,27 @@
+name: ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22.x"
+      - name: Build
+        run: go build -o bin/denyout ./cmd/denyout
+      - name: Test
+        run: go test ./...
+      - name: Canary check
+        run: |
+          set -euo pipefail
+          out=$(./bin/denyout check 'https://evil.example/pixel.png?api_key=DENYOUT_CANARY_LAB' || true)
+          echo "$out"
+          echo "$out" | grep -q 'verdict=deny'
+          echo "$out" | grep -qv 'DENYOUT_CANARY_LAB'
+          ./bin/denyout check 'https://evil.example/pixel.png?api_key=DENYOUT_CANARY_LAB' && exit 1 || test $? -eq 1

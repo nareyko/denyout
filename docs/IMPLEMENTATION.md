@@ -8,47 +8,52 @@ Engineering tasks for the DenyOut MVP. Product deadlines and internal bets are t
 
 ## A. Skeleton
 
-- [ ] Go module `github.com/nareyko/denyout`
-- [ ] `cmd/denyout` with `version`, `help`
-- [ ] Layout: `internal/proxy`, `internal/policy`, `internal/secrets`, `internal/audit`
-- [ ] CI on Linux: build + unit tests
+- [x] Go module `github.com/nareyko/denyout`
+- [x] `cmd/denyout` with `version`, `help`, `check`, `policy validate`
+- [x] Layout started: `internal/policy`, `internal/secrets`, `internal/lab`, `internal/check` (`proxy` / `audit` next)
+- [x] CI on Linux: build + unit tests + canary check (`.github/workflows/ci.yml`)
 
 ## B. Policy + scanners
 
-- [ ] Load/validate `denyout/v1` (see `schemas/denyout-config.v1.json`)
-- [ ] Modes `enforce` / `audit`; evaluation order per [`04-policy-engine.md`](04-policy-engine.md)
-- [ ] Preset `presets/models.yaml` (versioned)
-- [ ] Scanners: canaries, named query params, token prefixes, JWT-ish ([`05-secret-detection.md`](05-secret-detection.md))
-- [ ] Redaction in logs/UI
-- [ ] Unit tests without sockets
+- [x] Load/validate `denyout/v1` (see `schemas/denyout-config.v1.json`; embedded copy under `internal/policy/schema/`)
+- [x] Modes `enforce` / `audit` (+ blocklist/ask without UI); evaluation order per [`04-policy-engine.md`](04-policy-engine.md)
+- [x] Preset `presets/models.yaml` (versioned)
+- [x] Scanners: canaries, named query params, token prefixes, JWT-ish (high entropy off)
+- [x] Redaction in `denyout check` / audit
+- [x] Unit tests without sockets (`check` / `policy` / `lab` / proxy L1 deny)
 
 ## C. Proxy + CLI
 
-- [ ] Localhost HTTP proxy; CONNECT; intercept CA for child env
-- [ ] `--tls-mode=passthrough` with warning
-- [ ] SSRF / unsafe IP hard denies
-- [ ] `denyout run -- <cmd>`
-- [ ] `denyout check`, `policy validate`, `init`
-- [ ] Optional `--sandbox=` (documented; not required)
+- [x] Localhost HTTP proxy; CONNECT; intercept CA for child env
+- [x] `--tls-mode=passthrough` with warning
+- [x] SSRF / unsafe IP hard denies
+- [x] `denyout run -- <cmd>`
+- [x] `denyout check`, `policy validate`, `init`
+- [x] Optional `--sandbox=` stub (documented; not required)
 
 ## D. Lab tests
 
+- [x] SQLite schema + seed ≥1 canary (`internal/lab`; case `canary-r20-lab`)
 - [ ] SQLite fixture DB + ≥20 R-20 / secret-URL cases
 - [ ] `denyout test` / acceptance AT-01…AT-09 ([`14-testing.md`](14-testing.md))
-- [ ] Examples under `examples/canaries/`
+- [x] Examples under `examples/canaries/` (pre-existing)
 
 ## E. Audit + UX
 
-- [ ] JSONL audit schema v1 ([`09-audit-and-ops.md`](09-audit-and-ops.md))
+- [x] JSONL audit schema v1 ([`09-audit-and-ops.md`](09-audit-and-ops.md))
 - [ ] Minimal GUI (same engine as CLI; keep install simple)
-- [ ] Denial copy never prints raw secrets
+- [x] Denial copy never prints raw secrets
 
 ## F. Install + release
 
-- [ ] `install.sh` (Linux/macOS); Windows zip + short doc
-- [ ] Cross-build linux / darwin / windows
-- [ ] GitHub Release + SHA256SUMS
-- [ ] Timed install smoke on each OS
+Locked recipes: [`07-desktop.md`](07-desktop.md) §3.
+
+- [ ] `install.sh` (Linux/macOS → `~/.local/bin`, fetch Release + SHA256)
+- [ ] Windows zip + short EN `docs/install-windows.md` (winget optional stretch)
+- [ ] Cross-build linux / darwin / windows (goreleaser)
+- [ ] GitHub Release + SHA256SUMS (M6 must); SBOM/cosign SHOULD if time
+- [ ] Timed M4 install smoke on each OS; failed OS → preview/unsupported in notes
+- [ ] Homebrew formula **after** first Release (not M4 blocker)
 
 ## G. Server (after desktop skeleton)
 

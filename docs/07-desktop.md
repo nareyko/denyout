@@ -14,16 +14,50 @@
 | macOS Apple Silicon / Intel | Yes | Notifications + keychain later |
 | Windows | Yes (M4 install path) | Proxy env works; CA / intercept UX is the risk; if M4 fails → mark preview/unsupported |
 
-## 3. Install
+## 3. Install (locked for MVP / M4–M6)
 
-Planned:
+**SoT of artifacts:** GitHub Releases (`nareyko/denyout`) with binaries for **linux, darwin, windows** + **SHA256SUMS** (goreleaser).  
+**Default trust:** no system-wide CA; session CA via child env only (see §5–§7).
+
+### 3.1 Canonical recipes (≤5 minutes — M4)
+
+| OS | Canonical path | Fallback if M4 fails |
+| --- | --- | --- |
+| **Ubuntu / Linux** | `curl -fsSL https://denyout.com/install.sh \| sh` → `~/.local/bin/denyout` (script fetches Release + verifies SHA256) | Manual `.tar.gz` from Release |
+| **macOS** | Same `install.sh` → `~/.local/bin` | Manual `.tar.gz`; Homebrew = **post–first release**, not required for M4 |
+| **Windows** | `.zip` from Release + short EN install doc (PATH to `denyout.exe`) | Mark OS **preview / unsupported** in release notes; **winget = optional stretch** |
 
 ```bash
+# Unix (Linux / macOS) — preferred
 curl -fsSL https://denyout.com/install.sh | sh
-# installs to ~/.local/bin/denyout
+denyout version
+denyout init
+denyout run -- curl -I https://api.anthropic.com
 ```
 
-Also: Homebrew formula, GitHub Releases binaries.
+```text
+Windows (MVP):
+1. Download denyout_*_windows_*.zip from GitHub Releases
+2. Verify SHA256 against SHA256SUMS
+3. Extract denyout.exe onto PATH (see docs/install-windows.md — short EN)
+4. denyout version && denyout init && denyout run -- ...
+```
+
+### 3.2 Channels — status
+
+| Channel | Dec 1 status |
+| --- | --- |
+| GitHub Releases + SHA256SUMS | **Must** (M6) |
+| `install.sh` (Linux/macOS) | **Must** (M4) |
+| Windows zip + short EN doc | **Must** (M4) |
+| Homebrew | After first Release (nice-to-have) |
+| winget | Optional stretch |
+| `go install` | Contributors only (needs Go toolchain) |
+| apt / yum / scoop / chocolatey | Deferred |
+| Container image | Server path (`denyout serve`), not laptop M4 |
+| denyout.com hosts `install.sh` | Same script as repo; site may redirect to GitHub raw/Release |
+
+One release pipeline feeds every channel; package managers only re-point at Release assets.
 
 ## 4. Runtime algorithm (`denyout run`)
 

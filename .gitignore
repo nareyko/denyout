@@ -3,9 +3,11 @@
 /dist/
 /target/
 *.exe
-denyout
+/denyout
 !docs/
 !examples/
+*.sqlite
+*.sqlite-journal
 
 # IDE / OS
 .DS_Store
