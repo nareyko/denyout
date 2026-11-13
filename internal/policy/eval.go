@@ -89,23 +89,55 @@ func (e *Engine) EvaluateURL(rawURL string) (Decision, error) {
 func (e *Engine) Evaluate(rv RequestView) Decision {
 	cfg := e.Cfg
 	host := normalizeHost(rv.DestHost)
-	var reasons []string
-	var detectors []string
-
 	if host == "" {
 		return Decision{Verdict: "deny", Reasons: []string{ReasonInvalidURL}}
 	}
-
-	// Forbidden wildcard patterns.
-	if !cfg.InsecureAllowAll {
-		for _, r := range cfg.Allow {
-			if r.Host == "*" || r.Host == "*.*" {
-				return Decision{Verdict: "deny", Reasons: []string{ReasonHostNotAllowed}}
-			}
-		}
+	if d := denyForbiddenWildcards(cfg); d != nil {
+		return *d
 	}
 
-	ips := rv.DestIPs
+	var reasons []string
+	ips, early := e.resolveIPs(cfg, host, rv.DestIPs, &reasons)
+	if early != nil {
+		return *early
+	}
+	if d := denyUnsafeIPs(ips, cfg.AllowPrivate, reasons); d != nil {
+		return *d
+	}
+	if d := denyDisallowedPort(cfg, rv.DestPort, reasons); d != nil {
+		return *d
+	}
+
+	reasons, detectors, early := applySecretScanners(cfg, rv, reasons)
+	if early != nil {
+		return *early
+	}
+	if d := denyListedHost(cfg, host, reasons, detectors); d != nil {
+		return *d
+	}
+	if e.rateLimited(host) {
+		return Decision{
+			Verdict:   "deny",
+			Reasons:   uniq(append(reasons, ReasonRateLimited)),
+			Detectors: uniq(detectors),
+		}
+	}
+	return verdictByMode(cfg, host, reasons, detectors)
+}
+
+func denyForbiddenWildcards(cfg *Config) *Decision {
+	if cfg.InsecureAllowAll {
+		return nil
+	}
+	for _, r := range cfg.Allow {
+		if r.Host == "*" || r.Host == "*.*" {
+			return &Decision{Verdict: "deny", Reasons: []string{ReasonHostNotAllowed}}
+		}
+	}
+	return nil
+}
+
+func (e *Engine) resolveIPs(cfg *Config, host string, ips []net.IP, reasons *[]string) ([]net.IP, *Decision) {
 	if len(ips) == 0 && e.Resolve != nil && net.ParseIP(host) == nil {
 		resolved, err := e.Resolve(host)
 		if err != nil || len(resolved) == 0 {
@@ -114,7 +146,7 @@ func (e *Engine) Evaluate(rv RequestView) Decision {
 				denyDNS = *cfg.DenyOnDNSFailure
 			}
 			if denyDNS {
-				return Decision{Verdict: "deny", Reasons: []string{ReasonDNSFailure}}
+				return nil, &Decision{Verdict: "deny", Reasons: []string{ReasonDNSFailure}}
 			}
 		} else {
 			ips = resolved
@@ -123,31 +155,34 @@ func (e *Engine) Evaluate(rv RequestView) Decision {
 	if ip := net.ParseIP(host); ip != nil {
 		ips = []net.IP{ip}
 		if !cfg.AllowIPLiterals {
-			reasons = append(reasons, ReasonHostNotAllowed)
+			*reasons = append(*reasons, ReasonHostNotAllowed)
 		}
 	}
+	return ips, nil
+}
 
+func denyUnsafeIPs(ips []net.IP, allowPrivate bool, reasons []string) *Decision {
 	for _, ip := range ips {
-		if UnsafeIP(ip, cfg.AllowPrivate) {
-			reasons = append(reasons, ReasonUnsafeIP)
-			return Decision{Verdict: "deny", Reasons: uniq(reasons)}
+		if UnsafeIP(ip, allowPrivate) {
+			return &Decision{Verdict: "deny", Reasons: uniq(append(reasons, ReasonUnsafeIP))}
 		}
 	}
+	return nil
+}
 
-	if len(cfg.AllowedPorts) > 0 && rv.DestPort != 0 {
-		okPort := false
-		for _, p := range cfg.AllowedPorts {
-			if uint16(p) == rv.DestPort {
-				okPort = true
-				break
-			}
-		}
-		if !okPort {
-			reasons = append(reasons, ReasonPortNotAllowed)
-			return Decision{Verdict: "deny", Reasons: uniq(reasons)}
+func denyDisallowedPort(cfg *Config, port uint16, reasons []string) *Decision {
+	if len(cfg.AllowedPorts) == 0 || port == 0 {
+		return nil
+	}
+	for _, p := range cfg.AllowedPorts {
+		if uint16(p) == port {
+			return nil
 		}
 	}
+	return &Decision{Verdict: "deny", Reasons: uniq(append(reasons, ReasonPortNotAllowed))}
+}
 
+func applySecretScanners(cfg *Config, rv RequestView, reasons []string) ([]string, []string, *Decision) {
 	scanURL := rv.RawURL
 	if scanURL == "" {
 		scanURL = rebuildURL(rv)
@@ -156,41 +191,43 @@ func (e *Engine) Evaluate(rv RequestView) Decision {
 	if len(rv.BodyPrefix) > 0 {
 		hits = append(hits, secrets.ScanBytes(rv.BodyPrefix, cfg.Scanners.Canaries)...)
 	}
+	var detectors []string
 	for _, h := range hits {
 		reasons = append(reasons, h.Reason)
 		detectors = append(detectors, h.Detector)
 	}
-
-	secretHit := len(hits) > 0
-	if secretHit {
-		hard := true
-		if cfg.Scanners.HardSecretsInAuditMode != nil {
-			hard = *cfg.Scanners.HardSecretsInAuditMode
-		}
-		switch cfg.Mode {
-		case "audit":
-			if hard {
-				return Decision{Verdict: "deny", Reasons: uniq(reasons), Detectors: uniq(detectors)}
-			}
-		default:
-			return Decision{Verdict: "deny", Reasons: uniq(reasons), Detectors: uniq(detectors)}
-		}
+	if len(hits) == 0 {
+		return reasons, detectors, nil
 	}
+	hard := true
+	if cfg.Scanners.HardSecretsInAuditMode != nil {
+		hard = *cfg.Scanners.HardSecretsInAuditMode
+	}
+	if cfg.Mode == "audit" && !hard {
+		return reasons, detectors, nil
+	}
+	return reasons, detectors, &Decision{
+		Verdict:   "deny",
+		Reasons:   uniq(reasons),
+		Detectors: uniq(detectors),
+	}
+}
 
+func denyListedHost(cfg *Config, host string, reasons, detectors []string) *Decision {
 	for _, r := range cfg.Deny {
 		if HostMatch(r.Host, host) {
-			reasons = append(reasons, ReasonHostDenied)
-			return Decision{Verdict: "deny", Reasons: uniq(reasons), Detectors: uniq(detectors)}
+			return &Decision{
+				Verdict:   "deny",
+				Reasons:   uniq(append(reasons, ReasonHostDenied)),
+				Detectors: uniq(detectors),
+			}
 		}
 	}
+	return nil
+}
 
-	if e.rateLimited(host) {
-		reasons = append(reasons, ReasonRateLimited)
-		return Decision{Verdict: "deny", Reasons: uniq(reasons), Detectors: uniq(detectors)}
-	}
-
+func verdictByMode(cfg *Config, host string, reasons, detectors []string) Decision {
 	allowed := HostAllowed(cfg, host) || cfg.InsecureAllowAll
-
 	switch cfg.Mode {
 	case "audit":
 		would := !allowed
@@ -202,8 +239,11 @@ func (e *Engine) Evaluate(rv RequestView) Decision {
 		return Decision{Verdict: "allow", Reasons: uniq(reasons), Detectors: uniq(detectors)}
 	default: // enforce, ask (ask without UI → deny if not allowed)
 		if !allowed {
-			reasons = append(reasons, ReasonHostNotAllowed)
-			return Decision{Verdict: "deny", Reasons: uniq(reasons), Detectors: uniq(detectors)}
+			return Decision{
+				Verdict:   "deny",
+				Reasons:   uniq(append(reasons, ReasonHostNotAllowed)),
+				Detectors: uniq(detectors),
+			}
 		}
 		return Decision{Verdict: "allow", Reasons: uniq(reasons), Detectors: uniq(detectors)}
 	}
@@ -283,7 +323,7 @@ func HostMatch(pattern, host string) bool {
 		return false
 	}
 	if strings.HasPrefix(pattern, "*.") {
-		suffix := pattern[1:]
+		suffix := pattern[1:] // ".domain"
 		apex := pattern[2:]
 		if host == apex {
 			return false

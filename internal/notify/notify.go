@@ -41,13 +41,14 @@ func Deny(host string, reasons []string) {
 		host = "a website"
 	}
 	title := "DenyOut blocked a request"
-	body := fmt.Sprintf("Blocked connection to %s.\n%s", host, humanReasons(reasons))
+	body := fmt.Sprintf("Blocked connection to %s.\n%s", host, HumanReasons(reasons))
 	if err := beeep.Notify(title, body, ""); err != nil {
 		fmt.Fprintf(os.Stderr, "denyout: notification: %v\n", err)
 	}
 }
 
-func humanReasons(reasons []string) string {
+// HumanReasons turns stable reason codes into plain-language copy.
+func HumanReasons(reasons []string) string {
 	if len(reasons) == 0 {
 		return "Your agent tried to reach something outside the allowlist."
 	}

@@ -160,7 +160,7 @@ func dedupeHits(in []Hit) []Hit {
 	return out
 }
 
-// RedactURL replaces secret-looking query values with ***.
+// RedactURL replaces secret-looking query values and canary/token shapes with ***.
 func RedactURL(raw string) string {
 	u, err := url.Parse(raw)
 	if err != nil {
@@ -183,20 +183,76 @@ func RedactURL(raw string) string {
 	}
 	if changed {
 		u.RawQuery = q.Encode()
-		return u.String()
 	}
-	rq := u.RawQuery
-	for _, marker := range []string{"DENYOUT_CANARY_", "ARVISER_CANARY_", "SECRET_MARKER_"} {
-		if strings.Contains(rq, marker) || strings.Contains(u.Path, marker) {
-			u.RawQuery = "redacted=***"
-			return u.String()
+
+	// Canaries / token shapes may appear outside named query keys (host, path, opaque).
+	markers := []string{"DENYOUT_CANARY_", "ARVISER_CANARY_", "SECRET_MARKER_"}
+	blob := u.String()
+	if blob == "" {
+		blob = raw
+	}
+	needsHeavy := false
+	for _, marker := range markers {
+		if strings.Contains(blob, marker) || strings.Contains(raw, marker) {
+			needsHeavy = true
+			break
 		}
 	}
-	if reJWT.MatchString(raw) || reOpenAI.MatchString(raw) {
-		u.RawQuery = "redacted=***"
+	if !needsHeavy {
+		needsHeavy = reJWT.MatchString(raw) || reOpenAI.MatchString(raw) ||
+			reAnthropic.MatchString(raw) || reGitHub.MatchString(raw) ||
+			reAWS.MatchString(raw) || reSlack.MatchString(raw)
+	}
+	if needsHeavy {
+		if u.User != nil {
+			u.User = url.UserPassword("***", "***")
+		}
+		if u.Host != "" {
+			u.Host = redactMarkers(u.Host, markers)
+		}
+		if u.Opaque != "" {
+			u.Opaque = redactMarkers(u.Opaque, markers)
+		}
+		u.Path = redactMarkers(u.Path, markers)
+		if u.RawQuery != "" {
+			u.RawQuery = "redacted=***"
+		} else if strings.Contains(raw, "?") {
+			u.RawQuery = "redacted=***"
+		}
+		u.Fragment = ""
+		out := u.String()
+		for _, marker := range markers {
+			if strings.Contains(out, marker) {
+				return "***"
+			}
+		}
+		return out
+	}
+	if changed {
 		return u.String()
 	}
 	return raw
+}
+
+func redactMarkers(s string, markers []string) string {
+	out := s
+	for _, marker := range markers {
+		for strings.Contains(out, marker) {
+			i := strings.Index(out, marker)
+			// Replace marker + following token-ish run with ***.
+			j := i + len(marker)
+			for j < len(out) {
+				c := out[j]
+				if (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' || c == '-' {
+					j++
+					continue
+				}
+				break
+			}
+			out = out[:i] + "***" + out[j:]
+		}
+	}
+	return out
 }
 
 // RedactQuery returns query with sensitive values starred.

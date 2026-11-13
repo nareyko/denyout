@@ -50,47 +50,17 @@ func Run(ctx context.Context, opts Options) error {
 		return fmt.Errorf("config: %w", err)
 	}
 
-	listen := opts.Listen
-	if listen == "" {
-		host := cfg.Listen.Host
-		port := cfg.Listen.Port
-		if host == "" {
-			host = "127.0.0.1"
-		}
-		if port == 0 {
-			port = 8080
-		}
-		listen = net.JoinHostPort(host, strconv.Itoa(port))
-	}
-	host, portStr, err := net.SplitHostPort(listen)
+	host, port, err := resolveListen(opts.Listen, cfg)
 	if err != nil {
-		return fmt.Errorf("listen %q: %w", listen, err)
+		return err
 	}
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		return fmt.Errorf("listen port: %w", err)
-	}
-
-	tlsMode := opts.TLSMode
-	if tlsMode == "" {
-		if cfg.TLS.Mode == string(proxy.TLSPassthrough) {
-			tlsMode = proxy.TLSPassthrough
-		} else {
-			tlsMode = proxy.TLSIntercept
-		}
-	}
+	tlsMode := resolveTLSMode(opts.TLSMode, cfg)
 	if tlsMode == proxy.TLSPassthrough {
 		fmt.Fprintln(os.Stderr, "denyout serve: WARNING: tls-mode=passthrough — secret-in-URL / canary scanning on HTTPS is limited; not full R-20 protection")
 	}
 
-	metricsListen := opts.MetricsListen
-	if metricsListen == "" {
-		metricsListen = cfg.Server.MetricsListen
-	}
-	healthListen := opts.HealthListen
-	if healthListen == "" {
-		healthListen = cfg.Server.HealthListen
-	}
+	metricsListen := firstNonEmpty(opts.MetricsListen, cfg.Server.MetricsListen)
+	healthListen := firstNonEmpty(opts.HealthListen, cfg.Server.HealthListen)
 
 	sessionID := uuid.NewString()
 	sum := sha256.Sum256(raw)
@@ -167,17 +137,28 @@ func Run(ctx context.Context, opts Options) error {
 		DenyOutVersion: opts.Version,
 	})
 
-	var aux []*http.Server
-	shutdownAux := func() {
-		for _, a := range aux {
-			shCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-			_ = a.Shutdown(shCtx)
-			cancel()
-		}
+	aux, err := startOpsListeners(healthListen, metricsListen, cfg, opts.Version, &ready)
+	if err != nil {
+		return err
 	}
-	defer shutdownAux()
+	defer shutdownHTTP(aux)
 
-	healthHandler := func(w http.ResponseWriter, r *http.Request) {
+	<-ctx.Done()
+	ready.Store(false)
+	_ = sink.Log(audit.Event{
+		SessionID:      sessionID,
+		Verdict:        "session_end",
+		Reasons:        []string{},
+		Mode:           cfg.Mode,
+		Network:        audit.Network{DestHost: host, DestPort: srv.Port()},
+		PolicyHash:     policyHash,
+		DenyOutVersion: opts.Version,
+	})
+	return nil
+}
+
+func healthHandler(ready *atomic.Bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/healthz", "/livez":
 			w.WriteHeader(http.StatusOK)
@@ -193,55 +174,96 @@ func Run(ctx context.Context, opts Options) error {
 			http.NotFound(w, r)
 		}
 	}
+}
 
+func startOpsListeners(healthListen, metricsListen string, cfg *policy.Config, version string, ready *atomic.Bool) ([]*http.Server, error) {
+	var aux []*http.Server
+	hh := healthHandler(ready)
 	if healthListen != "" {
-		hs := &http.Server{Handler: http.HandlerFunc(healthHandler), ReadHeaderTimeout: 5 * time.Second}
-		aux = append(aux, hs)
+		hs := &http.Server{Handler: hh, ReadHeaderTimeout: 5 * time.Second}
 		hl, err := net.Listen("tcp", healthListen)
 		if err != nil {
-			return fmt.Errorf("health listen: %w", err)
+			return nil, fmt.Errorf("health listen: %w", err)
 		}
+		aux = append(aux, hs)
 		fmt.Fprintf(os.Stderr, "denyout serve: health=%s (/healthz /readyz)\n", hl.Addr())
 		go func() { _ = hs.Serve(hl) }()
 	}
-
 	if metricsListen != "" {
 		mux := http.NewServeMux()
 		mux.HandleFunc("/metrics", func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", "text/plain; version=0.0.4")
 			fmt.Fprintf(w, "# HELP denyout_up 1 if proxy is ready\n# TYPE denyout_up gauge\ndenyout_up %d\n", boolInt(ready.Load()))
 			fmt.Fprintf(w, "# HELP denyout_info Build/session labels\n# TYPE denyout_info gauge\ndenyout_info{mode=%q,preset=%q,version=%q} 1\n",
-				cfg.Mode, cfg.Preset, opts.Version)
+				cfg.Mode, cfg.Preset, version)
 		})
 		if healthListen == "" {
-			mux.HandleFunc("/healthz", healthHandler)
-			mux.HandleFunc("/readyz", healthHandler)
-			mux.HandleFunc("/livez", healthHandler)
+			mux.HandleFunc("/healthz", hh)
+			mux.HandleFunc("/readyz", hh)
+			mux.HandleFunc("/livez", hh)
 		}
 		ms := &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second}
-		aux = append(aux, ms)
 		ml, err := net.Listen("tcp", metricsListen)
 		if err != nil {
-			return fmt.Errorf("metrics listen: %w", err)
+			shutdownHTTP(aux)
+			return nil, fmt.Errorf("metrics listen: %w", err)
 		}
+		aux = append(aux, ms)
 		fmt.Fprintf(os.Stderr, "denyout serve: metrics=%s (/metrics)\n", ml.Addr())
 		go func() { _ = ms.Serve(ml) }()
 	}
+	return aux, nil
+}
 
-	// If neither health nor metrics: still expose health on a loopback admin derived from proxy port+1? Skip — readinessProbe can use TCP on proxy port.
+func shutdownHTTP(aux []*http.Server) {
+	for _, a := range aux {
+		shCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		_ = a.Shutdown(shCtx)
+		cancel()
+	}
+}
 
-	<-ctx.Done()
-	ready.Store(false)
-	_ = sink.Log(audit.Event{
-		SessionID:      sessionID,
-		Verdict:        "session_end",
-		Reasons:        []string{},
-		Mode:           cfg.Mode,
-		Network:        audit.Network{DestHost: host, DestPort: srv.Port()},
-		PolicyHash:     policyHash,
-		DenyOutVersion: opts.Version,
-	})
-	return nil
+func resolveListen(flag string, cfg *policy.Config) (host string, port int, err error) {
+	listen := flag
+	if listen == "" {
+		h := cfg.Listen.Host
+		p := cfg.Listen.Port
+		if h == "" {
+			h = "127.0.0.1"
+		}
+		if p == 0 {
+			p = 8080
+		}
+		listen = net.JoinHostPort(h, strconv.Itoa(p))
+	}
+	host, portStr, err := net.SplitHostPort(listen)
+	if err != nil {
+		return "", 0, fmt.Errorf("listen %q: %w", listen, err)
+	}
+	port, err = strconv.Atoi(portStr)
+	if err != nil {
+		return "", 0, fmt.Errorf("listen port: %w", err)
+	}
+	return host, port, nil
+}
+
+func resolveTLSMode(flag proxy.TLSMode, cfg *policy.Config) proxy.TLSMode {
+	if flag != "" {
+		return flag
+	}
+	if cfg.TLS.Mode == string(proxy.TLSPassthrough) {
+		return proxy.TLSPassthrough
+	}
+	return proxy.TLSIntercept
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 func hostForURL(host string) string {
