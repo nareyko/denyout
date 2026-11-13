@@ -1,22 +1,26 @@
 package desktop
 
 import (
-	"context"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/nareyko/denyout/internal/notify"
 )
 
-// Install performs silent desktop setup: autostart, try computer scope once,
-// fall back to session, detach tray, return.
+// Install performs silent desktop setup: autostart, persist preferred scope,
+// detach tray. Elevation happens at most once inside the tray process
+// (restoreProtection) — never Apply+Remove+Apply from the installer.
 func Install(opts Options) error {
+	_ = opts
 	st := LoadState()
 	st.SetupDone = true
 	st.Notify = true
 	st.AskMode = false
 	st.ComputerAvailable = true
+	// Prefer whole-computer; tray will try once, then fall back to session.
+	st.Scope = ScopeComputer
+	st.ProtectionOn = true
+	st.ComputerEnabled = true
 	if err := SaveState(st); err != nil {
 		return err
 	}
@@ -28,50 +32,11 @@ func Install(opts Options) error {
 		fmt.Fprintln(os.Stderr, "denyout install: login autostart registered")
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	a := &App{opts: opts, state: LoadState(), status: "Off"}
-	if _, err := a.startControlServer(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "denyout install: control server: %v\n", err)
-	}
-
-	scope := ScopeSession
-	avail := true
-	fmt.Fprintln(os.Stderr, "denyout install: trying Protect whole computer (admin may be required)…")
-	if err := a.startComputer(); err != nil {
-		fmt.Fprintf(os.Stderr, "denyout install: computer mode unavailable: %v\n", err)
-		avail = false
-		if err := a.startSession(); err != nil {
-			fmt.Fprintf(os.Stderr, "denyout install: session mode failed: %v\n", err)
-			scope = ScopeOff
-		} else {
-			scope = ScopeSession
-			fmt.Fprintln(os.Stderr, "denyout install: running in Session mode (proxy; no admin)")
-			notify.Info("DenyOut", "Session mode (no admin). Use tray → Protect whole computer for full protection.")
-		}
-	} else {
-		scope = ScopeComputer
-		fmt.Fprintln(os.Stderr, "denyout install: Protect whole computer is on")
-	}
-
-	// Tear down this process's protectors; tray will restore from state.
-	a.stopAll()
-	cancel()
-	time.Sleep(150 * time.Millisecond)
-
-	st = LoadState()
-	st.SetupDone = true
-	st.Scope = scope
-	st.ComputerAvailable = avail
-	st.ProtectionOn = scope == ScopeComputer || scope == ScopeSession
-	st.ComputerEnabled = scope == ScopeComputer
-	_ = SaveState(st)
-
 	if err := DetachDesktop(); err != nil {
 		return fmt.Errorf("start tray: %w", err)
 	}
-	fmt.Fprintf(os.Stderr, "denyout install: done (scope=%s protection_on=%v computer_available=%v)\n",
-		st.Scope, st.ProtectionOn, st.ComputerAvailable)
+
+	fmt.Fprintln(os.Stderr, "denyout install: tray started — approve admin once if prompted (or Session mode without password)")
+	fmt.Fprintf(os.Stderr, "denyout install: done (scope=%s protection_on=%v)\n", st.Scope, st.ProtectionOn)
 	return nil
 }

@@ -53,7 +53,11 @@ denyout run -- curl -I https://api.anthropic.com
 | **Computer** | hostguard transparent redirect + system CA | Yes (once) | This user’s TCP 80/443 (OS-dependent) |
 | **Session** | local proxy + `HTTP(S)_PROXY` / `environment.d` | No | Apps that honor proxy env; browsers may ignore |
 
-Tray: Protect whole computer / Protect this session / Turn off / Settings / Open logs (`~/.local/state/denyout/audit.jsonl`).
+Tray: Protect whole computer / Protect this session / Turn off / Settings / **Open logs** / **Copy last error**.
+
+Logs live in `~/.local/state/denyout/` (`desktop.log`, `last-error.txt`, `audit.jsonl`). Elevation failures (pkexec/UAC) are written there with full stderr so you can paste them when debugging.
+
+Install elevates **at most once** (in the tray process). Turning protection off may ask once more to remove host rules.
 
 ```text
 Windows (MVP):

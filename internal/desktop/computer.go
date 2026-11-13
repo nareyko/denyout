@@ -49,6 +49,7 @@ func (a *App) startComputer() error {
 		st := a.state
 		a.mu.Unlock()
 		_ = SaveState(st)
+		RecordError("hostguard.ElevateApply", err.Error())
 		return err
 	}
 
@@ -127,7 +128,10 @@ func (a *App) startComputer() error {
 }
 
 
-func (a *App) stopComputerKeep(keepRestore bool) {
+// stopComputerOpts stops computer-mode proxyd.
+// If elevateRemove is false, only kills proxyd — next ElevateApply replaces nft/pf
+// in one admin prompt (avoid Remove+Apply = two passwords).
+func (a *App) stopComputerOpts(keepRestore, elevateRemove bool) {
 	a.mu.Lock()
 	cmd := a.proxyd
 	port := a.proxyPort
@@ -147,12 +151,6 @@ func (a *App) stopComputerKeep(keepRestore bool) {
 	a.mu.Unlock()
 	_ = SaveState(st)
 
-	// Only tear down hostguard when we actually started computer-mode proxyd.
-	// Session mode also stores proxyPort — must not trigger ElevateRemove/pkexec.
-	if hadProxyd && port > 0 {
-		uid, _ := hostguard.CurrentUID()
-		_ = hostguard.ElevateRemove(port, uid)
-	}
 	if cmd != nil && cmd.Process != nil {
 		_ = cmd.Process.Signal(os.Interrupt)
 		done := make(chan struct{})
@@ -166,16 +164,22 @@ func (a *App) stopComputerKeep(keepRestore bool) {
 			_ = cmd.Process.Kill()
 		}
 	}
+	// Only tear down hostguard when leaving computer mode for real.
+	// Session mode also stores proxyPort — must not trigger ElevateRemove/pkexec.
+	if elevateRemove && hadProxyd && port > 0 {
+		uid, _ := hostguard.CurrentUID()
+		_ = hostguard.ElevateRemove(port, uid)
+	}
 }
 
 func (a *App) stopAll() {
-	a.stopComputerKeep(true)
+	a.stopComputerOpts(true, false) // keep rules; caller may re-Apply once
 	a.stopSessionKeep(true)
 	a.setStatus("Off")
 }
 
 func (a *App) stopProtection() {
-	a.stopComputerKeep(false)
+	a.stopComputerOpts(false, true) // user turned off → one Remove prompt
 	a.stopSession()
 	a.mu.Lock()
 	a.state.ProtectionOn = false
@@ -219,16 +223,15 @@ func (a *App) allowHostAlways(host string) error {
 	a.mu.Lock()
 	sess := a.session
 	wasProxy := a.proxyd != nil
-	scope := a.state.Scope
 	a.mu.Unlock()
 	if sess != nil {
 		return nil
 	}
 	if wasProxy {
-		a.stopComputerKeep(true)
+		// Kill proxyd only; ElevateApply replaces redirect in one password.
+		a.stopComputerOpts(true, false)
 		return a.startComputer()
 	}
-	_ = scope
 	return nil
 }
 
@@ -242,15 +245,16 @@ func (a *App) enableComputerFromTray() {
 	if err := a.startComputer(); err != nil {
 		fmt.Fprintf(os.Stderr, "denyout desktop: %v\n", err)
 		a.setStatus("Needs admin")
-		notify.Info("DenyOut", "Admin approval failed. Staying in Session mode.")
+		notify.Info("DenyOut", "Admin failed — tray → Copy last error / Open logs. Session mode on.")
 		_ = a.startSession()
 		return
 	}
+	AppendDesktopLog("INFO computer mode on")
 	notify.Info("DenyOut", "Protect whole computer is on.")
 }
 
 func (a *App) enableSessionFromTray() {
-	a.stopComputerKeep(false)
+	a.stopComputerOpts(false, true) // leaving computer → Remove once
 	if err := a.startSession(); err != nil {
 		fmt.Fprintf(os.Stderr, "denyout desktop: %v\n", err)
 		a.setStatus("Error")
@@ -267,7 +271,7 @@ func (a *App) restartActiveProtector() {
 	if !on {
 		return
 	}
-	a.stopAll()
+	a.stopAll() // computer: no ElevateRemove; session: stop in-process
 	a.mu.Lock()
 	a.state.ProtectionOn = true
 	a.state.Scope = scope
@@ -293,18 +297,26 @@ func (a *App) restoreProtection() {
 	if scope == "" {
 		scope = ScopeComputer
 	}
+	AppendDesktopLog("INFO restore scope=%s", scope)
 	switch scope {
 	case ScopeComputer:
 		if err := a.startComputer(); err != nil {
 			fmt.Fprintf(os.Stderr, "denyout desktop: restore computer failed: %v — session mode\n", err)
+			RecordError("restore.computer", err.Error())
 			a.mu.Lock()
 			a.state.ComputerAvailable = false
+			st := a.state
 			a.mu.Unlock()
-			_ = a.startSession()
+			_ = SaveState(st)
+			notify.Info("DenyOut", "Admin failed — Open logs / Copy last error. Using Session mode.")
+			if err := a.startSession(); err != nil {
+				RecordError("restore.session", err.Error())
+			}
 		}
 	case ScopeSession:
 		if err := a.startSession(); err != nil {
 			fmt.Fprintf(os.Stderr, "denyout desktop: restore session failed: %v\n", err)
+			RecordError("restore.session", err.Error())
 		}
 	}
 }

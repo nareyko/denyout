@@ -62,6 +62,9 @@ func (a *App) runTray(ctx context.Context) error {
 	menu.Add("Open logs…", func() {
 		openLogsOrPrint()
 	})
+	menu.Add("Copy last error", func() {
+		copyLastErrorOrPrint()
+	})
 	menu.AddSeparator()
 	menu.Add("Advanced: protect shell", func() {
 		a.mu.Lock()
