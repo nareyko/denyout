@@ -1,7 +1,7 @@
-.PHONY: build test check canary lab accept
+.PHONY: build test check canary lab accept snapshot release-dry
 
 build:
-	go build -o bin/denyout ./cmd/denyout
+	go build -ldflags "-X main.version=dev" -o bin/denyout ./cmd/denyout
 
 test:
 	go test ./...
@@ -19,3 +19,11 @@ lab: build
 
 accept:
 	go test ./internal/accept/ -count=1
+
+# Local goreleaser snapshot (no GitHub publish). Needs goreleaser on PATH.
+snapshot:
+	goreleaser release --snapshot --clean
+
+# Validate config only
+release-dry:
+	goreleaser check

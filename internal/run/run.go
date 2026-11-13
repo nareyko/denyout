@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"syscall"
 
 	"github.com/google/uuid"
 
@@ -132,7 +131,7 @@ func Exec(opts Options) (int, error) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Env = childEnv(os.Environ(), proxyURL, sessionID, ca)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	setProcGroup(cmd)
 
 	if err := cmd.Start(); err != nil {
 		return 2, err
@@ -149,9 +148,7 @@ func Exec(opts Options) (int, error) {
 			return 2, waitErr
 		}
 	}
-	if cmd.Process != nil {
-		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
-	}
+	killProcGroup(cmd)
 	_ = sink.Log(audit.Event{
 		SessionID:      sessionID,
 		Verdict:        "session_end",

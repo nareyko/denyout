@@ -48,10 +48,10 @@ Engineering tasks for the DenyOut MVP. Product deadlines and internal bets are t
 
 Locked recipes: [`07-desktop.md`](07-desktop.md) §3.
 
-- [ ] `install.sh` (Linux/macOS → `~/.local/bin`, fetch Release + SHA256)
-- [ ] Windows zip + short EN `docs/install-windows.md` (winget optional stretch)
-- [ ] Cross-build linux / darwin / windows (goreleaser)
-- [ ] GitHub Release + SHA256SUMS (M6 must); SBOM/cosign SHOULD if time
+- [x] `install.sh` (Linux/macOS → `~/.local/bin`, fetch Release + SHA256)
+- [x] Windows zip + short EN `docs/install-windows.md` (winget optional stretch)
+- [x] Cross-build linux / darwin / windows (`.goreleaser.yaml` + `release` workflow on `v*` tags)
+- [ ] GitHub Release + SHA256SUMS (M6 must) — tag `v*` to publish; SBOM/cosign SHOULD if time
 - [ ] Timed M4 install smoke on each OS; failed OS → preview/unsupported in notes
 - [ ] Homebrew formula **after** first Release (not M4 blocker)
 

@@ -7,25 +7,29 @@ Site: [https://denyout.com](https://denyout.com) · Canon GitHub (planned): [`na
 Agents that can read untrusted text, see sensitive data, and reach the network form a [lethal trifecta](https://arviser.com/guides/lethal-trifecta). DenyOut removes the easy outbound path: every connection goes through a local policy proxy that **denies by default**, blocks secret-bearing URLs, and leaves an audit trail the agent cannot edit.
 
 ```bash
+# Linux / macOS (after a GitHub Release exists)
+curl -fsSL https://raw.githubusercontent.com/nareyko/denyout/main/install.sh | sh
+denyout version
+denyout init
+denyout run -- curl -I https://api.anthropic.com
+
 # from this repo (dev)
 go run ./cmd/denyout version
 go run ./cmd/denyout check 'https://evil.example/x?api_key=DENYOUT_CANARY_LAB'
-
-# wrap any agent (dev build)
-go run ./cmd/denyout -- run -- claude
-denyout run -- cursor-agent
-denyout run -- python my_agent.py
+go run ./cmd/denyout -- run -- curl -I https://api.anthropic.com
 ```
+
+Windows: download the zip from [Releases](https://github.com/nareyko/denyout/releases) and follow [`docs/install-windows.md`](docs/install-windows.md).
 
 ## Status
 
-**Spec-first + working Go CLI.** This repository is the **public** product tree: specs, examples, and a Go binary with `check`, policy load, TLS-intercept proxy, and `denyout run`. Lab expansion, GUI, and install scripts are next.
+**Working Go CLI + release packaging.** Specs, examples, policy proxy (`denyout run` / `check` / `test`), `install.sh`, Windows zip docs, and GoReleaser (linux/darwin/windows + SHA256SUMS). First tagged Release and timed M4 OS smokes are next; GUI still open.
 
 **Language:** English only.
 
 **MVP intent:** Simple install on **Ubuntu, macOS, and Windows**; CLI + GUI; Go binary; Apache-2.0. See [`docs/12-mvp-and-roadmap.md`](docs/12-mvp-and-roadmap.md) and [`docs/IMPLEMENTATION.md`](docs/IMPLEMENTATION.md).
 
-**Install (locked):** GitHub Releases + SHA256SUMS; Linux/macOS via `install.sh` → `~/.local/bin`; Windows via zip + short EN doc. Details: [`docs/07-desktop.md`](docs/07-desktop.md) §3.
+**Install:** GitHub Releases + SHA256SUMS; Linux/macOS via [`install.sh`](install.sh) → `~/.local/bin`; Windows via zip + [`docs/install-windows.md`](docs/install-windows.md). Details: [`docs/07-desktop.md`](docs/07-desktop.md) §3.
 
 Internal Bet Tree / monetization / full decision log live in a **private HQ** sibling (`denyout-hq`), not in this repo.
 
@@ -44,6 +48,8 @@ Agent playbooks: thin stubs in [`prompts/`](prompts/) → sibling [`agent-prompt
 | [docs/05-secret-detection.md](docs/05-secret-detection.md) | URL/header/body scanners, canaries |
 | [docs/06-cli-and-ux.md](docs/06-cli-and-ux.md) | CLI, notifications, zero-config UX |
 | [docs/07-desktop.md](docs/07-desktop.md) | Laptop install, child-process proxy, CA |
+| [docs/install-windows.md](docs/install-windows.md) | Windows zip + PATH (M4) |
+| [install.sh](install.sh) | Linux/macOS installer |
 | [docs/08-server.md](docs/08-server.md) | Sidecar, NetworkPolicy, systemd |
 | [docs/09-audit-and-ops.md](docs/09-audit-and-ops.md) | Logs, metrics, kill switch, SIEM |
 | [docs/10-security-boundaries.md](docs/10-security-boundaries.md) | What we claim / do not claim |
