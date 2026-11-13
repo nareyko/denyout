@@ -44,11 +44,6 @@ func Open(path string) (*sql.DB, error) {
 	return db, nil
 }
 
-// SeedCanary keeps the original single-canary helper for older tests.
-func SeedCanary(db *sql.DB) error {
-	return SeedAll(db)
-}
-
 // ActiveCanaryURL returns the primary R-20 canary URL.
 func ActiveCanaryURL(db *sql.DB) (string, error) {
 	var u string
