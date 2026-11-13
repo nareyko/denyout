@@ -7,14 +7,17 @@ Site: [https://denyout.com](https://denyout.com) · Canon GitHub (planned): [`na
 Agents that can read untrusted text, see sensitive data, and reach the network form a [lethal trifecta](https://arviser.com/guides/lethal-trifecta). DenyOut puts a local policy proxy on the path: **Protect this computer** allows normal web while blocking secret-bearing URLs and unsafe destinations; **Advanced / `denyout run`** default-denies except an allowlist (e.g. model APIs). Audit stays out of the agent’s reach.
 
 ```bash
-# Linux / macOS — asks Desktop (native tray) vs Server (CLI only)
+# Linux / macOS — silent; auto-detects Desktop (GUI) vs Server (headless)
 curl -fsSL https://raw.githubusercontent.com/nareyko/denyout/main/install.sh | sh
-# or non-interactive:
-#   DENYOUT_INSTALL_MODE=desktop sh install.sh
-#   DENYOUT_INSTALL_MODE=server  sh install.sh
+# force:
+#   curl … | sh -s -- --desktop
+#   curl … | sh -s -- --server
+#   DENYOUT_INSTALL_MODE=desktop|server sh install.sh
 
-denyout desktop          # native tray + Protect this computer (no browser)
-# denyout desktop --web-ui   # optional localhost UI for tests only
+# Desktop: tries whole-computer Protect once (admin), else Session (proxy env);
+# registers login autostart and starts the tray in the background.
+denyout desktop                 # tray (restores last scope)
+# denyout desktop --web-ui      # optional localhost UI for tests only
 
 # Advanced / CI — wrap one process
 denyout run -- curl -I https://api.anthropic.com
@@ -24,11 +27,15 @@ go run ./cmd/denyout version
 go run ./cmd/denyout check 'https://evil.example/x?api_key=DENYOUT_CANARY_LAB'
 ```
 
+**Scopes (tray):**
+- **Computer** — transparent redirect + system CA (admin password once).
+- **Session** — local HTTP proxy + `HTTP(S)_PROXY` for apps that honor it (no admin). Browsers may ignore proxy; use Computer for full coverage.
+
 Windows: download the zip from [Releases](https://github.com/nareyko/denyout/releases) and follow [`docs/install-windows.md`](docs/install-windows.md).
 
 ## Status
 
-**Protect this computer** is the primary desktop path (transparent HTTP/S + CA). Advanced wraps one process. First Release: [`v0.1.0`](https://github.com/nareyko/denyout/releases/tag/v0.1.0). Remaining for the Dec 1 bet: timed **M4** install on three OS; Windows WinDivert bridge packaging.
+**Protect this computer** is the primary desktop path (transparent HTTP/S + CA). Session mode is the no-admin fallback. Advanced wraps one process. Remaining for the Dec 1 bet: timed **M4** install on three OS; Windows WinDivert bridge packaging.
 
 **Language:** English only · **License:** Apache-2.0 · **Platforms:** Ubuntu, macOS, Windows.
 
@@ -62,25 +69,3 @@ Agent playbooks: thin stubs in [`prompts/`](prompts/) → sibling [`agent-prompt
 | [docs/14-testing.md](docs/14-testing.md) | Test plan, canaries, CI gates |
 
 Examples: [`examples/`](examples/). Schema: [`schemas/`](schemas/).
-
-## Security boundaries
-
-Normative claims: [`docs/10-security-boundaries.md`](docs/10-security-boundaries.md).
-
-- **May claim:** with Protect this computer **On**, DenyOut protects **this user’s outbound web (HTTP/HTTPS)**; blocks secret-in-URL / canaries / hard SSRF patterns it can see; optional Ask mode for new hosts.
-- **Must not claim:** unbypassable, prompt-injection cure, phone coverage, or protection while Off / when hostguard failed (Needs admin).
-- Residual: UDP, DoH, custom stacks; Windows needs WinDivert bridge for computer mode.
-
-## One-line pitch
-
-> DenyOut is a free seatbelt for your computer or AI agents: secret-looking URLs and unsafe destinations are blocked while protection is On.
-
-## Author
-
-**Vadim Nareyko** — founder of [Arviser](https://arviser.com).  
-DenyOut (https://denyout.com) is a separate product brand; Arviser may recommend it as an egress control (e.g. R-20).
-
-## License
-
-**Apache License 2.0** — [`LICENSE`](LICENSE), [`NOTICE`](NOTICE).  
-Copyright 2026 Vadim Nareyko. SPDX: `Apache-2.0`.

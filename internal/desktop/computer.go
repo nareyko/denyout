@@ -19,14 +19,14 @@ func (a *App) startComputer() error {
 	a.mu.Lock()
 	if a.session != nil || a.proxyd != nil {
 		a.mu.Unlock()
-		return fmt.Errorf("Protect this computer is already on")
+		return fmt.Errorf("protection is already on")
 	}
 	ask := a.state.AskMode
 	wizard := a.wizardURL
+	control := a.controlURL
 	a.status = "Starting…"
 	a.mu.Unlock()
 
-	// Reserve a free local port for the transparent proxy.
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		a.setStatus("Error")
@@ -45,6 +45,11 @@ func (a *App) startComputer() error {
 	uid, _ := hostguard.CurrentUID()
 	if err := hostguard.ElevateApply(port, caPath, uid); err != nil {
 		a.setStatus("Needs admin")
+		a.mu.Lock()
+		a.state.ComputerAvailable = false
+		st := a.state
+		a.mu.Unlock()
+		_ = SaveState(st)
 		return err
 	}
 
@@ -62,8 +67,10 @@ func (a *App) startComputer() error {
 	if ask {
 		args = append(args, "--ask")
 	}
+	if control != "" {
+		args = append(args, "--control-url", control)
+	}
 	if wizard != "" {
-		// Optional --web-ui only; native Ask uses dialogs / notify-send actions.
 		args = append(args, "--allow-base", strings.TrimRight(wizard, "/"))
 	}
 	cmd := exec.Command(self, args...)
@@ -82,7 +89,6 @@ func (a *App) startComputer() error {
 		return err
 	}
 
-	// Wait until the proxyd is listening.
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		c, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", port), 100*time.Millisecond)
@@ -96,8 +102,11 @@ func (a *App) startComputer() error {
 	a.mu.Lock()
 	a.proxyd = cmd
 	a.proxyPort = port
+	a.state.Scope = ScopeComputer
+	a.state.ProtectionOn = true
 	a.state.ComputerEnabled = true
-	a.status = "Protecting computer"
+	a.state.ComputerAvailable = true
+	a.status = "Computer"
 	st := a.state
 	a.mu.Unlock()
 	_ = SaveState(st)
@@ -109,7 +118,7 @@ func (a *App) startComputer() error {
 			a.proxyd = nil
 			a.proxyPort = 0
 			a.state.ComputerEnabled = false
-			if a.status == "Protecting computer" {
+			if a.status == "Computer" {
 				a.status = "Off"
 			}
 		}
@@ -137,7 +146,6 @@ func (a *App) onComputerDeny(host string, reasons []string, wizard string) {
 	}
 	if ask && hostNotAllowed {
 		go func() {
-			// Prefer native dialog; "" = no toolkit → notify-send / optional web allow page.
 			switch nativeAllowDialog(host) {
 			case "once":
 				_ = a.allowHostOnce(host)
@@ -171,15 +179,22 @@ func (a *App) onComputerDeny(host string, reasons []string, wizard string) {
 }
 
 func (a *App) stopComputer() {
+	a.stopComputerKeep(false)
+}
+
+func (a *App) stopComputerKeep(keepRestore bool) {
 	a.mu.Lock()
 	cmd := a.proxyd
 	port := a.proxyPort
-	sess := a.session
 	a.proxyd = nil
 	a.proxyPort = 0
-	a.session = nil
 	a.state.ComputerEnabled = false
-	a.status = "Off"
+	if !keepRestore && a.state.Scope == ScopeComputer {
+		a.state.ProtectionOn = false
+	}
+	if a.session == nil {
+		a.status = "Off"
+	}
 	st := a.state
 	a.mu.Unlock()
 	_ = SaveState(st)
@@ -201,9 +216,24 @@ func (a *App) stopComputer() {
 			_ = cmd.Process.Kill()
 		}
 	}
-	if sess != nil {
-		_ = sess.Stop()
-	}
+}
+
+func (a *App) stopAll() {
+	a.stopComputerKeep(true)
+	a.stopSessionKeep(true)
+	a.setStatus("Off")
+}
+
+func (a *App) stopProtection() {
+	a.stopComputerKeep(false)
+	a.stopSession()
+	a.mu.Lock()
+	a.state.ProtectionOn = false
+	a.state.ComputerEnabled = false
+	a.status = "Off"
+	st := a.state
+	a.mu.Unlock()
+	_ = SaveState(st)
 }
 
 func (a *App) setStatus(s string) {
@@ -222,47 +252,109 @@ func (a *App) allowHostOnce(host string) error {
 	on := a.proxyd != nil || sess != nil
 	a.mu.Unlock()
 	if !on {
-		return fmt.Errorf("Protect this computer is off")
+		return fmt.Errorf("protection is off")
 	}
 	if sess != nil {
 		sess.AllowHost(host, "user_once")
 		return nil
 	}
-	// proxyd subprocess: persist as Always for this session via state + restart
-	// Minimal: treat once like always for subprocess mode until IPC exists.
+	// proxyd: once without IPC to live engine → persist + restart
 	return a.allowHostAlways(host)
 }
 
 func (a *App) allowHostAlways(host string) error {
-	host = strings.TrimSpace(host)
-	if host == "" {
-		return fmt.Errorf("empty host")
-	}
-	a.mu.Lock()
-	found := false
-	for _, h := range a.state.AlwaysAllowHosts {
-		if h == host {
-			found = true
-			break
-		}
-	}
-	if !found {
-		a.state.AlwaysAllowHosts = append(a.state.AlwaysAllowHosts, host)
-	}
-	st := a.state
-	sess := a.session
-	wasOn := a.proxyd != nil || sess != nil
-	a.mu.Unlock()
-	if err := SaveState(st); err != nil {
+	if err := a.persistAlwaysHost(host); err != nil {
 		return err
 	}
+	a.mu.Lock()
+	sess := a.session
+	wasProxy := a.proxyd != nil
+	scope := a.state.Scope
+	a.mu.Unlock()
 	if sess != nil {
-		sess.AllowHost(host, "user_always")
 		return nil
 	}
-	if wasOn {
-		a.stopComputer()
+	if wasProxy {
+		a.stopComputerKeep(true)
 		return a.startComputer()
 	}
+	_ = scope
 	return nil
+}
+
+func (a *App) enableComputerFromTray() {
+	a.stopSession()
+	a.mu.Lock()
+	a.state.ComputerAvailable = true // user explicitly retries
+	st := a.state
+	a.mu.Unlock()
+	_ = SaveState(st)
+	if err := a.startComputer(); err != nil {
+		fmt.Fprintf(os.Stderr, "denyout desktop: %v\n", err)
+		a.setStatus("Needs admin")
+		notify.Info("DenyOut", "Admin approval failed. Staying in Session mode.")
+		_ = a.startSession()
+		return
+	}
+	notify.Info("DenyOut", "Protect whole computer is on.")
+}
+
+func (a *App) enableSessionFromTray() {
+	a.stopComputerKeep(false)
+	if err := a.startSession(); err != nil {
+		fmt.Fprintf(os.Stderr, "denyout desktop: %v\n", err)
+		a.setStatus("Error")
+		return
+	}
+	notify.Info("DenyOut", "Session mode: apps that use system proxy. Browsers may ignore it.")
+}
+
+func (a *App) restartActiveProtector() {
+	a.mu.Lock()
+	scope := a.state.Scope
+	on := a.proxyd != nil || a.session != nil
+	a.mu.Unlock()
+	if !on {
+		return
+	}
+	a.stopAll()
+	a.mu.Lock()
+	a.state.ProtectionOn = true
+	a.state.Scope = scope
+	a.mu.Unlock()
+	switch scope {
+	case ScopeComputer:
+		if err := a.startComputer(); err != nil {
+			_ = a.startSession()
+		}
+	default:
+		_ = a.startSession()
+	}
+}
+
+func (a *App) restoreProtection() {
+	a.mu.Lock()
+	on := a.state.ProtectionOn || a.state.ComputerEnabled
+	scope := a.state.Scope
+	a.mu.Unlock()
+	if !on {
+		return
+	}
+	if scope == "" {
+		scope = ScopeComputer
+	}
+	switch scope {
+	case ScopeComputer:
+		if err := a.startComputer(); err != nil {
+			fmt.Fprintf(os.Stderr, "denyout desktop: restore computer failed: %v — session mode\n", err)
+			a.mu.Lock()
+			a.state.ComputerAvailable = false
+			a.mu.Unlock()
+			_ = a.startSession()
+		}
+	case ScopeSession:
+		if err := a.startSession(); err != nil {
+			fmt.Fprintf(os.Stderr, "denyout desktop: restore session failed: %v\n", err)
+		}
+	}
 }

@@ -74,14 +74,17 @@ Standard.
 
 ### 3.7 `denyout desktop` (recommended GUI)
 
-Non-technical entry: **native** first-run dialogs + system tray/menu bar + OS notifications.
-No localhost web wizard by default (`--web-ui` is optional / tests only).
+Silent tray + restore last protection scope. No localhost wizard by default (`--web-ui` optional / tests).
 
 ```bash
-denyout desktop [--setup] [--no-tray] [--web-ui] [--no-open]
+denyout desktop [--install] [--setup] [--no-tray] [--web-ui] [--no-open]
 ```
 
-`install.sh` asks **Desktop** vs **Server**. Desktop launches this; Server installs CLI only (no tray, no extra web services). Windows zip includes `Start-DenyOut.cmd`.
+- `--install` — autostart, try **Computer** once, fallback **Session**, detach tray (used by `install.sh`).
+- Scopes: **Computer** (hostguard + admin) vs **Session** (proxy env, no admin).
+- Tray: scope toggle, notify/Ask settings, Open logs.
+
+`install.sh` auto-detects Desktop vs Server; force with `--desktop` / `--server`. Windows zip includes `Start-DenyOut.cmd`.
 
 ### 3.8 `denyout gui` (advanced)
 
@@ -108,9 +111,9 @@ Same policy engine as `run`. `DENYOUT_KILL=1` refuses to start. Hardened claim r
 ## 4. Zero-config happy path
 
 ```bash
-# install (Linux/macOS) — choose Desktop (native UI) or Server (CLI)
+# install (Linux/macOS) — silent auto-detect; force with flags/env
 curl -fsSL https://raw.githubusercontent.com/nareyko/denyout/main/install.sh | sh
-# DENYOUT_INSTALL_MODE=desktop|server
+# curl … | sh -s -- --desktop|--server
 
 # CLI path (server / advanced)
 denyout run -- claude

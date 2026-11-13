@@ -28,6 +28,22 @@ func Enabled() bool {
 	return enabled
 }
 
+// Info shows a general status notification (install / mode changes).
+func Info(title, body string) {
+	mu.Lock()
+	on := enabled
+	mu.Unlock()
+	if !on {
+		return
+	}
+	if title == "" {
+		title = "DenyOut"
+	}
+	if err := beeep.Notify(title, body, ""); err != nil {
+		fmt.Fprintf(os.Stderr, "denyout: notification: %v\n", err)
+	}
+}
+
 // Deny shows a plain-language OS notification for a blocked request.
 // host and reasons must already be safe to show (no raw secrets).
 func Deny(host string, reasons []string) {

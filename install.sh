@@ -2,19 +2,40 @@
 # DenyOut installer (Linux / macOS) — installs to ~/.local/bin/denyout
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/nareyko/denyout/main/install.sh | sh
+#   curl ... | sh -s -- --desktop          # force desktop
+#   curl ... | sh -s -- --server           # force server
 #   DENYOUT_VERSION=v0.1.0 sh install.sh
-# Env:
-#   DENYOUT_VERSION      — tag (default: latest GitHub release)
-#   DENYOUT_INSTALL_DIR  — default ~/.local/bin
-#   DENYOUT_REPO         — default nareyko/denyout
-#   DENYOUT_BASE_URL     — override asset base (tests / mirrors)
-#   DENYOUT_INSTALL_MODE — desktop | server (skip prompt; for CI / scripts)
-#   DENYOUT_NO_DESKTOP=1 — same as server mode (compat)
+# Env / flags (force wins over auto-detect):
+#   DENYOUT_VERSION        — tag (default: latest GitHub release)
+#   DENYOUT_INSTALL_DIR    — default ~/.local/bin
+#   DENYOUT_REPO           — default nareyko/denyout
+#   DENYOUT_BASE_URL       — override asset base (tests / mirrors)
+#   DENYOUT_INSTALL_MODE   — desktop | server (force; same as --desktop / --server)
+#   DENYOUT_NO_DESKTOP=1   — force server (compat)
+#   DENYOUT_INSTALL_PROMPT=1 — ask interactively instead of auto-detect (rare)
+# Desktop path is silent: autostart + try whole-computer once + detach tray.
 set -eu
 
 REPO="${DENYOUT_REPO:-nareyko/denyout}"
 INSTALL_DIR="${DENYOUT_INSTALL_DIR:-${HOME}/.local/bin}"
 BASE_URL="${DENYOUT_BASE_URL:-}"
+FORCE_MODE=""
+WANT_PROMPT="${DENYOUT_INSTALL_PROMPT:-}"
+
+# Parse force flags early (supports: curl … | sh -s -- --desktop)
+for arg in "$@"; do
+  case "$arg" in
+    --desktop|-d) FORCE_MODE=desktop ;;
+    --server|-s) FORCE_MODE=server ;;
+    --prompt) WANT_PROMPT=1 ;;
+    --help|-h)
+      echo "Usage: install.sh [--desktop|--server] [--prompt]"
+      echo "  Auto-detects Desktop vs Server; flags/env force the mode."
+      echo "  DENYOUT_INSTALL_MODE=desktop|server  DENYOUT_NO_DESKTOP=1"
+      exit 0
+      ;;
+  esac
+done
 
 os=$(uname -s | tr '[:upper:]' '[:lower:]')
 arch=$(uname -m)
@@ -168,73 +189,114 @@ esac
 echo "denyout install: done"
 echo ""
 
-# --- Install mode: Desktop (native tray UI) vs Server (CLI only, no web) ---
-# Always try /dev/tty so `curl | sh` can still prompt interactively.
-MODE="${DENYOUT_INSTALL_MODE:-}"
-if [ -n "${DENYOUT_NO_DESKTOP:-}" ] && [ -z "$MODE" ]; then
-  MODE=server
-fi
+# --- Install mode: auto-detect Desktop vs Server; flags/env force ---
+# Priority: --desktop/--server > DENYOUT_INSTALL_MODE > DENYOUT_NO_DESKTOP > prompt > auto-detect
+
+normalize_mode() {
+  case "$1" in
+    desktop|Desktop|DESKTOP|d|D|1) echo desktop ;;
+    server|Server|SERVER|s|S|2) echo server ;;
+    *) return 1 ;;
+  esac
+}
+
+detect_desktop() {
+  # Graphical session → desktop install (native tray).
+  # Headless / SSH without display → server (CLI only).
+  case "$(uname -s | tr '[:upper:]' '[:lower:]')" in
+    darwin)
+      # macOS laptop/desktop is the common case; treat as desktop unless forced.
+      # Headless CI often has no Aqua session — still ok; --server / MODE=server overrides.
+      if [ -n "${SSH_CONNECTION:-}${SSH_TTY:-}" ] && [ -z "${DISPLAY:-}" ]; then
+        # Rare: SSH into Mac without GUI forwarding → prefer server.
+        return 1
+      fi
+      return 0
+      ;;
+  esac
+
+  if [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; then
+    return 0
+  fi
+  if [ -n "${XDG_CURRENT_DESKTOP:-}${DESKTOP_SESSION:-}${GNOME_DESKTOP_SESSION_ID:-}${KDE_FULL_SESSION:-}" ]; then
+    return 0
+  fi
+  # systemd user session type (best-effort)
+  if command -v loginctl >/dev/null 2>&1; then
+    sid=$(loginctl 2>/dev/null | awk -v u="$(id -un)" '$3==u {print $1; exit}')
+    if [ -n "$sid" ]; then
+      st=$(loginctl show-session "$sid" -p Type --value 2>/dev/null || true)
+      case "$st" in
+        x11|wayland|mir) return 0 ;;
+      esac
+    fi
+  fi
+  return 1
+}
 
 ask_mode() {
-  # Prefer controlling TTY (works under curl|sh). Fall back to stdin if interactive.
-  tty_dev=""
+  # Prefer controlling TTY (works under curl|sh).
   if [ -r /dev/tty ] && [ -w /dev/tty ]; then
-    tty_dev=/dev/tty
+    echo "Choose install type:" >/dev/tty
+    echo "  1) Desktop — native tray + Protect this computer (no browser UI)" >/dev/tty
+    echo "  2) Server  — CLI only; no tray, no web services" >/dev/tty
+    printf "Install type [1=Desktop / 2=Server]: " >/dev/tty
+    IFS= read -r ans </dev/tty || ans=
   elif [ -t 0 ] && [ -t 1 ]; then
-    tty_dev=""
+    echo "Choose install type:" >&2
+    echo "  1) Desktop — native tray + Protect this computer (no browser UI)" >&2
+    echo "  2) Server  — CLI only; no tray, no web services" >&2
+    printf "Install type [1=Desktop / 2=Server]: "
+    IFS= read -r ans || ans=
   else
     return 1
   fi
-
-  echo "Choose install type:" >&2
-  echo "  1) Desktop — native tray + Protect this computer (no browser UI)" >&2
-  echo "  2) Server  — CLI only (denyout init / run / serve); no tray, no web services" >&2
-  if [ -n "$tty_dev" ]; then
-    printf "Install type [1=Desktop / 2=Server] (default 1): " >/dev/tty
-    IFS= read -r ans </dev/tty || ans=1
-  else
-    printf "Install type [1=Desktop / 2=Server] (default 1): "
-    IFS= read -r ans || ans=1
-  fi
-  case "$ans" in
-    ""|1|d|D|desktop|Desktop|DESKTOP) echo desktop ;;
-    2|s|S|server|Server|SERVER) echo server ;;
-    *)
-      echo "denyout install: unknown choice '$ans' — using desktop" >&2
-      echo desktop
-      ;;
-  esac
-  return 0
+  normalize_mode "${ans:-}" || {
+    echo "denyout install: unknown choice — using auto-detect" >&2
+    return 1
+  }
 }
 
-if [ -z "$MODE" ]; then
+MODE=""
+MODE_SRC=""
+
+if [ -n "$FORCE_MODE" ]; then
+  MODE=$(normalize_mode "$FORCE_MODE") || true
+  MODE_SRC="flag"
+elif [ -n "${DENYOUT_INSTALL_MODE:-}" ]; then
+  MODE=$(normalize_mode "$DENYOUT_INSTALL_MODE") || {
+    echo "denyout install: DENYOUT_INSTALL_MODE must be desktop or server (got '$DENYOUT_INSTALL_MODE')" >&2
+    exit 1
+  }
+  MODE_SRC="env"
+elif [ -n "${DENYOUT_NO_DESKTOP:-}" ]; then
+  MODE=server
+  MODE_SRC="DENYOUT_NO_DESKTOP"
+elif [ -n "$WANT_PROMPT" ]; then
   if MODE=$(ask_mode); then
-    :
+    MODE_SRC="prompt"
   else
-    echo "denyout install: no TTY — defaulting to server (CLI only)." >&2
-    echo "  Re-run with DENYOUT_INSTALL_MODE=desktop to launch the native UI," >&2
-    echo "  or later: denyout desktop" >&2
-    MODE=server
+    echo "denyout install: no TTY for --prompt; falling back to auto-detect" >&2
   fi
 fi
 
-case "$MODE" in
-  desktop|Desktop|DESKTOP)
+if [ -z "$MODE" ]; then
+  if detect_desktop; then
     MODE=desktop
-    ;;
-  server|Server|SERVER)
+  else
     MODE=server
-    ;;
-  *)
-    echo "denyout install: DENYOUT_INSTALL_MODE must be desktop or server (got '$MODE')" >&2
-    exit 1
-    ;;
-esac
+  fi
+  MODE_SRC="auto-detect"
+fi
+
+echo "denyout install: mode=${MODE} (${MODE_SRC})"
+if [ "$MODE_SRC" = "auto-detect" ]; then
+  echo "denyout install: force with --desktop / --server or DENYOUT_INSTALL_MODE=…" >&2
+fi
 
 CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 mkdir -p "${CONFIG_HOME}/denyout"
 echo "$MODE" >"${CONFIG_HOME}/denyout/install-mode"
-echo "denyout install: mode=${MODE}"
 
 if [ "$MODE" = "server" ]; then
   echo ""
@@ -247,10 +309,9 @@ if [ "$MODE" = "server" ]; then
 fi
 
 echo ""
-echo "Desktop install — native UI (tray + dialogs). No browser wizard."
-echo "  Later: denyout desktop"
-echo "  Advanced/tests only: denyout desktop --web-ui"
+echo "Desktop install — silent: autostart, try whole computer, fallback session, tray in background."
 echo ""
 
-# Launch native first-run setup + tray (not a web server).
-exec "${INSTALL_DIR}/denyout" desktop --setup
+# Silent register + start (does not replace this shell with tray).
+"${INSTALL_DIR}/denyout" desktop --install
+exit $?

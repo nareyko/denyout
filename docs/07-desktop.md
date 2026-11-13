@@ -29,19 +29,31 @@
 | **Windows** | `.zip` from Release + short EN install doc (PATH to `denyout.exe`) | Mark OS **preview / unsupported** in release notes; **winget = optional stretch** |
 
 ```bash
-# Unix (Linux / macOS) — preferred
-# Prompts (via /dev/tty, works with curl|sh):
-#   1) Desktop — native tray + dialogs (no localhost web wizard)
-#   2) Server  — CLI only; no tray, no extra web services
+# Unix (Linux / macOS) — preferred (silent)
+# Auto-detect: graphical session → Desktop; headless → Server (CLI).
+# Desktop: binary + login autostart + try whole-computer once (admin) →
+#   fallback Session (HTTP proxy env) → detach tray.
+# Force: --desktop / --server, or DENYOUT_INSTALL_MODE=desktop|server
 curl -fsSL https://denyout.com/install.sh | sh
-# DENYOUT_INSTALL_MODE=desktop|server  # skip prompt
+curl -fsSL https://denyout.com/install.sh | sh -s -- --desktop
+curl -fsSL https://denyout.com/install.sh | sh -s -- --server
 
-denyout desktop          # native UI
-# denyout desktop --web-ui   # optional / advanced / tests only
+denyout desktop                 # tray; restores last scope
+denyout desktop --install       # silent register+start (used by install.sh)
+# denyout desktop --web-ui      # optional / tests only
 denyout version
-denyout init             # server / advanced path
+denyout init                    # server / advanced path
 denyout run -- curl -I https://api.anthropic.com
 ```
+
+### Scopes
+
+| Scope | Mechanism | Admin | Coverage |
+| --- | --- | --- | --- |
+| **Computer** | hostguard transparent redirect + system CA | Yes (once) | This user’s TCP 80/443 (OS-dependent) |
+| **Session** | local proxy + `HTTP(S)_PROXY` / `environment.d` | No | Apps that honor proxy env; browsers may ignore |
+
+Tray: Protect whole computer / Protect this session / Turn off / Settings / Open logs (`~/.local/state/denyout/audit.jsonl`).
 
 ```text
 Windows (MVP):

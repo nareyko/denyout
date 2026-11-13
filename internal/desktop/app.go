@@ -48,32 +48,53 @@ type Options struct {
 	Listen     string // web UI listen when WebUI; default 127.0.0.1:0
 }
 
-// App is the non-technical desktop entry (native setup + tray + hostguard).
+// App is the non-technical desktop entry (tray + hostguard / session proxy).
 type App struct {
 	opts Options
 
-	mu        sync.Mutex
-	state     State
-	lastDeny  string
-	status    string
-	protect   *exec.Cmd    // advanced process wrap
-	session   *run.Session // legacy in-process session (tests)
-	proxyd    *exec.Cmd    // computer-mode transparent proxy subprocess
-	proxyPort int
-	wizardURL string // only set when WebUI is enabled
+	mu         sync.Mutex
+	state      State
+	lastDeny   string
+	status     string
+	protect    *exec.Cmd    // advanced process wrap
+	session    *run.Session // session-mode in-process proxy
+	proxyd     *exec.Cmd    // computer-mode transparent proxy subprocess
+	proxyPort  int
+	wizardURL  string // only set when WebUI is enabled
+	controlURL string // Ask IPC for proxyd
 }
 
 // Run starts the desktop experience and blocks until quit.
-// Default path: native first-run dialogs + system tray — no localhost web server.
+// Silent path: restore protection from state + tray (no setup questionnaire).
 func Run(ctx context.Context, opts Options) error {
 	a := &App{opts: opts, state: LoadState(), status: "Off"}
 	notify.SetEnabled(a.state.Notify)
 
+	if _, err := a.startControlServer(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "denyout desktop: control server: %v\n", err)
+	}
+
+	// Optional legacy/web first-run only when --web-ui or explicit --setup with WebUI.
 	needSetup := opts.ForceSetup || !a.state.SetupDone
-	if needSetup && !opts.WebUI {
-		if err := a.nativeSetup(); err != nil {
-			return err
+	if needSetup && opts.WebUI {
+		// web wizard handles setup
+	} else if needSetup && opts.ForceSetup && !opts.WebUI {
+		// --setup without web: mark done with defaults (silent); no zenity questionnaire
+		a.mu.Lock()
+		a.state.SetupDone = true
+		if !a.state.Notify {
+			a.state.Notify = true
 		}
+		st := a.state
+		a.mu.Unlock()
+		_ = SaveState(st)
+		notify.SetEnabled(true)
+	} else if !a.state.SetupDone {
+		a.mu.Lock()
+		a.state.SetupDone = true
+		st := a.state
+		a.mu.Unlock()
+		_ = SaveState(st)
 	}
 
 	if opts.WebUI {
@@ -92,10 +113,15 @@ func Run(ctx context.Context, opts Options) error {
 		}
 	}
 
+	// Restore protection after login / restart (unless web-only setup tests with NoTray and no prior state).
+	if !opts.WebUI || a.state.ProtectionOn {
+		a.restoreProtection()
+	}
+
 	if opts.NoTray {
 		fmt.Fprintln(os.Stderr, "denyout desktop: tray disabled (--no-tray); press Ctrl+C to quit")
 		<-ctx.Done()
-		a.stopComputer()
+		a.stopProtection()
 		a.stopProtect()
 		return nil
 	}
@@ -136,15 +162,19 @@ func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	writeJSON(w, map[string]any{
-		"setup_done":       a.state.SetupDone,
-		"status":           a.status,
-		"last_deny":        a.lastDeny,
-		"notify":           a.state.Notify,
-		"ask_mode":         a.state.AskMode,
-		"computer_enabled": a.state.ComputerEnabled,
-		"agent":            a.state.PreferredAgent,
-		"always_allow":     a.state.AlwaysAllowHosts,
-		"version":          a.opts.Version,
+		"setup_done":         a.state.SetupDone,
+		"status":             a.status,
+		"last_deny":          a.lastDeny,
+		"notify":             a.state.Notify,
+		"ask_mode":           a.state.AskMode,
+		"scope":              a.state.Scope,
+		"protection_on":      a.state.ProtectionOn,
+		"computer_enabled":   a.state.ComputerEnabled,
+		"computer_available": a.state.ComputerAvailable,
+		"agent":              a.state.PreferredAgent,
+		"always_allow":       a.state.AlwaysAllowHosts,
+		"version":            a.opts.Version,
+		"audit_log":          AuditLogPath(),
 	})
 }
 
@@ -205,11 +235,7 @@ func (a *App) handleSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if wasOn && body.AskMode != nil {
-		a.stopComputer()
-		if err := a.startComputer(); err != nil {
-			writeErr(w, err, 500)
-			return
-		}
+		a.restartActiveProtector()
 	}
 	writeJSON(w, map[string]any{"ok": true})
 }
@@ -220,19 +246,20 @@ func (a *App) handleComputer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Enabled bool `json:"enabled"`
+		Enabled bool   `json:"enabled"`
+		Scope   string `json:"scope"` // computer | session | off
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, err, 400)
 		return
 	}
-	if body.Enabled {
-		if err := a.startComputer(); err != nil {
-			writeErr(w, err, 500)
-			return
-		}
-	} else {
-		a.stopComputer()
+	switch {
+	case body.Scope == ScopeSession || (body.Enabled && body.Scope == ScopeSession):
+		a.enableSessionFromTray()
+	case body.Scope == "off" || (!body.Enabled && body.Scope == ""):
+		a.stopProtection()
+	case body.Enabled || body.Scope == ScopeComputer:
+		a.enableComputerFromTray()
 	}
 	a.mu.Lock()
 	st := a.status

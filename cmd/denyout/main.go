@@ -1,12 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/nareyko/denyout/internal/check"
 	"github.com/nareyko/denyout/internal/desktop"
@@ -432,6 +437,7 @@ func cmdHostctlProxyd(args []string) int {
 	caDir := ""
 	ask := false
 	allowBase := ""
+	controlURL := ""
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch {
@@ -457,6 +463,13 @@ func cmdHostctlProxyd(args []string) int {
 			i++
 			if i < len(args) {
 				allowBase = args[i]
+			}
+		case strings.HasPrefix(a, "--control-url="):
+			controlURL = strings.TrimPrefix(a, "--control-url=")
+		case a == "--control-url":
+			i++
+			if i < len(args) {
+				controlURL = args[i]
 			}
 		default:
 			fmt.Fprintf(os.Stderr, "denyout hostctl proxyd: unknown flag %q\n", a)
@@ -487,6 +500,7 @@ func cmdHostctlProxyd(args []string) int {
 		fmt.Fprintf(os.Stderr, "denyout hostctl proxyd: %v\n", err)
 		return 2
 	}
+	var sessRef *run.Session
 	sess, err := run.StartSession(run.SessionOptions{
 		Config:      cfg,
 		TLSMode:     proxy.TLSIntercept,
@@ -503,10 +517,30 @@ func cmdHostctlProxyd(args []string) int {
 					break
 				}
 			}
-			if ask && hostNotAllowed && allowBase != "" {
-				u := strings.TrimRight(allowBase, "/") + "/allow.html?host=" + host
-				go notify.Ask(notify.AskOptions{Host: host, OpenURL: u})
-				return
+			if controlURL != "" {
+				go postControlDenyEvent(controlURL, host, reasons)
+			}
+			if ask && hostNotAllowed {
+				if controlURL != "" {
+					action := askViaControl(controlURL, host)
+					switch action {
+					case "once":
+						if sessRef != nil {
+							sessRef.AllowHost(host, "user_once")
+						}
+					case "always":
+						if sessRef != nil {
+							sessRef.AllowHost(host, "user_always")
+						}
+						postControlAlways(controlURL, host)
+					}
+					return
+				}
+				if allowBase != "" {
+					u := strings.TrimRight(allowBase, "/") + "/allow.html?host=" + host
+					go notify.Ask(notify.AskOptions{Host: host, OpenURL: u})
+					return
+				}
 			}
 			notify.Deny(host, reasons)
 		},
@@ -515,6 +549,7 @@ func cmdHostctlProxyd(args []string) int {
 		fmt.Fprintf(os.Stderr, "denyout hostctl proxyd: %v\n", err)
 		return 2
 	}
+	sessRef = sess
 	fmt.Fprintf(os.Stderr, "denyout hostctl proxyd: listening :%d transparent\n", sess.Port())
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -523,30 +558,75 @@ func cmdHostctlProxyd(args []string) int {
 	return 0
 }
 
+func askViaControl(base, host string) string {
+	u := strings.TrimRight(base, "/") + "/ask?host=" + url.QueryEscape(host)
+	client := &http.Client{Timeout: 5 * time.Minute}
+	resp, err := client.Get(u)
+	if err != nil {
+		return "deny"
+	}
+	defer resp.Body.Close()
+	var out struct {
+		Action string `json:"action"`
+	}
+	if json.NewDecoder(resp.Body).Decode(&out) != nil {
+		return "deny"
+	}
+	switch out.Action {
+	case "once", "always", "deny":
+		return out.Action
+	default:
+		return "deny"
+	}
+}
+
+func postControlAlways(base, host string) {
+	u := strings.TrimRight(base, "/") + "/always"
+	body, _ := json.Marshal(map[string]string{"host": host})
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Post(u, "application/json", bytes.NewReader(body))
+	if err == nil {
+		resp.Body.Close()
+	}
+}
+
+func postControlDenyEvent(base, host string, reasons []string) {
+	u := strings.TrimRight(base, "/") + "/deny-event"
+	body, _ := json.Marshal(map[string]any{"host": host, "reasons": reasons})
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Post(u, "application/json", bytes.NewReader(body))
+	if err == nil {
+		resp.Body.Close()
+	}
+}
+
 func cmdDesktop(args []string) int {
 	cfgPath := ""
 	forceSetup := false
 	noTray := false
 	noOpen := false
 	webUI := false
+	doInstall := false
 	listen := "127.0.0.1:0"
 
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch {
 		case a == "--help" || a == "-h":
-			fmt.Println(`Usage: denyout desktop [--setup] [--no-tray] [--web-ui] [--no-open] [--config path]
+			fmt.Println(`Usage: denyout desktop [--install] [--setup] [--no-tray] [--web-ui] [--no-open] [--config path]
 
-  Default: native first-run dialogs + system tray (no localhost web server).
-  Protect this computer = transparent host redirect + notifications.
-  Advanced: tray → protect a single program (same as denyout run).
+  Default: tray + restore protection from state (no browser UI).
+  Scopes: whole computer (hostguard, admin) or session (HTTP proxy env, no admin).
 
+  --install  silent setup: autostart, try computer once, fallback session, detach tray
   --web-ui   optional localhost settings page (tests / advanced only)
   --no-open  with --web-ui, do not open a browser
-  --setup    re-run first-run setup
+  --setup    mark first-run done (silent defaults)
 
-  Install: install.sh asks Desktop vs Server; Desktop runs this (native).`)
+  Install: install.sh → denyout desktop --install on Desktop machines.`)
 			return 0
+		case a == "--install":
+			doInstall = true
 		case a == "--setup":
 			forceSetup = true
 		case a == "--no-tray":
@@ -577,6 +657,14 @@ func cmdDesktop(args []string) int {
 			fmt.Fprintf(os.Stderr, "denyout desktop: unknown flag %q\n", a)
 			return 2
 		}
+	}
+
+	if doInstall {
+		if err := desktop.Install(desktop.Options{ConfigPath: cfgPath, Version: version}); err != nil {
+			fmt.Fprintf(os.Stderr, "denyout desktop --install: %v\n", err)
+			return 2
+		}
+		return 0
 	}
 
 	if webUI {
