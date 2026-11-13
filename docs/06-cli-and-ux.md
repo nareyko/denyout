@@ -72,17 +72,27 @@ Write a starter `denyout.yaml` in CWD with comments.
 
 Standard.
 
-### 3.7 `denyout gui`
+### 3.7 `denyout desktop` (recommended GUI)
 
-Minimal desktop UI (localhost only, embedded in the same binary):
+Non-technical entry: setup wizard + system tray/menu bar + OS notifications.
+
+```bash
+denyout desktop [--setup] [--no-tray] [--no-open]
+```
+
+Install: Linux/macOS `install.sh` can launch this; Windows zip includes `Start-DenyOut.cmd`.
+
+### 3.8 `denyout gui` (advanced)
+
+Technical localhost panel (mode/preset/proxy details):
 
 ```bash
 denyout gui [--config path] [--no-open]
 ```
 
-Shows start/stop wrap, current mode/preset, URL check, and recent redacted denials. Same policy engine as CLI; does not bypass `denyout run`.
+Same policy engine as CLI; prefer `desktop` for non-experts.
 
-### 3.8 `denyout serve`
+### 3.9 `denyout serve`
 
 Long-running sidecar / compose / systemd proxy:
 
@@ -96,20 +106,21 @@ Same policy engine as `run`. `DENYOUT_KILL=1` refuses to start. Hardened claim r
 ## 4. Zero-config happy path
 
 ```bash
-# install (planned)
-curl -fsSL https://denyout.com/install.sh | sh
+# install (Linux/macOS)
+curl -fsSL https://raw.githubusercontent.com/nareyko/denyout/main/install.sh | sh
+# then: denyout desktop   # or answer Y when install.sh asks
 
-# run
+# CLI path
 denyout run -- claude
 ```
 
-On first run:
+On first protected run:
 
 1. Generate session CA.  
 2. Start proxy with preset `models`.  
 3. Spawn child with env.  
-4. Print one-line status: `denyout: enforce mode, preset=models, proxy=127.0.0.1:49152`.  
-5. On first deny: notification + stderr line with reason and `denyout check` hint.
+4. Print one-line status.  
+5. On deny: desktop notification (default) + stderr line with reason.
 
 ## 5. Denial UX copy (examples)
 

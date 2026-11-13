@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/nareyko/denyout/internal/check"
+	"github.com/nareyko/denyout/internal/desktop"
 	"github.com/nareyko/denyout/internal/gui"
 	"github.com/nareyko/denyout/internal/lab"
 	"github.com/nareyko/denyout/internal/policy"
@@ -49,6 +50,8 @@ func runMain(args []string) int {
 		return cmdTest(args[1:])
 	case "gui":
 		return cmdGUI(args[1:])
+	case "desktop":
+		return cmdDesktop(args[1:])
 	case "serve":
 		return cmdServe(args[1:])
 	default:
@@ -72,7 +75,8 @@ Commands:
   policy validate <f>  Validate a denyout/v1 YAML config
   test [--db path]     Run lab SQLite fixtures (denyout test)
   run [flags] -- <cmd> Wrap command with local policy proxy
-  gui                  Local desktop UI (localhost; same engine as CLI)
+  desktop              Tray + setup wizard (recommended for non-technical use)
+  gui                  Advanced localhost UI (technical)
   serve -c <file>      Long-running sidecar proxy (pair with NetworkPolicy)
 
 Install and security boundaries: https://denyout.com · docs in this repo.
@@ -232,6 +236,10 @@ func cmdRun(args []string) int {
 	cfgPath := ""
 	tlsMode := string(proxy.TLSIntercept)
 	sandbox := ""
+	doNotify := true
+	if os.Getenv("DENYOUT_NOTIFY") == "0" {
+		doNotify = false
+	}
 	var cmdArgs []string
 
 	dash := -1
@@ -251,7 +259,7 @@ func cmdRun(args []string) int {
 		a := flagArgs[i]
 		switch {
 		case a == "--help" || a == "-h":
-			fmt.Println("Usage: denyout run [--config path] [--tls-mode intercept|passthrough] [--sandbox=name] -- <command>...")
+			fmt.Println("Usage: denyout run [--config path] [--tls-mode intercept|passthrough] [--sandbox=name] [--notify|--no-notify] -- <command>...")
 			return 0
 		case a == "--config" || a == "-c":
 			i++
@@ -278,6 +286,10 @@ func cmdRun(args []string) int {
 				return 2
 			}
 			sandbox = flagArgs[i]
+		case a == "--notify":
+			doNotify = true
+		case a == "--no-notify":
+			doNotify = false
 		default:
 			fmt.Fprintf(os.Stderr, "denyout run: unknown flag %q (command must follow --)\n", a)
 			return 2
@@ -301,6 +313,7 @@ func cmdRun(args []string) int {
 		Version:    version,
 		Command:    cmdArgs,
 		Sandbox:    sandbox,
+		Notify:     doNotify || os.Getenv("DENYOUT_DESKTOP_NOTIFY") == "1",
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "denyout run: %v\n", err)
@@ -309,6 +322,75 @@ func cmdRun(args []string) int {
 		}
 	}
 	return code
+}
+
+func cmdDesktop(args []string) int {
+	cfgPath := ""
+	forceSetup := false
+	noTray := false
+	noOpen := false
+	listen := "127.0.0.1:0"
+
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case a == "--help" || a == "-h":
+			fmt.Println(`Usage: denyout desktop [--setup] [--no-tray] [--no-open] [--config path]
+
+  Recommended entry for non-technical use: setup wizard + system tray/menu bar
+  + desktop notifications when something is blocked.
+
+  Install paths:
+    CLI:  install.sh finishes with optional "denyout desktop"
+    UI:   Windows — double-click Start-DenyOut.cmd from the zip`)
+			return 0
+		case a == "--setup":
+			forceSetup = true
+		case a == "--no-tray":
+			noTray = true
+		case a == "--no-open":
+			noOpen = true
+		case a == "--config" || a == "-c":
+			i++
+			if i >= len(args) {
+				fmt.Fprintln(os.Stderr, "denyout desktop: --config requires a path")
+				return 2
+			}
+			cfgPath = args[i]
+		case strings.HasPrefix(a, "--listen="):
+			listen = strings.TrimPrefix(a, "--listen=")
+		case a == "--listen":
+			i++
+			if i >= len(args) {
+				fmt.Fprintln(os.Stderr, "denyout desktop: --listen requires a value")
+				return 2
+			}
+			listen = args[i]
+		default:
+			fmt.Fprintf(os.Stderr, "denyout desktop: unknown flag %q\n", a)
+			return 2
+		}
+	}
+
+	if !strings.HasPrefix(listen, "127.0.0.1:") && !strings.HasPrefix(listen, "localhost:") {
+		fmt.Fprintln(os.Stderr, "denyout desktop: --listen must be 127.0.0.1 or localhost")
+		return 2
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	if err := desktop.Run(ctx, desktop.Options{
+		ConfigPath: cfgPath,
+		Version:    version,
+		ForceSetup: forceSetup,
+		NoTray:     noTray,
+		NoOpen:     noOpen,
+		Listen:     listen,
+	}); err != nil {
+		fmt.Fprintf(os.Stderr, "denyout desktop: %v\n", err)
+		return 2
+	}
+	return 0
 }
 
 func cmdServe(args []string) int {

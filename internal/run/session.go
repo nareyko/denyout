@@ -23,6 +23,7 @@ type SessionOptions struct {
 	TLSMode    proxy.TLSMode
 	Version    string
 	Sandbox    string
+	OnDeny     proxy.DenyHook
 }
 
 // Status is a snapshot of an active wrap session.
@@ -118,6 +119,7 @@ func StartSession(opts SessionOptions) (*Session, error) {
 		CA:         ca,
 		ListenHost: "127.0.0.1",
 		ListenPort: 0,
+		OnDeny:     opts.OnDeny,
 	})
 	if err != nil {
 		cancel()
