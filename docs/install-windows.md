@@ -38,7 +38,11 @@ Persist PATH via **Settings → System → About → Advanced system settings �
 
 Ensure `denyout.exe` is directly under that folder (or adjust the path to the extracted folder that contains the exe).
 
-## 4. Smoke (≤5 minutes)
+## 4. Start (UI or CLI)
+
+**UI (recommended for non-technical use):** double-click `Start-DenyOut.cmd` in the extracted folder (or run `denyout desktop --setup`). This opens a short setup wizard and keeps DenyOut in the system tray.
+
+**CLI:**
 
 ```powershell
 denyout version

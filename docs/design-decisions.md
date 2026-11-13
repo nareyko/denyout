@@ -13,7 +13,7 @@ Updated: 2026-11-13.
 | OS sandbox | **Optional** (`--sandbox`); desktop “supported” documents proxy-bypass residual |
 | Wrap model | One binary: `denyout run -- <command>`; deep editor hooks later |
 | UX | CLI **and** GUI; simplicity first-class |
-| GUI stack (MVP) | **Localhost web UI** embedded in `denyout gui` (same binary/engine as CLI; no CGO / no separate installer) |
+| GUI stack (MVP) | **`denyout desktop`**: system tray/menu bar + OS notifications + first-run setup wizard (same binary; pure-Go tray). `denyout gui` remains an advanced technical panel. |
 | Platforms (MVP) | Ubuntu, macOS, Windows **desktop** |
 | Install (MVP) | Releases + SHA256SUMS; `install.sh` → `~/.local/bin` (Linux/macOS); Windows zip + short EN doc; no system CA by default; Homebrew/winget after first release / stretch — [`07-desktop.md`](07-desktop.md) §3 |
 | Phone / mobile | Out of scope for MVP |

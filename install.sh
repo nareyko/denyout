@@ -162,4 +162,30 @@ case ":$PATH:" in
 esac
 
 "${INSTALL_DIR}/denyout" version || true
-echo "denyout install: next — denyout init && denyout run -- <your-agent>"
+
+echo "denyout install: done"
+echo ""
+echo "Two ways to continue:"
+echo "  UI (recommended):  denyout desktop"
+echo "  CLI:               denyout init && denyout run -- <your-agent>"
+echo ""
+
+# Optional interactive launch of the desktop wizard (TTY only; skip with DENYOUT_NO_DESKTOP=1).
+if [ -n "${DENYOUT_NO_DESKTOP:-}" ]; then
+  exit 0
+fi
+if [ ! -t 0 ] || [ ! -t 1 ]; then
+  # Non-interactive pipe install (curl | sh) — print hint only.
+  echo "denyout install: run 'denyout desktop' when you are ready for the setup wizard"
+  exit 0
+fi
+printf "Open DenyOut setup now? [Y/n] "
+read -r ans || ans=y
+case "$ans" in
+  ""|y|Y|yes|YES)
+    exec "${INSTALL_DIR}/denyout" desktop --setup
+    ;;
+  *)
+    echo "denyout install: skipped desktop; run 'denyout desktop' later"
+    ;;
+esac

@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/nareyko/denyout/internal/notify"
 	"github.com/nareyko/denyout/internal/proxy"
 )
 
@@ -15,6 +16,8 @@ type Options struct {
 	Version    string
 	Command    []string
 	Sandbox    string // stub only
+	Notify     bool   // OS notifications on deny
+	OnDeny     proxy.DenyHook
 }
 
 // Exec starts proxy, wraps child, returns child exit code.
@@ -23,11 +26,16 @@ func Exec(opts Options) (int, error) {
 		return 2, fmt.Errorf("no command after --")
 	}
 
+	onDeny := opts.OnDeny
+	if onDeny == nil && opts.Notify {
+		onDeny = notify.Deny
+	}
 	sess, err := StartSession(SessionOptions{
 		ConfigPath: opts.ConfigPath,
 		TLSMode:    opts.TLSMode,
 		Version:    opts.Version,
 		Sandbox:    opts.Sandbox,
+		OnDeny:     onDeny,
 	})
 	if err != nil {
 		return 2, err

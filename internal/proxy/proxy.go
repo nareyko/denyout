@@ -28,6 +28,9 @@ const (
 	TLSPassthrough TLSMode = "passthrough"
 )
 
+// DenyHook is called after a deny decision (host and reasons are safe to show).
+type DenyHook func(host string, reasons []string)
+
 // Config for the local proxy.
 type Config struct {
 	Engine     *policy.Engine
@@ -39,6 +42,7 @@ type Config struct {
 	CA         *SessionCA
 	ListenHost string // default 127.0.0.1
 	ListenPort int    // 0 = ephemeral
+	OnDeny     DenyHook
 }
 
 // Server is the HTTP proxy.
@@ -364,6 +368,9 @@ func (s *Server) logDecision(rv policy.RequestView, d policy.Decision, start tim
 	if s.cfg.Audit == nil {
 		if d.Verdict == "deny" {
 			fmt.Fprintf(os.Stderr, "denyout: DENY %s reasons=%s\n", secrets.RedactURL(rv.RawURL), strings.Join(d.Reasons, ","))
+			if s.cfg.OnDeny != nil {
+				s.cfg.OnDeny(rv.DestHost, append([]string(nil), d.Reasons...))
+			}
 		}
 		return
 	}
@@ -398,6 +405,9 @@ func (s *Server) logDecision(rv policy.RequestView, d policy.Decision, start tim
 	_ = s.cfg.Audit.Log(ev)
 	if d.Verdict == "deny" {
 		fmt.Fprintf(os.Stderr, "denyout: DENY host=%s reasons=%s\n", rv.DestHost, strings.Join(d.Reasons, ","))
+		if s.cfg.OnDeny != nil {
+			s.cfg.OnDeny(rv.DestHost, append([]string(nil), d.Reasons...))
+		}
 	}
 }
 

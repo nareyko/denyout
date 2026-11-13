@@ -40,6 +40,7 @@ archives:
       - README.md
       - docs/install-windows.md
       - docs/10-security-boundaries.md
+      - scripts/Start-DenyOut.cmd
 
 checksum:
   name_template: SHA256SUMS

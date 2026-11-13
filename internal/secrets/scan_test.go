@@ -48,6 +48,15 @@ func TestScanBytesCanary(t *testing.T) {
 	}
 }
 
+func TestRedactURLCanaryInHostLike(t *testing.T) {
+	// Regression from FuzzScanURL: canary outside query must not survive.
+	in := "0DENYOUT_CANARY_LAB"
+	red := secrets.RedactURL(in)
+	if strings.Contains(red, "DENYOUT_CANARY_") {
+		t.Fatalf("leaked: %s", red)
+	}
+}
+
 func TestFuzzScanURLSmoke(t *testing.T) {
 	// Lightweight resilience smoke (not full go-fuzz); malformed inputs must not panic.
 	inputs := []string{
