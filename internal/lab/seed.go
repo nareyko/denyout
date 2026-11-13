@@ -55,6 +55,12 @@ func DefaultCases() []CaseSpec {
 	allow := []CaseSpec{
 		{ID: "allow-01-anthropic", Suite: "allow_models", URL: "https://api.anthropic.com/", Mode: "enforce", Preset: "models", ExpectVerdict: "allow", Note: "AT-01"},
 		{ID: "allow-02-openai", Suite: "allow_models", URL: "https://api.openai.com/", Mode: "enforce", Preset: "models", ExpectVerdict: "allow", Note: "openai host"},
+		{ID: "allow-03-groq", Suite: "allow_models", URL: "https://api.groq.com/openai/v1/chat/completions", Mode: "enforce", Preset: "models", ExpectVerdict: "allow", Note: "M3 model host"},
+		{ID: "allow-04-mistral", Suite: "allow_models", URL: "https://api.mistral.ai/v1/chat/completions", Mode: "enforce", Preset: "models", ExpectVerdict: "allow", Note: "M3 model host"},
+		{ID: "allow-05-google", Suite: "allow_models", URL: "https://generativelanguage.googleapis.com/v1beta/models", Mode: "enforce", Preset: "models", ExpectVerdict: "allow", Note: "M3 model host"},
+		{ID: "allow-06-cohere", Suite: "allow_models", URL: "https://api.cohere.ai/v1/chat", Mode: "enforce", Preset: "models", ExpectVerdict: "allow", Note: "M3 model host"},
+		{ID: "allow-07-together", Suite: "allow_models", URL: "https://api.together.xyz/v1/chat/completions", Mode: "enforce", Preset: "models", ExpectVerdict: "allow", Note: "M3 model host"},
+		{ID: "allow-08-fireworks", Suite: "allow_models", URL: "https://api.fireworks.ai/inference/v1/chat/completions", Mode: "enforce", Preset: "models", ExpectVerdict: "allow", Note: "M3 model host"},
 		{ID: "deny-host-example", Suite: "allow_models", URL: "https://example.com/", Mode: "enforce", Preset: "models", ExpectVerdict: "deny", ExpectReasons: []string{"host_not_allowed"}, Note: "AT-02"},
 		{ID: "audit-would-deny", Suite: "allow_models", URL: "https://example.com/", Mode: "audit", Preset: "none", ExpectVerdict: "allow", ExpectReasons: []string{"host_not_allowed"}, Note: "AT-06 would_deny via reasons"},
 	}

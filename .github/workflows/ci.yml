@@ -32,5 +32,10 @@ jobs:
           ./bin/denyout test --db examples/fixtures/denyout-lab.sqlite
       - name: Acceptance AT-01…AT-09
         run: go test ./internal/accept/ -count=1
+      - name: M3 false-deny script (≤1/10)
+        run: |
+          set -euo pipefail
+          chmod +x scripts/m3-false-deny.sh
+          DENYOUT_BIN=./bin/denyout ./scripts/m3-false-deny.sh
       - name: govulncheck
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...

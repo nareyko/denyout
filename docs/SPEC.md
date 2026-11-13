@@ -140,7 +140,7 @@ Exact order is specified in [04-policy-engine.md](04-policy-engine.md). Secret s
 See end of [12-mvp-and-roadmap.md](12-mvp-and-roadmap.md). Critical ones:
 
 1. Exact v1 vs later cut during build (private HQ `decisions.md` §1 — in process).  
-2. GUI toolkit / screens for Dec 1 (GUI required; details TBD).  
+2. GUI: `denyout gui` localhost web UI locked for Dec 1 (see [`design-decisions.md`](design-decisions.md)); deeper screens later.  
 3. Language **Go**, license **Apache-2.0**, TLS default **intercept** — [`design-decisions.md`](design-decisions.md).
 
 ## 9. Change control

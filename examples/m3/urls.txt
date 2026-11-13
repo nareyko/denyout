@@ -1,0 +1,14 @@
+# M3 — model-host-only traffic (default preset models).
+# Ten scripted runs that MUST allow without allowlist edits.
+# Lines: URL only; blank/# ignored.
+# Metric: ≤1/10 false-deny (host_not_allowed / need allowlist edit).
+https://api.anthropic.com/v1/messages
+https://api.anthropic.com/v1/models
+https://api.openai.com/v1/chat/completions
+https://api.openai.com/v1/models
+https://api.groq.com/openai/v1/chat/completions
+https://api.mistral.ai/v1/chat/completions
+https://generativelanguage.googleapis.com/v1beta/models
+https://api.cohere.ai/v1/chat
+https://api.together.xyz/v1/chat/completions
+https://api.fireworks.ai/inference/v1/chat/completions

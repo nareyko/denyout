@@ -37,11 +37,12 @@ Engineering tasks for the DenyOut MVP. Product deadlines and internal bets are t
 - [x] SQLite fixture DB + ≥20 R-20 / secret-URL cases (`r20_url` suite, 22 cases)
 - [x] `denyout test` / acceptance AT-01…AT-09 (`internal/accept`, CI)
 - [x] Examples under `examples/canaries/` (pre-existing)
+- [x] M3 false-deny script (`scripts/m3-false-deny.sh` + `examples/m3/urls.txt`, CI)
 
 ## E. Audit + UX
 
 - [x] JSONL audit schema v1 ([`09-audit-and-ops.md`](09-audit-and-ops.md))
-- [ ] Minimal GUI (same engine as CLI; keep install simple)
+- [x] Minimal GUI: `denyout gui` localhost web UI (start/stop wrap, mode/preset, check, recent denials) — same engine; no extra install deps
 - [x] Denial copy never prints raw secrets
 
 ## F. Install + release

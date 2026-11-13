@@ -1,11 +1,15 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/nareyko/denyout/internal/check"
+	"github.com/nareyko/denyout/internal/gui"
 	"github.com/nareyko/denyout/internal/lab"
 	"github.com/nareyko/denyout/internal/policy"
 	"github.com/nareyko/denyout/internal/proxy"
@@ -42,6 +46,8 @@ func runMain(args []string) int {
 		return cmdRun(args[1:])
 	case "test":
 		return cmdTest(args[1:])
+	case "gui":
+		return cmdGUI(args[1:])
 	default:
 		fmt.Fprintf(os.Stderr, "denyout: unknown command %q\n\n", args[0])
 		printHelp(os.Stderr)
@@ -63,6 +69,7 @@ Commands:
   policy validate <f>  Validate a denyout/v1 YAML config
   test [--db path]     Run lab SQLite fixtures (denyout test)
   run [flags] -- <cmd> Wrap command with local policy proxy
+  gui                  Local desktop UI (localhost; same engine as CLI)
 
 Install and security boundaries: https://denyout.com · docs in this repo.
 `)
@@ -300,6 +307,79 @@ func cmdRun(args []string) int {
 	return code
 }
 
+func cmdGUI(args []string) int {
+	cfgPath := ""
+	tlsMode := string(proxy.TLSIntercept)
+	listen := "127.0.0.1:0"
+	openBrowser := true
+
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case a == "--help" || a == "-h":
+			fmt.Println("Usage: denyout gui [--config path] [--tls-mode intercept|passthrough] [--listen 127.0.0.1:0] [--no-open]")
+			fmt.Println("  Localhost web UI: start/stop wrap, mode/preset, check URL, recent redacted denials.")
+			fmt.Println("  Same policy engine as CLI; does not bypass denyout run.")
+			return 0
+		case a == "--no-open":
+			openBrowser = false
+		case a == "--config" || a == "-c":
+			i++
+			if i >= len(args) {
+				fmt.Fprintln(os.Stderr, "denyout gui: --config requires a path")
+				return 2
+			}
+			cfgPath = args[i]
+		case strings.HasPrefix(a, "--tls-mode="):
+			tlsMode = strings.TrimPrefix(a, "--tls-mode=")
+		case a == "--tls-mode":
+			i++
+			if i >= len(args) {
+				fmt.Fprintln(os.Stderr, "denyout gui: --tls-mode requires a value")
+				return 2
+			}
+			tlsMode = args[i]
+		case strings.HasPrefix(a, "--listen="):
+			listen = strings.TrimPrefix(a, "--listen=")
+		case a == "--listen":
+			i++
+			if i >= len(args) {
+				fmt.Fprintln(os.Stderr, "denyout gui: --listen requires a value")
+				return 2
+			}
+			listen = args[i]
+		default:
+			fmt.Fprintf(os.Stderr, "denyout gui: unknown flag %q\n", a)
+			return 2
+		}
+	}
+
+	mode := proxy.TLSMode(tlsMode)
+	if mode != proxy.TLSIntercept && mode != proxy.TLSPassthrough {
+		fmt.Fprintf(os.Stderr, "denyout gui: invalid tls-mode %q\n", tlsMode)
+		return 2
+	}
+	if !strings.HasPrefix(listen, "127.0.0.1:") && !strings.HasPrefix(listen, "localhost:") {
+		fmt.Fprintln(os.Stderr, "denyout gui: --listen must be 127.0.0.1 or localhost (desktop UI is local-only)")
+		return 2
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	if err := gui.Run(ctx, gui.Options{
+		ConfigPath:  cfgPath,
+		TLSMode:     mode,
+		Version:     version,
+		Listen:      listen,
+		OpenBrowser: openBrowser,
+	}); err != nil {
+		fmt.Fprintf(os.Stderr, "denyout gui: %v\n", err)
+		return 2
+	}
+	return 0
+}
+
 func cmdTest(args []string) int {
 	dbPath := "examples/fixtures/denyout-lab.sqlite"
 	suite := ""
@@ -372,4 +452,3 @@ func cmdTest(args []string) int {
 	}
 	return 0
 }
-

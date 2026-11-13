@@ -1,19 +1,10 @@
 package run
 
 import (
-	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
-	"net"
 	"os"
 	"os/exec"
-	"path/filepath"
 
-	"github.com/google/uuid"
-
-	"github.com/nareyko/denyout/internal/audit"
-	"github.com/nareyko/denyout/internal/policy"
 	"github.com/nareyko/denyout/internal/proxy"
 )
 
@@ -31,114 +22,34 @@ func Exec(opts Options) (int, error) {
 	if len(opts.Command) == 0 {
 		return 2, fmt.Errorf("no command after --")
 	}
-	if opts.TLSMode == "" {
-		opts.TLSMode = proxy.TLSIntercept
-	}
 
-	var (
-		cfg *policy.Config
-		raw []byte
-		err error
-	)
-	if opts.ConfigPath != "" {
-		raw, err = os.ReadFile(opts.ConfigPath)
-		if err != nil {
-			return 2, err
-		}
-		cfg, err = policy.LoadBytes(raw)
-	} else {
-		cfg, err = policy.DefaultEnforceModels()
-		if err == nil {
-			raw = []byte("preset:models")
-		}
-	}
-	if err != nil {
-		return 2, fmt.Errorf("config: %w", err)
-	}
-
-	if opts.TLSMode == proxy.TLSPassthrough {
-		fmt.Fprintln(os.Stderr, "denyout: WARNING: tls-mode=passthrough — secret-in-URL / canary scanning on HTTPS is limited to CONNECT host only; not full R-20 protection")
-	}
-	if opts.Sandbox != "" {
-		fmt.Fprintf(os.Stderr, "denyout: --sandbox=%s is documented stub only in this build; proceeding without OS sandbox\n", opts.Sandbox)
-	}
-
-	sessionID := uuid.NewString()
-	sum := sha256.Sum256(raw)
-	policyHash := "sha256:" + hex.EncodeToString(sum[:])
-
-	auditPath := audit.ExpandPath(cfg.Audit.JSONLPath)
-	if auditPath == "" {
-		auditPath = audit.DefaultDesktopPath()
-	}
-	sink := audit.MustOpen(auditPath, cfg.Audit.Stdout, opts.Version)
-	defer sink.Close()
-
-	var ca *proxy.SessionCA
-	if opts.TLSMode == proxy.TLSIntercept {
-		caDir := filepath.Join(os.TempDir(), "denyout-ca-"+sessionID)
-		ca, err = proxy.NewSessionCA(caDir)
-		if err != nil {
-			return 2, fmt.Errorf("session CA: %w", err)
-		}
-		defer ca.Shred()
-	}
-
-	eng := policy.NewEngine(cfg)
-	eng.Resolve = func(host string) ([]net.IP, error) {
-		return net.DefaultResolver.LookupIP(context.Background(), "ip", host)
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	srv, err := proxy.Start(ctx, proxy.Config{
-		Engine:     eng,
-		Audit:      sink,
-		SessionID:  sessionID,
-		PolicyHash: policyHash,
-		Version:    opts.Version,
+	sess, err := StartSession(SessionOptions{
+		ConfigPath: opts.ConfigPath,
 		TLSMode:    opts.TLSMode,
-		CA:         ca,
-		ListenHost: "127.0.0.1",
-		ListenPort: 0,
+		Version:    opts.Version,
+		Sandbox:    opts.Sandbox,
 	})
 	if err != nil {
 		return 2, err
 	}
-	defer srv.Close()
+	defer sess.Stop()
 
-	proxyURL := fmt.Sprintf("http://127.0.0.1:%d", srv.Port())
+	st := sess.Status()
 	fmt.Fprintf(os.Stderr, "denyout: mode=%s preset=%s tls=%s proxy=%s session=%s\n",
-		cfg.Mode, cfg.Preset, opts.TLSMode, proxyURL, sessionID)
-
-	_ = sink.Log(audit.Event{
-		SessionID: sessionID,
-		Verdict:   "session_start",
-		Reasons:   []string{},
-		Mode:      cfg.Mode,
-		Network: audit.Network{
-			DestHost: "localhost",
-			DestPort: srv.Port(),
-			Protocol: "proxy",
-		},
-		PolicyHash:     policyHash,
-		DenyOutVersion: opts.Version,
-	})
+		st.Mode, st.Preset, st.TLSMode, st.ProxyURL, st.SessionID)
 
 	cmd := exec.Command(opts.Command[0], opts.Command[1:]...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.Env = childEnv(os.Environ(), proxyURL, sessionID, ca)
+	cmd.Env = childEnv(os.Environ(), st.ProxyURL, st.SessionID, sess.ca)
 	setProcGroup(cmd)
 
 	if err := cmd.Start(); err != nil {
 		return 2, err
 	}
 	waitErr := cmd.Wait()
-	cancel()
-	_ = srv.Close()
+	killProcGroup(cmd)
 
 	code := 0
 	if waitErr != nil {
@@ -148,16 +59,6 @@ func Exec(opts Options) (int, error) {
 			return 2, waitErr
 		}
 	}
-	killProcGroup(cmd)
-	_ = sink.Log(audit.Event{
-		SessionID:      sessionID,
-		Verdict:        "session_end",
-		Reasons:        []string{},
-		Mode:           cfg.Mode,
-		Network:        audit.Network{DestHost: "localhost", DestPort: srv.Port()},
-		PolicyHash:     policyHash,
-		DenyOutVersion: opts.Version,
-	})
 	return code, nil
 }
 

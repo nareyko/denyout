@@ -72,6 +72,16 @@ Write a starter `denyout.yaml` in CWD with comments.
 
 Standard.
 
+### 3.7 `denyout gui`
+
+Minimal desktop UI (localhost only, embedded in the same binary):
+
+```bash
+denyout gui [--config path] [--no-open]
+```
+
+Shows start/stop wrap, current mode/preset, URL check, and recent redacted denials. Same policy engine as CLI; does not bypass `denyout run`.
+
 ## 4. Zero-config happy path
 
 ```bash

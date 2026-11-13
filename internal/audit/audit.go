@@ -1,6 +1,7 @@
 package audit
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -153,4 +154,43 @@ func MustOpen(path string, stdout bool, version string) *Sink {
 		s, _ = Open("", stdout, version)
 	}
 	return s
+}
+
+// RecentDenials returns up to limit recent deny / would_deny events from a JSONL file (newest last).
+func RecentDenials(path string, limit int) ([]Event, error) {
+	if path == "" || limit <= 0 {
+		return nil, nil
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	defer f.Close()
+
+	var all []Event
+	sc := bufio.NewScanner(f)
+	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	for sc.Scan() {
+		line := sc.Bytes()
+		if len(line) == 0 {
+			continue
+		}
+		var ev Event
+		if err := json.Unmarshal(line, &ev); err != nil {
+			continue
+		}
+		if ev.Verdict == "deny" || ev.WouldDeny {
+			all = append(all, ev)
+		}
+	}
+	if err := sc.Err(); err != nil {
+		return nil, err
+	}
+	if len(all) > limit {
+		all = all[len(all)-limit:]
+	}
+	return all, nil
 }

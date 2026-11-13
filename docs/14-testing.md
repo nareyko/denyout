@@ -85,10 +85,19 @@ Files in `examples/canaries/`:
 | `urls.txt` | List of URLs for `denyout check` loop |
 | `expected.json` | Expected verdicts |
 
-## 5. Performance smoke
+## 5. M3 false-deny script
+
+Metric: model-only traffic false-deny ≤ **1/10** scripted runs need an allowlist edit.
+
+- URL list: [`examples/m3/urls.txt`](../examples/m3/urls.txt) (exactly 10 clean model-host paths).
+- Runner: [`scripts/m3-false-deny.sh`](../scripts/m3-false-deny.sh) → `denyout check` (no dial).
+- Pass if ≤1 of 10 returns deny (would require allowlist/policy edit).
+- Wired in Linux CI and `make m3`.
+
+## 6. Performance smoke
 
 - 100 sequential GETs to allowlisted host through proxy; p95 overhead < 50ms local (informal until measured).
 
-## 6. Security regression
+## 7. Security regression
 
 Any change to evaluation order or scanner defaults **MUST** update this file and unit snapshots in the same PR.

@@ -39,4 +39,12 @@ func TestLogJSONLRequiredFields(t *testing.T) {
 	if strings.Contains(line, "sk-") {
 		t.Fatal("unexpected secret material")
 	}
+
+	evs, err := audit.RecentDenials(path, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(evs) != 1 || evs[0].Verdict != "deny" {
+		t.Fatalf("RecentDenials=%v", evs)
+	}
 }
