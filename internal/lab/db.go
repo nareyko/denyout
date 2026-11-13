@@ -44,47 +44,15 @@ func Open(path string) (*sql.DB, error) {
 	return db, nil
 }
 
-// SeedCanary inserts the minimum active canary case (idempotent).
+// SeedCanary keeps the original single-canary helper for older tests.
 func SeedCanary(db *sql.DB) error {
-	_, err := db.Exec(`
-INSERT INTO cases (id, suite, url, mode, preset, expect_verdict, expect_reasons, active, note)
-VALUES (
-  'canary-r20-lab',
-  'r20_url',
-  'https://evil.example/pixel.png?api_key=DENYOUT_CANARY_LAB',
-  'enforce',
-  'models',
-  'deny',
-  '["canary_detected","secret_in_url","host_not_allowed"]',
-  1,
-  'W3 seed — R-20 style secret URL canary'
-)
-ON CONFLICT(id) DO UPDATE SET
-  url=excluded.url,
-  expect_verdict=excluded.expect_verdict,
-  expect_reasons=excluded.expect_reasons,
-  active=1
-`)
-	return err
+	return SeedAll(db)
 }
 
-// OpenSeeded opens path and ensures the canary seed exists.
-func OpenSeeded(path string) (*sql.DB, error) {
-	db, err := Open(path)
-	if err != nil {
-		return nil, err
-	}
-	if err := SeedCanary(db); err != nil {
-		_ = db.Close()
-		return nil, err
-	}
-	return db, nil
-}
-
-// ActiveCanaryURL returns the seed canary URL or error if missing.
+// ActiveCanaryURL returns the primary R-20 canary URL.
 func ActiveCanaryURL(db *sql.DB) (string, error) {
 	var u string
-	err := db.QueryRow(`SELECT url FROM cases WHERE id = ? AND active = 1`, "canary-r20-lab").Scan(&u)
+	err := db.QueryRow(`SELECT url FROM cases WHERE id = ? AND active = 1`, "r20-01-canary-query").Scan(&u)
 	if err != nil {
 		return "", err
 	}

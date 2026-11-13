@@ -54,6 +54,14 @@ type Scanners struct {
 	HighEntropy *struct {
 		Enabled *bool `yaml:"enabled" json:"enabled"`
 	} `yaml:"high_entropy" json:"high_entropy"`
+	CustomRegex []CustomRegex `yaml:"custom_regex" json:"custom_regex"`
+}
+
+// CustomRegex is a user pattern (invalid pattern → fail closed at load).
+type CustomRegex struct {
+	ID      string `yaml:"id" json:"id"`
+	Pattern string `yaml:"pattern" json:"pattern"`
+	Redact  bool   `yaml:"redact" json:"redact"`
 }
 
 // MinValueLenOrDefault returns scanner min value length.

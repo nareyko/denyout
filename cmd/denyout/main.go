@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/nareyko/denyout/internal/check"
+	"github.com/nareyko/denyout/internal/lab"
 	"github.com/nareyko/denyout/internal/policy"
 	"github.com/nareyko/denyout/internal/proxy"
 	"github.com/nareyko/denyout/internal/run"
@@ -39,6 +40,8 @@ func runMain(args []string) int {
 		return cmdInit(args[1:])
 	case "run":
 		return cmdRun(args[1:])
+	case "test":
+		return cmdTest(args[1:])
 	default:
 		fmt.Fprintf(os.Stderr, "denyout: unknown command %q\n\n", args[0])
 		printHelp(os.Stderr)
@@ -58,6 +61,7 @@ Commands:
   init                 Write starter denyout.yaml
   check <url>          Evaluate a URL against policy (no network dial)
   policy validate <f>  Validate a denyout/v1 YAML config
+  test [--db path]     Run lab SQLite fixtures (denyout test)
   run [flags] -- <cmd> Wrap command with local policy proxy
 
 Install and security boundaries: https://denyout.com · docs in this repo.
@@ -295,3 +299,77 @@ func cmdRun(args []string) int {
 	}
 	return code
 }
+
+func cmdTest(args []string) int {
+	dbPath := "examples/fixtures/denyout-lab.sqlite"
+	suite := ""
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case a == "--help" || a == "-h":
+			fmt.Println("Usage: denyout test [--db path] [--suite name]")
+			fmt.Println("  Seeds the lab DB if needed, runs active fixtures (no network dial).")
+			return 0
+		case a == "--db":
+			i++
+			if i >= len(args) {
+				fmt.Fprintln(os.Stderr, "denyout test: --db requires a path")
+				return 2
+			}
+			dbPath = args[i]
+		case strings.HasPrefix(a, "--db="):
+			dbPath = strings.TrimPrefix(a, "--db=")
+		case a == "--suite":
+			i++
+			if i >= len(args) {
+				fmt.Fprintln(os.Stderr, "denyout test: --suite requires a name")
+				return 2
+			}
+			suite = args[i]
+		case strings.HasPrefix(a, "--suite="):
+			suite = strings.TrimPrefix(a, "--suite=")
+		default:
+			fmt.Fprintf(os.Stderr, "denyout test: unknown flag %q\n", a)
+			return 2
+		}
+	}
+
+	db, err := lab.OpenSeeded(dbPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "denyout test: %v\n", err)
+		return 2
+	}
+	defer db.Close()
+
+	if suite == "r20_url" {
+		n, err := lab.CountActive(db, "r20_url")
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "denyout test: %v\n", err)
+			return 2
+		}
+		if n < 20 {
+			fmt.Fprintf(os.Stderr, "denyout test: r20_url active=%d want >=20 (M1)\n", n)
+			return 2
+		}
+	}
+
+	rep, err := lab.RunDB(db, lab.RunOptions{Suite: suite, Label: "cli"})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "denyout test: %v\n", err)
+		return 2
+	}
+
+	for _, r := range rep.Results {
+		status := "PASS"
+		if !r.Passed {
+			status = "FAIL"
+		}
+		fmt.Printf("%s %s suite=%s verdict=%s reasons=%v %s\n", status, r.CaseID, r.Suite, r.Verdict, r.Reasons, r.Detail)
+	}
+	fmt.Printf("summary run_id=%s passed=%d failed=%d total=%d db=%s\n", rep.RunID, rep.Passed, rep.Failed, rep.Total, dbPath)
+	if rep.Failed > 0 {
+		return 1
+	}
+	return 0
+}
+

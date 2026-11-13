@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/santhosh-tekuri/jsonschema/v5"
@@ -45,10 +46,25 @@ func LoadBytes(raw []byte) (*Config, error) {
 	if cfg.Mode == "" {
 		cfg.Mode = "enforce"
 	}
+	if err := validateCustomRegex(&cfg); err != nil {
+		return nil, err
+	}
 	if err := mergePreset(&cfg); err != nil {
 		return nil, err
 	}
 	return &cfg, nil
+}
+
+func validateCustomRegex(cfg *Config) error {
+	for _, cr := range cfg.Scanners.CustomRegex {
+		if cr.Pattern == "" {
+			return fmt.Errorf("custom_regex %q: empty pattern", cr.ID)
+		}
+		if _, err := regexp.Compile(cr.Pattern); err != nil {
+			return fmt.Errorf("custom_regex %q: invalid pattern: %w", cr.ID, err)
+		}
+	}
+	return nil
 }
 
 func validateSchema(yamlRaw []byte) error {

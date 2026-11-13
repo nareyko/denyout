@@ -25,5 +25,12 @@ jobs:
           echo "$out" | grep -q 'verdict=deny'
           echo "$out" | grep -qv 'DENYOUT_CANARY_LAB'
           ./bin/denyout check 'https://evil.example/pixel.png?api_key=DENYOUT_CANARY_LAB' && exit 1 || test $? -eq 1
+      - name: Lab test (M1 r20_url ≥20)
+        run: |
+          set -euo pipefail
+          ./bin/denyout test --db examples/fixtures/denyout-lab.sqlite --suite r20_url
+          ./bin/denyout test --db examples/fixtures/denyout-lab.sqlite
+      - name: Acceptance AT-01…AT-09
+        run: go test ./internal/accept/ -count=1
       - name: govulncheck
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...

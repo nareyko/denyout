@@ -33,9 +33,9 @@ Engineering tasks for the DenyOut MVP. Product deadlines and internal bets are t
 
 ## D. Lab tests
 
-- [x] SQLite schema + seed ≥1 canary (`internal/lab`; case `canary-r20-lab`)
-- [ ] SQLite fixture DB + ≥20 R-20 / secret-URL cases
-- [ ] `denyout test` / acceptance AT-01…AT-09 ([`14-testing.md`](14-testing.md))
+- [x] SQLite schema + seed (`internal/lab`; primary `r20-01-canary-query`)
+- [x] SQLite fixture DB + ≥20 R-20 / secret-URL cases (`r20_url` suite, 22 cases)
+- [x] `denyout test` / acceptance AT-01…AT-09 (`internal/accept`, CI)
 - [x] Examples under `examples/canaries/` (pre-existing)
 
 ## E. Audit + UX
