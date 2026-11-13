@@ -48,12 +48,18 @@ denyout serve --config /etc/denyout/denyout.yaml --listen 127.0.0.1:8080
 
 | Flag | Description |
 | --- | --- |
-| `--listen` | Bind address |
-| `--metrics-listen` | Optional `127.0.0.1:9090` |
-| `--health-listen` | `/healthz` readiness |
+| `--config`, `-c` | **Required** policy file |
+| `--listen` | Bind address (default from config `listen`, else `127.0.0.1:8080`) |
+| `--metrics-listen` | Optional `127.0.0.1:9090` (`/metrics`; also `/healthz` if health unset) |
+| `--health-listen` | Optional `/healthz` `/readyz` `/livez` |
+| `--tls-mode` | `intercept` (default) or `passthrough` |
+| `--ca-dir` | Where to write session CA cert for agent trust (intercept) |
 
-**Readiness:** proxy accepting connections + policy loaded.  
-**Liveness:** event loop alive.
+**Readiness:** `/readyz` → 200 when proxy is accepting + policy loaded.  
+**Liveness:** `/healthz` / `/livez`.  
+**Kill switch:** `DENYOUT_KILL=1` refuses to start (fail closed).
+
+Without NetworkPolicy / host firewall, `serve` is **not** a hardened deployment — agents can ignore `HTTP(S)_PROXY`.
 
 ## 4. Docker Compose (indie P2)
 

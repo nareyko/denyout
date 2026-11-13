@@ -17,6 +17,21 @@ type Config struct {
 	Limits           Limits   `yaml:"limits" json:"limits"`
 	Audit            Audit    `yaml:"audit" json:"audit"`
 	TLS              TLS      `yaml:"tls" json:"tls"`
+	Listen           Listen   `yaml:"listen" json:"listen"`
+	Server           Server   `yaml:"server" json:"server"`
+}
+
+// Listen is the proxy bind address (used by denyout serve).
+type Listen struct {
+	Host string `yaml:"host" json:"host"`
+	Port int    `yaml:"port" json:"port"`
+}
+
+// Server holds sidecar/ops settings.
+type Server struct {
+	AgentIDHeader string `yaml:"agent_id_header" json:"agent_id_header"`
+	MetricsListen string `yaml:"metrics_listen" json:"metrics_listen"`
+	HealthListen  string `yaml:"health_listen" json:"health_listen"`
 }
 
 // Limits are optional RPM caps.

@@ -51,3 +51,4 @@ ui:
 
 server:
   metrics_listen: "127.0.0.1:9090"
+  health_listen: "127.0.0.1:8081"

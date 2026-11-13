@@ -14,6 +14,7 @@ import (
 	"github.com/nareyko/denyout/internal/policy"
 	"github.com/nareyko/denyout/internal/proxy"
 	"github.com/nareyko/denyout/internal/run"
+	"github.com/nareyko/denyout/internal/serve"
 )
 
 // version is overridden at link time via -ldflags "-X main.version=…".
@@ -48,6 +49,8 @@ func runMain(args []string) int {
 		return cmdTest(args[1:])
 	case "gui":
 		return cmdGUI(args[1:])
+	case "serve":
+		return cmdServe(args[1:])
 	default:
 		fmt.Fprintf(os.Stderr, "denyout: unknown command %q\n\n", args[0])
 		printHelp(os.Stderr)
@@ -70,6 +73,7 @@ Commands:
   test [--db path]     Run lab SQLite fixtures (denyout test)
   run [flags] -- <cmd> Wrap command with local policy proxy
   gui                  Local desktop UI (localhost; same engine as CLI)
+  serve -c <file>      Long-running sidecar proxy (pair with NetworkPolicy)
 
 Install and security boundaries: https://denyout.com · docs in this repo.
 `)
@@ -305,6 +309,116 @@ func cmdRun(args []string) int {
 		}
 	}
 	return code
+}
+
+func cmdServe(args []string) int {
+	cfgPath := ""
+	listen := ""
+	metricsListen := ""
+	healthListen := ""
+	tlsMode := ""
+	caDir := ""
+
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case a == "--help" || a == "-h":
+			fmt.Println(`Usage: denyout serve --config path [--listen 127.0.0.1:8080] [--health-listen addr] [--metrics-listen addr] [--tls-mode intercept|passthrough] [--ca-dir path]
+
+  Long-running policy proxy for sidecar / compose / systemd.
+  Same engine as denyout run. Hardened deployments MUST pair with NetworkPolicy
+  (or host firewall) so the agent cannot bypass the proxy — docs/08-server.md.
+
+  DENYOUT_KILL=1 refuses to start (fail closed).`)
+			return 0
+		case a == "--config" || a == "-c":
+			i++
+			if i >= len(args) {
+				fmt.Fprintln(os.Stderr, "denyout serve: --config requires a path")
+				return 2
+			}
+			cfgPath = args[i]
+		case strings.HasPrefix(a, "--listen="):
+			listen = strings.TrimPrefix(a, "--listen=")
+		case a == "--listen":
+			i++
+			if i >= len(args) {
+				fmt.Fprintln(os.Stderr, "denyout serve: --listen requires a value")
+				return 2
+			}
+			listen = args[i]
+		case strings.HasPrefix(a, "--metrics-listen="):
+			metricsListen = strings.TrimPrefix(a, "--metrics-listen=")
+		case a == "--metrics-listen":
+			i++
+			if i >= len(args) {
+				fmt.Fprintln(os.Stderr, "denyout serve: --metrics-listen requires a value")
+				return 2
+			}
+			metricsListen = args[i]
+		case strings.HasPrefix(a, "--health-listen="):
+			healthListen = strings.TrimPrefix(a, "--health-listen=")
+		case a == "--health-listen":
+			i++
+			if i >= len(args) {
+				fmt.Fprintln(os.Stderr, "denyout serve: --health-listen requires a value")
+				return 2
+			}
+			healthListen = args[i]
+		case strings.HasPrefix(a, "--tls-mode="):
+			tlsMode = strings.TrimPrefix(a, "--tls-mode=")
+		case a == "--tls-mode":
+			i++
+			if i >= len(args) {
+				fmt.Fprintln(os.Stderr, "denyout serve: --tls-mode requires a value")
+				return 2
+			}
+			tlsMode = args[i]
+		case strings.HasPrefix(a, "--ca-dir="):
+			caDir = strings.TrimPrefix(a, "--ca-dir=")
+		case a == "--ca-dir":
+			i++
+			if i >= len(args) {
+				fmt.Fprintln(os.Stderr, "denyout serve: --ca-dir requires a path")
+				return 2
+			}
+			caDir = args[i]
+		default:
+			fmt.Fprintf(os.Stderr, "denyout serve: unknown flag %q\n", a)
+			return 2
+		}
+	}
+
+	if cfgPath == "" {
+		fmt.Fprintln(os.Stderr, "denyout serve: --config is required")
+		return 2
+	}
+
+	var mode proxy.TLSMode
+	if tlsMode != "" {
+		mode = proxy.TLSMode(tlsMode)
+		if mode != proxy.TLSIntercept && mode != proxy.TLSPassthrough {
+			fmt.Fprintf(os.Stderr, "denyout serve: invalid tls-mode %q\n", tlsMode)
+			return 2
+		}
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	if err := serve.Run(ctx, serve.Options{
+		ConfigPath:    cfgPath,
+		Listen:        listen,
+		MetricsListen: metricsListen,
+		HealthListen:  healthListen,
+		TLSMode:       mode,
+		CADir:         caDir,
+		Version:       version,
+	}); err != nil {
+		fmt.Fprintf(os.Stderr, "denyout serve: %v\n", err)
+		return 2
+	}
+	return 0
 }
 
 func cmdGUI(args []string) int {

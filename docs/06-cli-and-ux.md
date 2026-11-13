@@ -82,6 +82,17 @@ denyout gui [--config path] [--no-open]
 
 Shows start/stop wrap, current mode/preset, URL check, and recent redacted denials. Same policy engine as CLI; does not bypass `denyout run`.
 
+### 3.8 `denyout serve`
+
+Long-running sidecar / compose / systemd proxy:
+
+```bash
+denyout serve --config /etc/denyout/denyout.yaml --listen 127.0.0.1:8080 \
+  --health-listen 127.0.0.1:8081 [--metrics-listen 127.0.0.1:9090]
+```
+
+Same policy engine as `run`. `DENYOUT_KILL=1` refuses to start. Hardened claim requires NetworkPolicy — [`08-server.md`](08-server.md).
+
 ## 4. Zero-config happy path
 
 ```bash

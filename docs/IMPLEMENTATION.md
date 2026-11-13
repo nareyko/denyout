@@ -58,8 +58,8 @@ Locked recipes: [`07-desktop.md`](07-desktop.md) §3.
 
 ## G. Server (after desktop skeleton)
 
-- [ ] `denyout serve`
-- [ ] Examples in `examples/k8s/` + NetworkPolicy docs
+- [x] `denyout serve` (`--listen`, `--health-listen`, `--metrics-listen`, `--ca-dir`; `DENYOUT_KILL=1`)
+- [x] Examples in `examples/k8s/` + `examples/compose/` + NetworkPolicy docs ([`08-server.md`](08-server.md))
 
 ## Non-goals for MVP code
 

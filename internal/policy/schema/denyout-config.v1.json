@@ -116,7 +116,8 @@
       "additionalProperties": false,
       "properties": {
         "agent_id_header": { "type": "string" },
-        "metrics_listen": { "type": "string" }
+        "metrics_listen": { "type": "string" },
+        "health_listen": { "type": "string" }
       }
     }
   },

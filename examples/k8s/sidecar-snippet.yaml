@@ -46,14 +46,32 @@ spec:
               value: http://127.0.0.1:8080
             - name: NO_PROXY
               value: localhost,127.0.0.1
-            # Mount DenyOut CA into SSL_CERT_FILE when using intercept
+            - name: SSL_CERT_FILE
+              value: /ca/ca.crt
+            - name: REQUESTS_CA_BUNDLE
+              value: /ca/ca.crt
+            - name: NODE_EXTRA_CA_CERTS
+              value: /ca/ca.crt
+          volumeMounts:
+            - name: ca
+              mountPath: /ca
+              readOnly: true
           resources:
             requests:
               cpu: 100m
               memory: 256Mi
         - name: denyout
           image: denyout/denyout:0.1.0 # planned
-          args: ["serve", "-c", "/config/denyout.yaml"]
+          args:
+            - serve
+            - -c
+            - /config/denyout.yaml
+            - --listen
+            - 127.0.0.1:8080
+            - --health-listen
+            - 127.0.0.1:8081
+            - --ca-dir
+            - /ca
           ports:
             - containerPort: 8080
               name: proxy
@@ -61,16 +79,33 @@ spec:
             - name: config
               mountPath: /config
               readOnly: true
+            - name: ca
+              mountPath: /ca
           resources:
             requests:
               cpu: 50m
               memory: 128Mi
           readinessProbe:
-            tcpSocket:
-              port: 8080
+            httpGet:
+              path: /readyz
+              port: 8081
             initialDelaySeconds: 1
             periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
       volumes:
         - name: config
           configMap:
             name: denyout-config
+        - name: ca
+          emptyDir: {}

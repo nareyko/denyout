@@ -1,0 +1,43 @@
+# Indie / VPS sketch — weaker than K8s+NetworkPolicy.
+# Agent can still ignore HTTP(S)_PROXY unless you add host firewall / nftables.
+# See docs/08-server.md §2.1 for hardened requirements.
+services:
+  denyout:
+    image: denyout/denyout:0.1.0 # planned; or build from this repo
+    command:
+      - serve
+      - -c
+      - /config/denyout.yaml
+      - --listen
+      - 0.0.0.0:8080
+      - --health-listen
+      - 127.0.0.1:8081
+      - --ca-dir
+      - /ca
+    volumes:
+      - ../policies/denyout.server.sidecar.yaml:/config/denyout.yaml:ro
+      - denyout-ca:/ca
+    # Prefer not publishing the proxy on the host; keep it on an internal network.
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "denyout", "version"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  agent:
+    image: curlimages/curl:8.5.0
+    depends_on:
+      - denyout
+    environment:
+      HTTP_PROXY: http://denyout:8080
+      HTTPS_PROXY: http://denyout:8080
+      NO_PROXY: localhost,127.0.0.1
+      # SSL_CERT_FILE: /ca/ca.crt  # mount denyout-ca when using intercept
+    volumes:
+      - denyout-ca:/ca:ro
+    command: ["sleep", "infinity"]
+
+volumes:
+  denyout-ca:
