@@ -43,11 +43,11 @@ type Config struct {
 
 // Server is the HTTP proxy.
 type Server struct {
-	cfg      Config
-	ln       net.Listener
-	httpSrv  *http.Server
-	mu       sync.Mutex
-	closed   bool
+	cfg     Config
+	ln      net.Listener
+	httpSrv *http.Server
+	mu      sync.Mutex
+	closed  bool
 }
 
 // Start listens and serves in the background.
@@ -163,7 +163,7 @@ func (s *Server) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 	_ = bufrw.Flush()
 
 	if s.cfg.TLSMode == TLSPassthrough {
-		s.tunnel(clientConn, host, port, ips)
+		s.tunnel(clientConn, host, port, ips, s.cfg.Engine.Cfg.AllowPrivate)
 		s.logDecision(rv, d, start)
 		return
 	}
@@ -237,7 +237,26 @@ func (s *Server) roundTripIntercept(client io.ReadWriteCloser, req *http.Request
 		return
 	}
 
-	addr := net.JoinHostPort(pickIP(ips, host), fmt.Sprintf("%d", port))
+	ip, err := safeDialIP(host, ips, s.cfg.Engine.Cfg.AllowPrivate)
+	if err != nil {
+		reason := policy.ReasonUnsafeIP
+		if err == errDNSFailure {
+			reason = policy.ReasonDNSFailure
+		}
+		deny := policy.Decision{Verdict: "deny", Reasons: []string{reason}}
+		rv.DestIPs = ips
+		s.logDecision(rv, deny, start)
+		resp := &http.Response{
+			StatusCode: http.StatusForbidden,
+			ProtoMajor: 1,
+			ProtoMinor: 1,
+			Header:     make(http.Header),
+			Body:       io.NopCloser(strings.NewReader(redactDenyMsg(deny) + "\n")),
+		}
+		_ = resp.Write(client)
+		return
+	}
+	addr := net.JoinHostPort(ip.String(), fmt.Sprintf("%d", port))
 	up, err := tls.DialWithDialer(&net.Dialer{Timeout: 15 * time.Second}, "tcp", addr, &tls.Config{
 		ServerName: host,
 		MinVersion: tls.VersionTLS12,
@@ -323,9 +342,13 @@ func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
 	_, _ = io.Copy(w, resp.Body)
 }
 
-func (s *Server) tunnel(client net.Conn, host, port string, ips []net.IP) {
+func (s *Server) tunnel(client net.Conn, host, port string, ips []net.IP, allowPrivate bool) {
 	defer client.Close()
-	addr := net.JoinHostPort(pickIP(ips, host), port)
+	ip, err := safeDialIP(host, ips, allowPrivate)
+	if err != nil {
+		return
+	}
+	addr := net.JoinHostPort(ip.String(), port)
 	up, err := net.DialTimeout("tcp", addr, 15*time.Second)
 	if err != nil {
 		return
@@ -349,10 +372,10 @@ func (s *Server) logDecision(rv policy.RequestView, d policy.Decision, start tim
 		ips = append(ips, ip.String())
 	}
 	ev := audit.Event{
-		SessionID: s.cfg.SessionID,
-		Verdict:   d.Verdict,
-		Reasons:   d.Reasons,
-		Mode:      s.cfg.Engine.Cfg.Mode,
+		SessionID:  s.cfg.SessionID,
+		Verdict:    d.Verdict,
+		Reasons:    d.Reasons,
+		Mode:       s.cfg.Engine.Cfg.Mode,
 		Inspection: rv.Inspection,
 		Network: audit.Network{
 			DestHost:   rv.DestHost,
@@ -394,14 +417,30 @@ func lookupIPs(host string) ([]net.IP, error) {
 	return addrs, err
 }
 
-func pickIP(ips []net.IP, host string) string {
-	for _, ip := range ips {
-		if ip.To4() != nil {
-			return ip.String()
+var (
+	errDNSFailure = fmt.Errorf("dns failure")
+	errUnsafeIP   = fmt.Errorf("unsafe ip")
+)
+
+// safeDialIP picks a dial address only after every candidate IP passes UnsafeIP.
+// Never falls back to dialing by hostname (avoids a second DNS lookup without SSRF check).
+func safeDialIP(host string, ips []net.IP, allowPrivate bool) (net.IP, error) {
+	if len(ips) == 0 {
+		var err error
+		ips, err = lookupIPs(host)
+		if err != nil || len(ips) == 0 {
+			return nil, errDNSFailure
 		}
 	}
-	if len(ips) > 0 {
-		return ips[0].String()
+	for _, ip := range ips {
+		if policy.UnsafeIP(ip, allowPrivate) {
+			return nil, errUnsafeIP
+		}
 	}
-	return host
+	for _, ip := range ips {
+		if ip.To4() != nil {
+			return ip, nil
+		}
+	}
+	return ips[0], nil
 }
