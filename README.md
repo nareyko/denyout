@@ -22,6 +22,8 @@ denyout run -- python my_agent.py
 
 Internal Bet Tree / monetization / full decision log live in a **private HQ** sibling (`denyout-hq`), not in this repo.
 
+Agent playbooks: thin stubs in [`prompts/`](prompts/) → sibling [`agent-prompts`](https://github.com/nareyko/agent-prompts). Multi-root workspace: `~/projects/denyout-hq/denyout.code-workspace`.
+
 | Doc | Contents |
 | --- | --- |
 | [docs/REPO.md](docs/REPO.md) | Public vs private HQ layout |
