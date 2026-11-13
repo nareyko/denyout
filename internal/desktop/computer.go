@@ -3,7 +3,6 @@ package desktop
 import (
 	"fmt"
 	"net"
-	"net/url"
 	"os"
 	"os/exec"
 	"strconv"
@@ -127,67 +126,16 @@ func (a *App) startComputer() error {
 	return nil
 }
 
-func (a *App) onComputerDeny(host string, reasons []string, wizard string) {
-	a.mu.Lock()
-	a.lastDeny = host
-	a.state.LastDenyHost = host
-	a.state.LastDenySummary = notify.HumanReasons(reasons)
-	ask := a.state.AskMode
-	st := a.state
-	a.mu.Unlock()
-	_ = SaveState(st)
-
-	hostNotAllowed := false
-	for _, r := range reasons {
-		if r == "host_not_allowed" {
-			hostNotAllowed = true
-			break
-		}
-	}
-	if ask && hostNotAllowed {
-		go func() {
-			switch nativeAllowDialog(host) {
-			case "once":
-				_ = a.allowHostOnce(host)
-				return
-			case "always":
-				_ = a.allowHostAlways(host)
-				return
-			case "deny":
-				return
-			}
-			allowURL := ""
-			if wizard != "" {
-				allowURL = strings.TrimRight(wizard, "/") + "/allow.html?host=" + url.QueryEscape(host)
-			}
-			notify.Ask(notify.AskOptions{
-				Host:    host,
-				OpenURL: allowURL,
-				OnAction: func(h string, act notify.AskAction) {
-					switch act {
-					case notify.AskOnce:
-						_ = a.allowHostOnce(h)
-					case notify.AskAlways:
-						_ = a.allowHostAlways(h)
-					}
-				},
-			})
-		}()
-		return
-	}
-	notify.Deny(host, reasons)
-}
-
-func (a *App) stopComputer() {
-	a.stopComputerKeep(false)
-}
 
 func (a *App) stopComputerKeep(keepRestore bool) {
 	a.mu.Lock()
 	cmd := a.proxyd
 	port := a.proxyPort
+	hadProxyd := cmd != nil
 	a.proxyd = nil
-	a.proxyPort = 0
+	if hadProxyd {
+		a.proxyPort = 0
+	}
 	a.state.ComputerEnabled = false
 	if !keepRestore && a.state.Scope == ScopeComputer {
 		a.state.ProtectionOn = false
@@ -199,7 +147,9 @@ func (a *App) stopComputerKeep(keepRestore bool) {
 	a.mu.Unlock()
 	_ = SaveState(st)
 
-	if port > 0 {
+	// Only tear down hostguard when we actually started computer-mode proxyd.
+	// Session mode also stores proxyPort — must not trigger ElevateRemove/pkexec.
+	if hadProxyd && port > 0 {
 		uid, _ := hostguard.CurrentUID()
 		_ = hostguard.ElevateRemove(port, uid)
 	}

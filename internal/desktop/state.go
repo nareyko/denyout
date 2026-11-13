@@ -80,11 +80,8 @@ func LoadState() State {
 		st.Scope = ScopeComputer
 		st.ProtectionOn = true
 	}
-	if !st.ComputerAvailable && st.Scope == ScopeComputer && !st.ProtectionOn {
-		// keep unavailable until user retries from tray
-	}
 	// Older files lacked computer_available — treat as available.
-	if b != nil && !jsonHasComputerAvailable(b) {
+	if !jsonHasComputerAvailable(b) {
 		st.ComputerAvailable = true
 	}
 	return st

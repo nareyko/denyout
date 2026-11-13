@@ -177,9 +177,7 @@ scanners:
 	if err != nil {
 		return nil, err
 	}
-	for _, r := range extraAllow {
-		cfg.Allow = append(cfg.Allow, r)
-	}
+	cfg.Allow = append(cfg.Allow, extraAllow...)
 	return cfg, nil
 }
 
