@@ -173,6 +173,14 @@ if [ -z "$BIN" ] || [ ! -f "$BIN" ]; then
 fi
 
 mkdir -p "$INSTALL_DIR"
+
+# Stop old tray/proxyd before overwriting the binary (ETXTBSY / stale process).
+if command -v pkill >/dev/null 2>&1; then
+  pkill -f '[d]enyout[[:space:]]+desktop' 2>/dev/null || true
+  pkill -f '[d]enyout[[:space:]]+hostctl[[:space:]]+proxyd' 2>/dev/null || true
+  sleep 0.4 || true
+fi
+
 install -m 0755 "$BIN" "${INSTALL_DIR}/denyout"
 echo "denyout install: installed ${INSTALL_DIR}/denyout"
 

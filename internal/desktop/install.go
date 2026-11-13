@@ -32,6 +32,9 @@ func Install(opts Options) error {
 		fmt.Fprintln(os.Stderr, "denyout install: login autostart registered")
 	}
 
+	fmt.Fprintln(os.Stderr, "denyout install: stopping previous tray/proxyd (if any)…")
+	StopPreviousInstances()
+
 	if err := DetachDesktop(); err != nil {
 		return fmt.Errorf("start tray: %w", err)
 	}

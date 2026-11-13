@@ -27,3 +27,19 @@ func TestRecordErrorAndReadLast(t *testing.T) {
 		t.Fatalf("desktop.log=%s", b)
 	}
 }
+
+func TestOpenLogsWritesReadme(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_STATE_HOME", filepath.Join(home, ".local", "state"))
+
+	// OpenLogs may fail to launch a GUI opener in CI; still writes README.
+	_ = desktop.OpenLogs()
+	b, err := os.ReadFile(desktop.ReadmePath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), "last-error.txt") || !strings.Contains(string(b), "audit.jsonl") {
+		t.Fatalf("README=%s", b)
+	}
+}

@@ -33,6 +33,21 @@ func LastErrorPath() string {
 	return filepath.Join(LogDir(), "last-error.txt")
 }
 
+// ReadmePath explains which files in the log dir matter for support.
+func ReadmePath() string {
+	return filepath.Join(LogDir(), "README.txt")
+}
+
+const logsReadme = `DenyOut logs — which file to send
+
+1) last-error.txt  ← SEND THIS for admin / protect failures
+2) desktop.log     ← send if last-error is empty or unclear
+3) audit.jsonl     ← traffic decisions (allow/deny). NOT an admin error log.
+
+If last-error.txt says "No errors recorded yet", Protect is OK or the
+failure was not recorded. Prefer tray → "Copy last error".
+`
+
 // AppendDesktopLog writes a timestamped line to desktop.log.
 func AppendDesktopLog(format string, args ...any) {
 	_ = os.MkdirAll(LogDir(), 0o755)
@@ -74,12 +89,13 @@ func ReadLastError() string {
 	return string(b)
 }
 
-// OpenLogs reveals the log directory (audit + desktop.log + last-error.txt).
+// OpenLogs reveals the log directory and opens last-error.txt (not audit.jsonl).
 func OpenLogs() error {
 	dir := LogDir()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
+	_ = os.WriteFile(ReadmePath(), []byte(logsReadme), 0o644)
 	// Ensure files exist so the folder looks useful.
 	if _, err := os.Stat(AuditLogPath()); os.IsNotExist(err) {
 		_ = os.WriteFile(AuditLogPath(), []byte(""), 0o600)
@@ -90,16 +106,21 @@ func OpenLogs() error {
 	if _, err := os.Stat(LastErrorPath()); os.IsNotExist(err) {
 		_ = os.WriteFile(LastErrorPath(), []byte("No errors recorded yet.\n"), 0o600)
 	}
+	// Prefer opening the actionable file so users do not paste audit.jsonl.
+	last := LastErrorPath()
 	switch runtime.GOOS {
 	case "darwin":
-		return exec.Command("open", dir).Start()
+		_ = exec.Command("open", "-R", last).Start()
+		return exec.Command("open", last).Start()
 	case "windows":
-		return exec.Command("explorer", dir).Start()
+		_ = exec.Command("explorer", "/select,", last).Start()
+		return exec.Command("notepad", last).Start()
 	default:
+		_ = exec.Command("xdg-open", last).Start()
 		if err := exec.Command("xdg-open", dir).Start(); err == nil {
 			return nil
 		}
-		return exec.Command("xdg-open", LastErrorPath()).Start()
+		return nil
 	}
 }
 
