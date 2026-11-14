@@ -216,7 +216,10 @@ func applySecretScanners(cfg *Config, rv RequestView, reasons []string) ([]strin
 	if len(rv.BodyPrefix) > 0 {
 		hits = append(hits, secrets.ScanBytes(rv.BodyPrefix, cfg.Scanners.Canaries)...)
 	}
-	hostAllowed := HostAllowed(cfg, rv.DestHost) || cfg.InsecureAllowAll
+	// Auth headers are OK toward destinations the mode would allow.
+	// In blocklist (Safe desktop), HostAllowed is often false (empty allow[]) —
+	// treating that as "unknown host" falsely denied Cursor/API Bearer tokens.
+	hostAllowed := HostAllowed(cfg, rv.DestHost) || cfg.InsecureAllowAll || blocklistHostOK(cfg, rv.DestHost)
 	hits = append(hits, secrets.ScanHeaders(rv.Headers, cfg.Scanners.Canaries, hostAllowed)...)
 	var detectors []string
 	for _, h := range hits {
@@ -251,6 +254,19 @@ func denyListedHost(cfg *Config, host string, reasons, detectors []string) *Deci
 		}
 	}
 	return nil
+}
+
+// blocklistHostOK is true in Safe desktop (blocklist) when the host is not on deny[].
+func blocklistHostOK(cfg *Config, host string) bool {
+	if cfg == nil || cfg.Mode != "blocklist" {
+		return false
+	}
+	for _, r := range cfg.Deny {
+		if HostMatch(r.Host, host) {
+			return false
+		}
+	}
+	return true
 }
 
 func (e *Engine) verdictByMode(host string, reasons, detectors []string) Decision {
