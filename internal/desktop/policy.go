@@ -8,7 +8,7 @@ import (
 
 // Policy profiles for desktop Computer.
 const (
-	PolicyProfileAgent = "agent" // Agents only - default-deny allowlist
+	PolicyProfileAgent  = "agent"  // Agents only - default-deny allowlist
 	PolicyProfileBrowse = "browse" // Safe desktop - web OK, scanners on
 )
 

@@ -129,7 +129,7 @@ export function Profiles({
  {tipsEnabled && (
  <Tip id="profiles" dismissed={tipGone(snap?.dismissed_tips, "profiles")} onDismiss={onTipDismiss}>
  For AI tools: wrap one command so DenyOut can ask before new sites. Everyday browsing stays
- on Home -> Protect computer.
+ on Home under Protect computer.
  </Tip>
  )}
 

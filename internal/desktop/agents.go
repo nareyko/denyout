@@ -14,10 +14,10 @@ import (
 )
 
 type wrapProc struct {
-	id string
-	name string
-	cmd *exec.Cmd
-	sess *run.Session
+	id      string
+	name    string
+	cmd     *exec.Cmd
+	sess    *run.Session
 	started time.Time
 }
 
@@ -147,13 +147,13 @@ func (a *App) startProfile(id string) error {
 	ask := p.AskMode
 	threats := a.ensureThreatStore(false)
 	sess, err := run.StartSession(run.SessionOptions{
-		Config: cfg,
-		TLSMode: proxy.TLSIntercept,
-		Version: a.opts.Version,
-		Sandbox: sandbox,
+		Config:        cfg,
+		TLSMode:       proxy.TLSIntercept,
+		Version:       a.opts.Version,
+		Sandbox:       sandbox,
 		PolicyProfile: "agent",
-		Process: "wrap:" + p.ID,
-		Threats: threats,
+		Process:       "wrap:" + p.ID,
+		Threats:       threats,
 		OnDeny: func(host string, reasons []string, redactedURL string) {
 			a.onWrapDeny(sessRef, profileID, profileName, ask, host, reasons, redactedURL)
 		},

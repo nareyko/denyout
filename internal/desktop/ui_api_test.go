@@ -28,7 +28,7 @@ func TestListDenialsFilters(t *testing.T) {
 		Verdict: "deny",
 		Reasons: []string{"secret_in_url"},
 		Network: audit.Network{DestHost: "evil.example", DestPort: 443},
-		HTTP: &audit.HTTPInfo{Path: "/x", QueryRedacted: "api_key=***"},
+		HTTP:    &audit.HTTPInfo{Path: "/x", QueryRedacted: "api_key=***"},
 		Process: "proxyd",
 	}
 	if err := sink.Log(ev); err != nil {

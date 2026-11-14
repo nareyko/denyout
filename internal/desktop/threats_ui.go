@@ -12,33 +12,33 @@ import (
 
 // ThreatFeedView is one subscription row for Settings.
 type ThreatFeedView struct {
-	ID string `json:"id"`
-	Label string `json:"label"`
-	Category string `json:"category"`
-	Enabled bool `json:"enabled"`
-	Active bool `json:"active"`
-	EntryCount int `json:"entry_count"`
+	ID          string `json:"id"`
+	Label       string `json:"label"`
+	Category    string `json:"category"`
+	Enabled     bool   `json:"enabled"`
+	Active      bool   `json:"active"`
+	EntryCount  int    `json:"entry_count"`
 	LastSuccess string `json:"last_success,omitempty"` // RFC3339 or empty
-	LastError string `json:"last_error,omitempty"`
-	Homepage string `json:"homepage,omitempty"`
-	Advanced bool `json:"advanced,omitempty"` // OISD / StevenBlack - not core job
+	LastError   string `json:"last_error,omitempty"`
+	Homepage    string `json:"homepage,omitempty"`
+	Advanced    bool   `json:"advanced,omitempty"` // OISD / StevenBlack - not core job
 }
 
 // ThreatListsView is Settings -> Threat lists payload.
 type ThreatListsView struct {
-	PollHours int `json:"poll_hours"`
-	BlockPhishing bool `json:"block_phishing"`
-	BlockMalware bool `json:"block_malware"`
-	BlockStronger bool `json:"block_stronger"` // HaGeZi TIF medium
-	NeedsAttention bool `json:"needs_attention"`
-	Feeds []ThreatFeedView `json:"feeds"`
-	AdvancedFeeds []ThreatFeedView `json:"advanced_feeds"`
-	AboutNote string `json:"about_note"`
-	StrongerWarning string `json:"stronger_warning"`
-	AdvancedWarning string `json:"advanced_warning"`
-	ProductExceptions int `json:"product_exceptions"`
-	ProductExceptionHosts []string `json:"product_exception_hosts"`
-	ProductExceptionsNote string `json:"product_exceptions_note"`
+	PollHours             int              `json:"poll_hours"`
+	BlockPhishing         bool             `json:"block_phishing"`
+	BlockMalware          bool             `json:"block_malware"`
+	BlockStronger         bool             `json:"block_stronger"` // HaGeZi TIF medium
+	NeedsAttention        bool             `json:"needs_attention"`
+	Feeds                 []ThreatFeedView `json:"feeds"`
+	AdvancedFeeds         []ThreatFeedView `json:"advanced_feeds"`
+	AboutNote             string           `json:"about_note"`
+	StrongerWarning       string           `json:"stronger_warning"`
+	AdvancedWarning       string           `json:"advanced_warning"`
+	ProductExceptions     int              `json:"product_exceptions"`
+	ProductExceptionHosts []string         `json:"product_exception_hosts"`
+	ProductExceptionsNote string           `json:"product_exceptions_note"`
 }
 
 // StrongerFirstEnableWarning is shown once in UI before enabling HaGeZi medium.
@@ -52,13 +52,13 @@ func (a *App) GetThreatLists() ThreatListsView {
 	st := a.ensureThreatStore(false)
 	unbreak := policy.DefaultUnbreakHosts()
 	out := ThreatListsView{
-		PollHours: threatlists.DefaultPollHours,
-		AboutNote: "DenyOut downloads known phishing and malware domain lists. Lists stay on this computer. Failed downloads keep the last good copy - Protect still works.",
-		StrongerWarning: StrongerFirstEnableWarning,
-		AdvancedWarning: AdvancedFeedEnableWarning,
-		Feeds: []ThreatFeedView{},
-		AdvancedFeeds: []ThreatFeedView{},
-		ProductExceptions: len(unbreak),
+		PollHours:             threatlists.DefaultPollHours,
+		AboutNote:             "DenyOut downloads known phishing and malware domain lists. Lists stay on this computer. Failed downloads keep the last good copy - Protect still works.",
+		StrongerWarning:       StrongerFirstEnableWarning,
+		AdvancedWarning:       AdvancedFeedEnableWarning,
+		Feeds:                 []ThreatFeedView{},
+		AdvancedFeeds:         []ThreatFeedView{},
+		ProductExceptions:     len(unbreak),
 		ProductExceptionHosts: unbreak,
 		ProductExceptionsNote: "Product exceptions are maintained by DenyOut so threat lists do not break common OS, login, and update hosts. Read-only. Secrets scanners still apply.",
 	}
@@ -95,15 +95,15 @@ func feedViewFrom(sub threatlists.Subscription, status threatlists.StatusFile, a
 		enabled = fs.Enabled
 	}
 	row := ThreatFeedView{
-		ID: sub.ID,
-		Label: threatFeedLabel(sub.ID),
-		Category: string(sub.Category),
-		Enabled: enabled,
-		Active: fs.Active,
+		ID:         sub.ID,
+		Label:      threatFeedLabel(sub.ID),
+		Category:   string(sub.Category),
+		Enabled:    enabled,
+		Active:     fs.Active,
 		EntryCount: fs.EntryCount,
-		LastError: fs.LastError,
-		Homepage: sub.Homepage,
-		Advanced: advanced,
+		LastError:  fs.LastError,
+		Homepage:   sub.Homepage,
+		Advanced:   advanced,
 	}
 	if !fs.LastSuccess.IsZero() {
 		row.LastSuccess = fs.LastSuccess.UTC().Format(time.RFC3339)

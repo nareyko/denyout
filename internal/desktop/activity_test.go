@@ -40,8 +40,8 @@ func TestControlReadyAndSessionRestore(t *testing.T) {
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- desktop.Run(ctx, desktop.Options{
-			NoTray: true,
-			Version: "test",
+			NoTray:        true,
+			Version:       "test",
 			ControlListen: addr,
 		})
 	}()

@@ -627,7 +627,7 @@ export function Settings({
 
  <h3 className="settings-subhead">Allowed</h3>
  {allows.length === 0 ? (
- <p className="muted">None yet. Use History -> Allow this site on a block.</p>
+ <p className="muted">None yet. Use History, then Allow this site on a block.</p>
  ) : (
  <ul>
  {allows.map((h) => (

@@ -13,13 +13,13 @@ const postBlockQuietEvery = time.Minute // keep-repeat toast throttle (P3 may ho
 
 // clearPostBlockReasons are Safe-desktop threats that use post-block confirm (not Pre-act Ask).
 var clearPostBlockReasons = map[string]bool{
-	"secret_in_url": true,
+	"secret_in_url":    true,
 	"secret_in_header": true,
-	"secret_in_body": true,
-	"canary_detected": true,
-	"host_denied": true,
-	"threat_list": true,
-	"unsafe_ip": true,
+	"secret_in_body":   true,
+	"canary_detected":  true,
+	"host_denied":      true,
+	"threat_list":      true,
+	"unsafe_ip":        true,
 }
 
 func primaryPostBlockReason(reasons []string) string {
@@ -136,9 +136,9 @@ var postBlockQuietAt = map[string]time.Time{}
 var decisionBusy bool
 
 type queuedDecision struct {
-	Host string
+	Host   string
 	Reason string
-	URL string
+	URL    string
 }
 
 var decisionQueue []queuedDecision
@@ -245,12 +245,12 @@ func (a *App) runDecisionBatch(batch []queuedDecision, taught bool) {
 		it := seen[order[0]]
 		why := notify.HumanReasons([]string{it.Reason})
 		action := a.presentHardBlockDecision(DecisionPrompt{
-			Host: it.Host,
-			Reason: it.Reason,
-			Why: why,
-			URL: it.URL,
+			Host:    it.Host,
+			Reason:  it.Reason,
+			Why:     why,
+			URL:     it.URL,
 			Timeout: decisionTimeout(a),
-			Taught: taught,
+			Taught:  taught,
 		})
 		a.applyHardBlockDecision(it.Host, it.Reason, action)
 		return
@@ -272,11 +272,11 @@ func (a *App) runDecisionBatch(batch []queuedDecision, taught bool) {
 	}
 	_ = hosts
 	action := a.presentHardBlockDecision(DecisionPrompt{
-		Host: fmt.Sprintf("%d sites", len(hostKeys)),
-		Reason: "batch",
-		Why: strings.TrimSpace(body.String()),
+		Host:    fmt.Sprintf("%d sites", len(hostKeys)),
+		Reason:  "batch",
+		Why:     strings.TrimSpace(body.String()),
 		Timeout: decisionTimeout(a),
-		Taught: true,
+		Taught:  true,
 	})
 	// Apply same action to every pending item (bulk Keep / Allow / later).
 	for _, k := range order {

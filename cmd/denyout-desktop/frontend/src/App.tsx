@@ -127,14 +127,14 @@ export default function App() {
  {
  label: "Allowed / silenced sites",
  route: "settings" as Route,
- hint: "Settings -> Advanced",
+ hint: "Settings, Advanced",
  settingsTab: "advanced" as const,
  focus: "always-allow",
  },
  {
  label: "Resume asks",
  route: "settings" as Route,
- hint: "Settings -> Advanced",
+ hint: "Settings, Advanced",
  settingsTab: "advanced" as const,
  focus: "asks",
  },

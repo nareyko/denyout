@@ -39,14 +39,14 @@ func (a *App) startSession() error {
 	a.mu.Unlock()
 	threats := a.ensureThreatStore(true)
 	sess, err := run.StartSession(run.SessionOptions{
-		Config: cfg,
-		TLSMode: proxy.TLSIntercept,
-		Version: ver,
-		CADir: caDir,
-		PersistCA: true,
+		Config:        cfg,
+		TLSMode:       proxy.TLSIntercept,
+		Version:       ver,
+		CADir:         caDir,
+		PersistCA:     true,
 		PolicyProfile: profile,
-		Process: "desktop-session",
-		Threats: threats,
+		Process:       "desktop-session",
+		Threats:       threats,
 		OnDeny: func(host string, reasons []string, redactedURL string) {
 			a.onSessionDeny(host, reasons, redactedURL)
 		},

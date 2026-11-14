@@ -11,10 +11,10 @@ import (
 
 // SyncResult is the outcome of a pull/push attempt.
 type SyncResult struct {
-	OK bool `json:"ok"`
+	OK      bool   `json:"ok"`
 	Message string `json:"message"`
-	Pushed bool `json:"pushed"`
-	Pulled bool `json:"pulled"`
+	Pushed  bool   `json:"pushed"`
+	Pulled  bool   `json:"pulled"`
 }
 
 // UISyncNow pulls remote config, merges last-write-wins with local, applies winner, pushes if needed.
@@ -120,9 +120,9 @@ func (a *App) applyRemoteDocument(doc cloudsync.Document) error {
 func (a *App) threatSyncPrefs() ThreatSyncPrefs {
 	v := a.GetThreatLists()
 	return ThreatSyncPrefs{
-		BlockPhishing: v.BlockPhishing,
-		BlockMalware: v.BlockMalware,
-		BlockStronger: v.BlockStronger,
+		BlockPhishing:   v.BlockPhishing,
+		BlockMalware:    v.BlockMalware,
+		BlockStronger:   v.BlockStronger,
 		ThreatPollHours: v.PollHours,
 	}
 }
