@@ -27,7 +27,8 @@ jobs:
             tags: "wails,production"
             deps: ""
           # macOS: best-effort; tray+Wails main-thread coexistence is fragile.
-          - os: macos-14
+          # macos-14 retired Nov 2026 (macos-14-arm64-us-default unsupported) -> pin macos-15 arm64.
+          - os: macos-15
             goos: darwin
             goarch: arm64
             tags: "wails,production"
