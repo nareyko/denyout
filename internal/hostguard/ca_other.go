@@ -6,3 +6,7 @@ func installCA(certPath string) error {
 	_ = certPath
 	return ErrUnsupported
 }
+
+func uninstallCA() error {
+	return nil
+}

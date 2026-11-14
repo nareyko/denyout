@@ -56,8 +56,14 @@ func unregisterAutostartLinux() error {
 	if err != nil {
 		return err
 	}
-	_ = os.Remove(filepath.Join(home, ".config", "autostart", "denyout.desktop"))
-	_ = os.Remove(filepath.Join(home, ".config", "systemd", "user", "denyout-desktop.service"))
+	cfg := os.Getenv("XDG_CONFIG_HOME")
+	if cfg == "" {
+		cfg = filepath.Join(home, ".config")
+	}
+	_ = os.Remove(filepath.Join(cfg, "autostart", "denyout.desktop"))
+	unitDir := filepath.Join(cfg, "systemd", "user")
+	_ = os.Remove(filepath.Join(unitDir, "denyout-desktop.service"))
+	_ = os.Remove(filepath.Join(unitDir, "denyout-desktop.service.off"))
 	return nil
 }
 

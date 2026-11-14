@@ -78,6 +78,7 @@ func Apply(spec Spec) error {
 }
 
 // Remove tears down redirect rules. CA is left in the trust store.
+// Use Teardown (uninstall) to also remove system CA trust.
 func Remove(spec Spec) error {
 	if spec.UID == 0 {
 		uid, err := CurrentUID()
@@ -86,6 +87,17 @@ func Remove(spec Spec) error {
 		}
 	}
 	return removeRedirect(spec)
+}
+
+// Teardown removes redirect rules and the system CA installed by Apply.
+// User NSS trust is removed separately via UntrustCAForUserBrowsers (no root).
+func Teardown(spec Spec) error {
+	if err := Remove(spec); err != nil {
+		// Still attempt CA uninstall even if rules were already gone.
+		_ = uninstallCA()
+		return err
+	}
+	return uninstallCA()
 }
 
 // Render returns the platform rule text for tests / dry-run (no privileges).

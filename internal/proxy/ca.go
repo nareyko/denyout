@@ -32,7 +32,7 @@ func NewSessionCA(dir string) (*SessionCA, error) {
 }
 
 // LoadOrCreatePersistentCA loads an existing desktop CA from dir or creates one
-// with long validity (kept across Protect On/Off; removed only on uninstall).
+// with long validity (kept across Protect On/Off; removed by `denyout uninstall`).
 func LoadOrCreatePersistentCA(dir string) (*SessionCA, error) {
 	certPath := dir + "/ca.crt"
 	keyPath := dir + "/ca.key"

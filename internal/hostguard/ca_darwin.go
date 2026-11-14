@@ -25,3 +25,13 @@ func installCA(certPath string) error {
 	}
 	return nil
 }
+
+func uninstallCA() error {
+	// Best-effort: remove by common name from System keychain (unverified in field notes).
+	cmd := exec.Command("security", "delete-certificate", "-c", DesktopCANickname,
+		"/Library/Keychains/System.keychain")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	_ = cmd.Run()
+	return nil
+}

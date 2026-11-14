@@ -37,3 +37,14 @@ func installCA(certPath string) error {
 	}
 	return nil
 }
+
+// uninstallCA removes the system CA installed by installCA and refreshes the store.
+func uninstallCA() error {
+	_ = os.Remove(LinuxSystemCACert)
+	cmd := exec.Command("update-ca-certificates")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	_ = cmd.Run() // best-effort; still clear dangling hash link
+	_ = os.Remove(LinuxSystemCAHashLink)
+	return nil
+}

@@ -39,6 +39,20 @@ func ElevateRemove(proxyPort int, uid int) error {
 	return elevate(exe, args)
 }
 
+// ElevateTeardown re-executes hostctl teardown (redirect Remove + system CA uninstall).
+func ElevateTeardown(proxyPort int, uid int) error {
+	exe, err := SelfExe()
+	if err != nil {
+		return err
+	}
+	args := []string{"hostctl", "teardown",
+		"--port", strconv.Itoa(proxyPort),
+		"--uid", strconv.Itoa(uid),
+		"--no-elevate",
+	}
+	return elevate(exe, args)
+}
+
 func elevate(exe string, args []string) error {
 	switch runtime.GOOS {
 	case "linux":

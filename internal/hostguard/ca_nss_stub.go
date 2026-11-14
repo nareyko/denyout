@@ -7,3 +7,8 @@ func TrustCAForUserBrowsers(certPath string) error {
 	_ = certPath
 	return nil
 }
+
+// UntrustCAForUserBrowsers is a no-op outside Linux.
+func UntrustCAForUserBrowsers() error {
+	return nil
+}

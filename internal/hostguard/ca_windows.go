@@ -30,3 +30,10 @@ func installCA(certPath string) error {
 	}
 	return nil
 }
+
+func uninstallCA() error {
+	// Best-effort delete from Current User and Local Machine Root (unverified in field notes).
+	_ = exec.Command("certutil", "-user", "-delstore", "Root", DesktopCANickname).Run()
+	_ = exec.Command("certutil", "-delstore", "Root", DesktopCANickname).Run()
+	return nil
+}

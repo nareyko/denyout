@@ -68,6 +68,8 @@ func runMain(args []string) int {
 		return cmdDesktop(args[1:])
 	case "hostctl":
 		return cmdHostctl(args[1:])
+	case "uninstall":
+		return cmdUninstall(args[1:])
 	case "serve":
 		return cmdServe(args[1:])
 	case "audit":
@@ -96,6 +98,7 @@ Commands:
   profile              Manage named agent wrap profiles
   desktop              Tray + Protect this computer (recommended)
   hostctl              Privileged helper for transparent redirect + CA (elevated)
+  uninstall            Remove install: processes, hostguard, CA, config, binaries
   gui                  Advanced localhost UI (technical)
   serve -c <file>      Long-running sidecar proxy (pair with NetworkPolicy)
   audit tail           Show recent audit.jsonl events (desktop path by default)
@@ -530,10 +533,11 @@ Profiles live in ~/.config/denyout/profiles/`)
 
 func cmdHostctl(args []string) int {
 	if len(args) == 0 || args[0] == "--help" || args[0] == "-h" {
-		fmt.Println(`Usage: denyout hostctl apply|remove|render|proxyd [flags]
+		fmt.Println(`Usage: denyout hostctl apply|remove|teardown|render|proxyd [flags]
 
   Privileged helper for Protect this computer (transparent redirect + CA trust).
   proxyd runs the transparent proxy (started after setcap so SO_MARK works).
+  teardown removes redirect rules and the system CA (used by denyout uninstall).
 
 Flags:
   --port N     local DenyOut proxy port
@@ -620,10 +624,57 @@ Flags:
 			return 2
 		}
 		return 0
+	case "teardown":
+		if !noElevate {
+			if err := hostguard.ElevateTeardown(port, uid); err != nil {
+				fmt.Fprintf(os.Stderr, "denyout hostctl: %v\n", err)
+				return 2
+			}
+			return 0
+		}
+		if err := hostguard.Teardown(spec); err != nil {
+			fmt.Fprintf(os.Stderr, "denyout hostctl: %v\n", err)
+			return 2
+		}
+		return 0
 	default:
 		fmt.Fprintf(os.Stderr, "denyout hostctl: unknown action %q\n", action)
 		return 2
 	}
+}
+
+func cmdUninstall(args []string) int {
+	keep := false
+	yes := false
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--keep-config":
+			keep = true
+		case "--yes", "-y":
+			yes = true
+		case "--help", "-h":
+			fmt.Println(`Usage: denyout uninstall [--keep-config] [--yes]
+
+  Full local uninstall: stop tray/proxyd, tear down hostguard + system CA
+  (one admin prompt), remove NSS CA, autostart, XDG data, and binaries in
+  DENYOUT_INSTALL_DIR (default ~/.local/bin).
+
+  --keep-config  leave ~/.config/denyout and related state/cache
+  --yes          non-interactive (default behavior; reserved)
+
+  Does not delete source trees or cloud account data.
+  Upgrade (install.sh) is different: it keeps CA/hostguard for one Apply.`)
+			return 0
+		default:
+			fmt.Fprintf(os.Stderr, "denyout uninstall: unknown flag %q\n", args[i])
+			return 2
+		}
+	}
+	if err := desktop.Uninstall(desktop.UninstallOptions{KeepConfig: keep, Yes: yes}); err != nil {
+		fmt.Fprintf(os.Stderr, "denyout uninstall: %v\n", err)
+		return 1
+	}
+	return 0
 }
 
 func cmdHostctlProxyd(args []string) int {

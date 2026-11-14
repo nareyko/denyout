@@ -58,3 +58,24 @@ Clear Safe threats: `secret_in_url` / header-body (when denied), `canary_detecte
 ## 5. Diagnostics paths
 
 User state (Linux XDG): `~/.local/state/denyout/` (`audit.jsonl`, `desktop.log`, `last-error.txt`). Opened from **Problems** and Settings -> Advanced -> Open diagnostics folder - see UX doc §5.3-§5.4.
+
+## 6. Uninstall
+
+Full local removal (not the same as upgrade):
+
+```bash
+denyout uninstall          # stop processes, hostguard + system CA, NSS CA, autostart, XDG, binaries
+denyout uninstall --keep-config   # leave ~/.config/denyout and related state
+```
+
+| Upgrade (`install.sh`) | Uninstall |
+| --- | --- |
+| Stops old tray/proxyd, replaces binaries | Same stop, then **tears down** hostguard |
+| Leaves CA + nft/pf for one Apply | Removes system CA + NSS + dangling `/etc/ssl/certs/denyout-desktop.pem` |
+| Warns about other PATH copies | Deletes only `DENYOUT_INSTALL_DIR` bins; warns on other PATH hits |
+
+Tray **Quit** unloads protection for this session. It does **not** delete binaries or config - use `uninstall` for that.
+
+macOS/Windows CA untrust follows the reverse of install (Keychain / certutil) and is best-effort until field-verified.
+
+Does not delete source trees or cloud account data (Settings -> Delete cloud data).

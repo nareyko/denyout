@@ -43,6 +43,8 @@ Windows: download the zip from [Releases](https://github.com/nareyko/denyout/rel
 
 **Install:** GitHub Releases + SHA256SUMS. Linux/macOS [`install.sh`](install.sh) -> `~/.local/bin` (`denyout` + `denyout-desktop` when published). Windows zip + [`docs/install-windows.md`](docs/install-windows.md). See [`docs/07-desktop.md`](docs/07-desktop.md).
 
+**Uninstall:** `denyout uninstall` (removes processes, hostguard, CA trust, config, binaries). See [`docs/07-desktop.md`](docs/07-desktop.md) §6.
+
 | Doc | Contents |
 | --- | --- |
 | [docs/REPO.md](docs/REPO.md) | Repository layout |

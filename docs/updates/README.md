@@ -7,6 +7,8 @@ DenyOut desktop can check for a newer **program** version without an account.
 Default URL: `https://denyout.com/updates/desktop.json` 
 (Served from denyout.com; not built from this repository.)
 
+Program updates reuse `install.sh` (replace binaries; hostguard/CA stay for one Apply). That is **not** uninstall - see [`../07-desktop.md`](../07-desktop.md) §6 (`denyout uninstall`).
+
 Example shape: [`desktop.example.json`](desktop.example.json).
 
 | Field | Required | Meaning |

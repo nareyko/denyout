@@ -97,7 +97,7 @@ Quit DenyOut
 | **My agents...** | With Wails: open window on **My agents** screen. Fallback shell: native agent list / New / Start / Stop |
 | Off | Turn Protect off |
 | Open DenyOut... | Same as left-click -> Home |
-| Quit DenyOut | Full unload: tear down hostguard (admin once if needed), stop proxyd/agents, exit process |
+| Quit DenyOut | Full unload: tear down hostguard (admin once if needed), stop proxyd/agents, exit process. Does not delete binaries/config (use `denyout uninstall`). |
 
 **Not in tray:** What was blocked, Always-allow, Help, Notifications, Test, Agents only, Switch Safe, Resume asks, Learning primary, Last block, version footer.
 

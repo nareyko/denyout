@@ -37,11 +37,31 @@ func TrustCAForUserBrowsers(certPath string) error {
 		init := exec.Command(certutil, "-N", "-d", db, "--empty-password")
 		_ = init.Run()
 	}
-	name := "DenyOut Desktop CA"
+	name := DesktopCANickname
 	_ = exec.Command(certutil, "-d", db, "-D", "-n", name).Run()
 	cmd := exec.Command(certutil, "-d", db, "-A", "-t", "C,,", "-n", name, "-i", certPath)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("nss trust: %w (%s)", err, string(out))
 	}
+	return nil
+}
+
+// UntrustCAForUserBrowsers removes the DenyOut CA from the user NSS DB.
+func UntrustCAForUserBrowsers() error {
+	certutil, err := exec.LookPath("certutil")
+	if err != nil {
+		return nil // no NSS tools = nothing to untrust
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	nssDir := filepath.Join(home, ".pki", "nssdb")
+	if _, err := os.Stat(filepath.Join(nssDir, "cert9.db")); err != nil {
+		return nil
+	}
+	db := "sql:" + nssDir
+	cmd := exec.Command(certutil, "-d", db, "-D", "-n", DesktopCANickname)
+	_ = cmd.Run() // already absent is OK
 	return nil
 }
