@@ -26,3 +26,19 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  notify-site:
+    needs: goreleaser
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger denyout-web site deploy
+        env:
+          GH_TOKEN: ${{ secrets.DENYOUT_WEB_DISPATCH_TOKEN }}
+        run: |
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "DENYOUT_WEB_DISPATCH_TOKEN unset; skip site dispatch (use workflow_dispatch on denyout-web)"
+            exit 0
+          fi
+          gh api repos/nareyko/denyout-web/dispatches \
+            -f event_type=denyout-release \
+            -f "client_payload[tag]=${GITHUB_REF_NAME}"
