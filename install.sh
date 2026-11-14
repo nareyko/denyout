@@ -187,17 +187,28 @@ install -m 0755 "$BIN" "${INSTALL_DIR}/denyout"
 echo "denyout install: installed ${INSTALL_DIR}/denyout"
 
 # Optional second artifact: denyout-desktop (Wails UI). Best-effort; CLI still works without it.
+# Archives may contain denyout-desktop or denyout-desktop_<tag>_<os>_<arch>[.exe].
 DESKTOP_ARCHIVE="denyout-desktop_${TAG}_${os}_${arch}.tar.gz"
-if curl -fsSL -o "${TMP}/${DESKTOP_ARCHIVE}" "${ASSET_BASE}/${DESKTOP_ARCHIVE}" 2>/dev/null; then
+DESKTOP_DEST="${INSTALL_DIR}/denyout-desktop"
+if [ "$os" = "windows" ]; then
+  DESKTOP_DEST="${INSTALL_DIR}/denyout-desktop.exe"
+fi
+if curl -fsSL -o "${TMP}/${DESKTOP_ARCHIVE}" "${ASSET_BASE}/${DESKTOP_ARCHIVE}"; then
   tar -xzf "${TMP}/${DESKTOP_ARCHIVE}" -C "$TMP"
-  DBIN=$(find "$TMP" -type f -name 'denyout-desktop' | head -n1 || true)
+  DBIN=$(find "$TMP" -type f \( -name 'denyout-desktop' -o -name 'denyout-desktop.exe' \) | head -n1 || true)
+  if [ -z "$DBIN" ]; then
+    # release-desktop historically packed the platform-qualified OUT name
+    DBIN=$(find "$TMP" -type f \( -name "denyout-desktop_${TAG}_${os}_${arch}" -o -name "denyout-desktop_${TAG}_${os}_${arch}.exe" -o -name 'denyout-desktop_*' \) | head -n1 || true)
+  fi
   if [ -n "$DBIN" ] && [ -f "$DBIN" ]; then
     if command -v pkill >/dev/null 2>&1; then
       pkill -f '[d]enyout-desktop' 2>/dev/null || true
       sleep 0.2 || true
     fi
-    install -m 0755 "$DBIN" "${INSTALL_DIR}/denyout-desktop"
-    echo "denyout install: installed ${INSTALL_DIR}/denyout-desktop"
+    install -m 0755 "$DBIN" "$DESKTOP_DEST"
+    echo "denyout install: installed ${DESKTOP_DEST}"
+  else
+    echo "denyout install: note - ${DESKTOP_ARCHIVE} has no denyout-desktop binary (CLI tray still available)" >&2
   fi
 else
   echo "denyout install: note - denyout-desktop asset not found for this release (CLI tray still available)" >&2

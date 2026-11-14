@@ -85,16 +85,14 @@ jobs:
           fi
           EXT=""
           if [ "${{ matrix.goos }}" = "windows" ]; then EXT=".exe"; fi
-          OUT="denyout-desktop_${TAG}_${{ matrix.goos }}_${{ matrix.goarch }}${EXT}"
+          # Binary inside the archive must be denyout-desktop(.exe) — install.sh
+          # installs that name next to denyout. Archive filename stays tagged.
+          BIN="denyout-desktop${EXT}"
+          ARCHIVE="denyout-desktop_${TAG}_${{ matrix.goos }}_${{ matrix.goarch }}.tar.gz"
           go build -tags "${{ matrix.tags }}" -ldflags "-s -w -X main.version=${TAG}" \
-            -o "$OUT" ./cmd/denyout-desktop
+            -o "$BIN" ./cmd/denyout-desktop
           mkdir -p dist
-          if [ "${{ matrix.goos }}" = "windows" ]; then
-            # tar.gz keeps install.sh naming consistent across platforms
-            tar -czf "dist/denyout-desktop_${TAG}_${{ matrix.goos }}_${{ matrix.goarch }}.tar.gz" "$OUT"
-          else
-            tar -czf "dist/${OUT}.tar.gz" "$OUT"
-          fi
+          tar -czf "dist/${ARCHIVE}" "$BIN"
         shell: bash
       - name: Upload release asset
         if: steps.meta.outputs.tag != ''

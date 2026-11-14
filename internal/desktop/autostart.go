@@ -44,13 +44,14 @@ func UnregisterAutostart() error {
 	}
 }
 
-// autostartExecLine returns the Exec= value for a desktop entry.
+// autostartExecLine returns the Exec=/ExecStart= value for login launch.
+// Prefers sibling denyout-desktop when present (same rule as DetachDesktop).
 func autostartExecLine(self string) string {
-	base := filepath.Base(self)
-	if strings.Contains(base, "denyout-desktop") {
-		return self
+	bin, args := desktopLaunchArgs(self)
+	if len(args) == 0 {
+		return bin
 	}
-	return self + " desktop"
+	return bin + " " + strings.Join(args, " ")
 }
 
 // DetachDesktop starts denyout-desktop (preferred) or `denyout desktop` in the background.

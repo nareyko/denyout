@@ -12,10 +12,21 @@ func TestAutostartExecLine(t *testing.T) {
 	if got := autostartExecLine(desktop); got != desktop {
 		t.Fatalf("desktop binary: got %q", got)
 	}
-	cli := filepath.Join("/opt", "denyout")
+	dir := t.TempDir()
+	cli := filepath.Join(dir, "denyout")
 	want := cli + " desktop"
 	if got := autostartExecLine(cli); got != want {
-		t.Fatalf("cli binary: got %q want %q", got, want)
+		t.Fatalf("cli binary without sibling: got %q want %q", got, want)
+	}
+	sib := filepath.Join(dir, "denyout-desktop")
+	if runtime.GOOS == "windows" {
+		sib += ".exe"
+	}
+	if err := os.WriteFile(sib, []byte{}, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if got := autostartExecLine(cli); got != sib {
+		t.Fatalf("cli with sibling: got %q want %q", got, sib)
 	}
 }
 
