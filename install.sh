@@ -13,6 +13,8 @@
 #   DENYOUT_INSTALL_MODE   — desktop | server (force; same as --desktop / --server)
 #   DENYOUT_NO_DESKTOP=1   — force server (compat)
 #   DENYOUT_INSTALL_PROMPT=1 — ask interactively instead of auto-detect (rare)
+#   DENYOUT_FETCH_RETRIES  — curl attempts (default 10)
+#   DENYOUT_FETCH_RETRY_SECS — base delay between retries, doubles up to 30s (default 2)
 # Desktop path is silent: autostart + try whole-computer once + detach tray.
 set -eu
 
@@ -21,6 +23,8 @@ INSTALL_DIR="${DENYOUT_INSTALL_DIR:-${HOME}/.local/bin}"
 BASE_URL="${DENYOUT_BASE_URL:-}"
 FORCE_MODE=""
 WANT_PROMPT="${DENYOUT_INSTALL_PROMPT:-}"
+FETCH_RETRIES="${DENYOUT_FETCH_RETRIES:-10}"
+FETCH_RETRY_SECS="${DENYOUT_FETCH_RETRY_SECS:-2}"
 
 # Parse force flags early (supports: curl … | sh -s -- --desktop)
 for arg in "$@"; do
@@ -77,13 +81,50 @@ sha256_file() {
   fi
 }
 
+# curl_fetch dest url — retries on network / HTTP failures until success or give up.
+# Prints wait lines so a flaky GitHub is visible instead of a silent fail.
+curl_fetch() {
+  dest=$1
+  url=$2
+  attempt=1
+  delay=$FETCH_RETRY_SECS
+  while [ "$attempt" -le "$FETCH_RETRIES" ]; do
+    if curl -fsSL --connect-timeout 15 --retry 0 -o "$dest" "$url"; then
+      return 0
+    fi
+    rm -f "$dest" 2>/dev/null || true
+    if [ "$attempt" -ge "$FETCH_RETRIES" ]; then
+      break
+    fi
+    echo "denyout install: download failed (${attempt}/${FETCH_RETRIES}), waiting ${delay}s — ${url}" >&2
+    sleep "$delay" || true
+    # Exponential backoff, cap 30s.
+    next=$((delay * 2))
+    if [ "$next" -gt 30 ]; then
+      next=30
+    fi
+    delay=$next
+    attempt=$((attempt + 1))
+  done
+  return 1
+}
+
 resolve_version() {
   if [ -n "${DENYOUT_VERSION:-}" ]; then
     echo "$DENYOUT_VERSION"
     return
   fi
-  # Latest release tag via GitHub API
-  tag=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | sed -n 's/.*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)
+  # Latest release tag via GitHub API (retried — API flaps are common).
+  api="https://api.github.com/repos/${REPO}/releases/latest"
+  body=$(mktemp)
+  if ! curl_fetch "$body" "$api"; then
+    rm -f "$body"
+    echo "denyout install: could not resolve latest release for ${REPO}" >&2
+    echo "hint: set DENYOUT_VERSION=vX.Y.Z once a GitHub Release exists" >&2
+    exit 1
+  fi
+  tag=$(sed -n 's/.*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p' "$body" | head -n1)
+  rm -f "$body"
   if [ -z "$tag" ]; then
     echo "denyout install: could not resolve latest release for ${REPO}" >&2
     echo "hint: set DENYOUT_VERSION=vX.Y.Z once a GitHub Release exists" >&2
@@ -115,12 +156,15 @@ echo "denyout install: version=${TAG} os=${os} arch=${arch}"
 echo "denyout install: fetching ${ASSET_BASE}/${ARCHIVE}"
 
 fetch() {
-  # $1 dest $2 url-or-path
+  # $1 dest $2 url-or-path — required (exit on failure after retries)
   src=$2
   dest=$1
   case "$src" in
     http://*|https://*|file://*)
-      curl -fsSL -o "$dest" "$src"
+      if ! curl_fetch "$dest" "$src"; then
+        echo "denyout install: failed to download after ${FETCH_RETRIES} tries: $src" >&2
+        exit 1
+      fi
       ;;
     *)
       # Local directory / path (snapshot testing)
@@ -193,7 +237,7 @@ DESKTOP_DEST="${INSTALL_DIR}/denyout-desktop"
 if [ "$os" = "windows" ]; then
   DESKTOP_DEST="${INSTALL_DIR}/denyout-desktop.exe"
 fi
-if curl -fsSL -o "${TMP}/${DESKTOP_ARCHIVE}" "${ASSET_BASE}/${DESKTOP_ARCHIVE}"; then
+if curl_fetch "${TMP}/${DESKTOP_ARCHIVE}" "${ASSET_BASE}/${DESKTOP_ARCHIVE}"; then
   tar -xzf "${TMP}/${DESKTOP_ARCHIVE}" -C "$TMP"
   DBIN=$(find "$TMP" -type f \( -name 'denyout-desktop' -o -name 'denyout-desktop.exe' \) | head -n1 || true)
   if [ -z "$DBIN" ]; then
@@ -211,7 +255,7 @@ if curl -fsSL -o "${TMP}/${DESKTOP_ARCHIVE}" "${ASSET_BASE}/${DESKTOP_ARCHIVE}";
     echo "denyout install: note - ${DESKTOP_ARCHIVE} has no denyout-desktop binary (CLI tray still available)" >&2
   fi
 else
-  echo "denyout install: note - denyout-desktop asset not found for this release (CLI tray still available)" >&2
+  echo "denyout install: note - denyout-desktop still unreachable after ${FETCH_RETRIES} tries (CLI tray still available)" >&2
 fi
 
 # Warn about other denyout binaries on PATH (do not delete system copies).
