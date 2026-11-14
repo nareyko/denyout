@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+### Added
+
+- **Optional Account + sync** (Settings → Advanced): magic-link sign-in / sign out; **Sync now** pull/push with last-write-wins; **Delete cloud data** (server account + blob); local-only when signed out. Protect never requires an account. UX: [`docs/07-desktop-ux.md`](docs/07-desktop-ux.md), [`docs/cloud-sync.md`](docs/cloud-sync.md).
+- **Cloud sync schema** (`internal/cloudsync` + desktop export/apply map): versioned settings blob for optional signed-in sync; never includes audit/secrets.
+- **App updates (no account):** `internal/updates` public JSON client + desktop **Check for updates** (Settings → Diagnostics); Home/Problems tip when newer; fail-open if offline. Example: [`docs/updates/desktop.example.json`](docs/updates/desktop.example.json).
+- **Threat lists (Book C):** Phishing Army + URLhaus (on after first good fetch) + optional Stronger (HaGeZi TIF medium); Settings Basic toggles, poll interval, Refresh now; reason `threat_list` → post-block HITL. Advanced optional OISD / StevenBlack (off). Product unbreak (Book D) + read-only Product exceptions. Plan/QA: [`docs/ux-iters/threat-lists-plan.md`](docs/ux-iters/threat-lists-plan.md), [`docs/ux-iters/threat-lists-qa.md`](docs/ux-iters/threat-lists-qa.md).
+- **Agent allow packs:** `cursor-starter` / `claude-starter`; ask on new agent; Undo pack in My agents.
+- Docs: normative desktop UX inventory [`docs/07-desktop-ux.md`](docs/07-desktop-ux.md) (install, tray, menu, every screen).
+- **`denyout-desktop`** (Wails v2 + React/TS): Activity / My agents / Settings / Problems; tray **Open DenyOut…**; close hides to tray.
+- Dual artifacts: static **`denyout`** (CLI/proxy) + CGO **`denyout-desktop`**; `install.sh` fetches both when present; autostart prefers desktop binary.
+- **Your setup** dialog after first-run / install (mode, what to expect, Activity / Problems pointers).
+- **Post-block confirm** on Safe desktop clear threats: 15s **Keep blocked** / **Allow this site**; Keep remembered per host+reason.
+- **Activity:** Time / Site / Why; drawer URL + codes; Always allow / Allow this site.
+- Post-block / deny toasts include **redacted URL** when known (secrets → `***`).
+
+### Changed
+
+- **Desktop UX backlog:** compact tray; left-click → Activity; toast **Keep blocked / Allow this site**; Settings **Basic | Advanced**.
+- **UX2 polish:** nav **My agents**; Agents only → Advanced; tips one-at-a-time; Activity **Select…** + Group by host under Filters; human reason labels; Your setup **Open DenyOut** / Got it; tray My agents opens window; top bar Needs attention; empty Activity CTA; Settings find + Jump sections.
+
 ## 0.2.1 — Safe desktop Cursor/API auth headers (2026-11-14)
 
 ### Fixed
@@ -9,6 +29,8 @@
 - **Safe desktop** no longer treats normal `Authorization` / API-key headers to ordinary sites (e.g. `api2.cursor.sh`) as `secret_in_header` exfil. Blocklist mode allows auth headers except toward explicit deny hosts / canaries.
 
 ## 0.2.0 — Safe desktop, profiles, wrap learning, srt (2026-11-14)
+
+> Tray / screen inventory below is historical for 0.2.0. Current UX (compact tray, My agents nav, Agents only in Settings → Advanced): see **Unreleased** and [`docs/07-desktop-ux.md`](docs/07-desktop-ux.md).
 
 ### Changed
 

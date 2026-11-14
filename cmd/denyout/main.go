@@ -27,6 +27,7 @@ import (
 	"github.com/nareyko/denyout/internal/proxy"
 	"github.com/nareyko/denyout/internal/run"
 	"github.com/nareyko/denyout/internal/serve"
+	"github.com/nareyko/denyout/internal/threatlists"
 )
 
 // version is overridden at link time via -ldflags "-X main.version=…".
@@ -691,6 +692,9 @@ func cmdHostctlProxyd(args []string) int {
 	switch {
 	case profile == "browse":
 		cfg, err = policy.DefaultWholeDeviceBrowse()
+		if err == nil && len(rules) > 0 {
+			cfg.Allow = append(cfg.Allow, rules...)
+		}
 	case ask || len(rules) > 0:
 		cfg, err = policy.DefaultWholeDeviceAsk(rules)
 	default:
@@ -699,6 +703,12 @@ func cmdHostctlProxyd(args []string) int {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "denyout hostctl proxyd: %v\n", err)
 		return 2
+	}
+	var threats policy.ThreatChecker
+	if att, err := threatlists.OpenAndRefresh(context.Background(), true); err != nil {
+		fmt.Fprintf(os.Stderr, "denyout hostctl proxyd: threatlists: %v (continuing)\n", err)
+	} else {
+		threats = att.Store
 	}
 	var sessRef *run.Session
 	sess, err := run.StartSession(run.SessionOptions{
@@ -711,7 +721,8 @@ func cmdHostctlProxyd(args []string) int {
 		ListenPort:    port,
 		PolicyProfile: profile,
 		Process:       "proxyd",
-		OnDeny: func(host string, reasons []string) {
+		Threats:       threats,
+		OnDeny: func(host string, reasons []string, redactedURL string) {
 			hostNotAllowed := false
 			for _, r := range reasons {
 				if r == "host_not_allowed" {
@@ -722,16 +733,16 @@ func cmdHostctlProxyd(args []string) int {
 			// Raw IP literals: hard-deny toast only (no Ask). Control rate-limits.
 			if net.ParseIP(host) != nil {
 				if controlURL != "" {
-					go postControlDenyEvent(controlURL, host, reasons, true)
+					go postControlDenyEvent(controlURL, host, reasons, redactedURL, true)
 					return
 				}
-				notify.Deny(host, reasons)
+				notify.Deny(host, reasons, redactedURL)
 				return
 			}
 			if ask && hostNotAllowed {
 				if controlURL != "" {
 					// Update tray last-deny without toast; Ask dialog follows (coalesced).
-					go postControlDenyEvent(controlURL, host, reasons, false)
+					go postControlDenyEvent(controlURL, host, reasons, redactedURL, false)
 					action := askViaControl(controlURL, host)
 					switch action {
 					case "once":
@@ -754,10 +765,10 @@ func cmdHostctlProxyd(args []string) int {
 			}
 			if controlURL != "" {
 				// Tray process owns toast + LastDenySummary (avoid duplicate notify).
-				go postControlDenyEvent(controlURL, host, reasons, true)
+				go postControlDenyEvent(controlURL, host, reasons, redactedURL, true)
 				return
 			}
-			notify.Deny(host, reasons)
+			notify.Deny(host, reasons, redactedURL)
 		},
 	})
 	if err != nil {
@@ -805,9 +816,14 @@ func postControlAlways(base, host string) {
 	}
 }
 
-func postControlDenyEvent(base, host string, reasons []string, doNotify bool) {
+func postControlDenyEvent(base, host string, reasons []string, redactedURL string, doNotify bool) {
 	u := strings.TrimRight(base, "/") + "/deny-event"
-	body, _ := json.Marshal(map[string]any{"host": host, "reasons": reasons, "notify": doNotify})
+	body, _ := json.Marshal(map[string]any{
+		"host":    host,
+		"reasons": reasons,
+		"url":     redactedURL,
+		"notify":  doNotify,
+	})
 	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Post(u, "application/json", bytes.NewReader(body))
 	if err == nil {

@@ -45,13 +45,25 @@ const logsReadme = `DenyOut diagnostics — which file to send
 3) audit.jsonl     ← traffic decisions (allow/deny). NOT an admin error log.
    Rotates when large (~32 MiB). Use: denyout audit tail --denials
 
-Tray → "Open activity…" for native denial history (Always allow selected host).
-Tray → "Always-allow list…" to remove persisted hosts.
-Tray → "Open diagnostics…" opens this folder (last-error / desktop.log).
+Left-click the tray icon (or Open DenyOut…) for Home / History.
+Settings → Advanced for Always-allow list and diagnostics.
+Problems covers admin/CA errors and this folder.
 
 If last-error.txt says "No errors recorded yet", Protect is OK or the
-failure was not recorded. Prefer tray → "Copy last error".
+failure was not recorded.
 `
+
+// LastErrorSummary returns a short snippet for Problems UI.
+func LastErrorSummary() string {
+	s := strings.TrimSpace(ReadLastError())
+	if s == "" {
+		return ""
+	}
+	if len(s) > 600 {
+		return s[:600] + "…"
+	}
+	return s
+}
 
 // AppendDesktopLog writes a timestamped line to desktop.log.
 func AppendDesktopLog(format string, args ...any) {

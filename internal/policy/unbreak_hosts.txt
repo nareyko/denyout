@@ -1,0 +1,37 @@
+# Book D — product unbreak (DenyOut maintainers).
+# Exact hosts or *.suffix patterns (HostMatch rules). Comments with #.
+# Purpose: skip Book C threat-list denies only; scanners still apply.
+# ~25 reviewed entries to reduce FP breakage from threat / stronger lists.
+
+# Captive portal / connectivity checks
+captive.apple.com
+www.apple.com
+detectportal.firefox.com
+connectivitycheck.gstatic.com
+clients3.google.com
+www.msftconnecttest.com
+dns.msftncsi.com
+
+# OCSP / software update plumbing
+ocsp.apple.com
+ocsp.digicert.com
+ocsp.pki.goog
+ctldl.windowsupdate.com
+download.windowsupdate.com
+
+# Common account / IdP surfaces (threat FP risk)
+accounts.google.com
+appleid.apple.com
+login.live.com
+login.microsoftonline.com
+
+# Dev / CDN hosts DenyOut and agents often need
+cdn.jsdelivr.net
+github.com
+api.github.com
+objects.githubusercontent.com
+raw.githubusercontent.com
+camo.githubusercontent.com
+gitlab.com
+bitbucket.org
+registry.npmjs.org

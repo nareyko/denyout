@@ -92,7 +92,7 @@ DenyOut’s bet: **make the safe outcome the default outcome** when someone wrap
 4. **Friction on first deny, not on first run.** First run works for common model APIs out of the box.
 5. **Audit lives outside the agent’s reach** whenever the deployment can ensure it.
 6. **Secrets never required in the agent env for third-party APIs** (phase 2: credential injection). MVP may still use env keys for model providers — document the residual risk.
-7. **Local-first OSS core.** No account required for MVP; telemetry off by default.
+7. **Local-first OSS core.** No account required for Protect or app update checks; optional account only for settings sync. Telemetry off by default.
 
 ## 7. Brand & naming
 

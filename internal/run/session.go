@@ -25,12 +25,13 @@ type SessionOptions struct {
 	Version       string
 	Sandbox       string
 	OnDeny        proxy.DenyHook
-	ListenPort    int    // 0 = ephemeral
-	CADir         string // empty = temp session CA
-	PersistCA     bool   // if true, do not shred CA on Stop
-	Transparent   bool   // raw TCP redirect mode for hostguard
-	PolicyProfile string // agent | browse (audit attribution)
-	Process       string // best-effort client label
+	ListenPort    int                  // 0 = ephemeral
+	CADir         string               // empty = temp session CA
+	PersistCA     bool                 // if true, do not shred CA on Stop
+	Transparent   bool                 // raw TCP redirect mode for hostguard
+	PolicyProfile string               // agent | browse (audit attribution)
+	Process       string               // best-effort client label
+	Threats       policy.ThreatChecker // Book C; optional
 }
 
 // Status is a snapshot of an active wrap session.
@@ -122,6 +123,7 @@ func StartSession(opts SessionOptions) (*Session, error) {
 	}
 
 	eng := policy.NewEngine(cfg)
+	eng.Threats = opts.Threats
 	eng.Resolve = func(host string) ([]net.IP, error) {
 		return net.DefaultResolver.LookupIP(context.Background(), "ip", host)
 	}
@@ -230,6 +232,16 @@ func (s *Session) AllowHost(host, reason string) {
 	s.mu.Unlock()
 	if eng != nil {
 		eng.AllowHost(host, reason)
+	}
+}
+
+// SetThreatChecker attaches or replaces Book C on the live engine.
+func (s *Session) SetThreatChecker(c policy.ThreatChecker) {
+	s.mu.Lock()
+	eng := s.eng
+	s.mu.Unlock()
+	if eng != nil {
+		eng.Threats = c
 	}
 }
 

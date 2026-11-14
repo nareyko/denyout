@@ -1,229 +1,60 @@
 # D07 — Desktop deployment
 
-## 1. Goals
+Normative deploy/build for desktop.
 
-- Protect P1 users who will not configure firewalls: **Protect this computer** is the primary GUI mode.  
-- Transparent redirect of this user’s HTTP/HTTPS into DenyOut while On (Linux nft / macOS pf / Windows WinDivert).  
-- Install DenyOut CA into the trust store when enabling Protect computer (one admin prompt).  
-- Advanced / CLI: scope trust to a **child process tree** via `denyout run` (no host redirect).
+**User-visible surfaces (behavior):** [`07-desktop-ux.md`](07-desktop-ux.md).  
+**Screens & message catalog:** [`07-desktop-ux-catalog.md`](07-desktop-ux-catalog.md).
 
-## 2. Supported platforms (MVP target)
+## 1. Two binaries
 
-| OS | MVP (bet 1 Dec 2026) | Notes |
+| Binary | Role | Build |
 | --- | --- | --- |
-| Ubuntu / Linux x86_64 / arm64 | Yes | Primary CI |
-| macOS Apple Silicon / Intel | Yes | Notifications + keychain later |
-| Windows | Yes (M4 install path) | Proxy env works; CA / intercept UX is the risk; if M4 fails → mark preview/unsupported |
+| **`denyout`** | CLI, proxy, `hostctl proxyd`, `denyout desktop` (native-dialog fallback shell) | `CGO_ENABLED=0` (GoReleaser) |
+| **`denyout-desktop`** | Tray + Wails React UI (Activity / My agents / Settings / Problems) | `CGO_ENABLED=1` + WebKit / WebView2 (`release-desktop` workflow) |
 
-## 3. Install (locked for MVP / M4–M6)
+`install.sh --desktop` installs CLI always and **denyout-desktop** when the release asset exists. Autostart / detach prefer `denyout-desktop` when present beside `denyout`.
 
-**SoT of artifacts:** GitHub Releases (`nareyko/denyout`) with binaries for **linux, darwin, windows** + **SHA256SUMS** (goreleaser).  
-**Default trust:** process wrap uses session CA via child env only. **Protect this computer** installs a persistent desktop CA into the OS trust store (kept until uninstall).
+### Build denyout-desktop locally (Linux)
 
-### 3.1 Canonical recipes (≤5 minutes — M4)
+```bash
+sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+cd cmd/denyout-desktop/frontend && npm ci && npm run build && cd ../../..
+CGO_ENABLED=1 go build -tags 'wails,production,webkit2_41' -ldflags "-X main.version=dev" -o denyout-desktop ./cmd/denyout-desktop
+```
 
-| OS | Canonical path | Fallback if M4 fails |
+Plain `go build` **must** include the `production` tag (otherwise Wails links a stub). Close the window **hides to tray**; Quit only from the tray menu — see [`07-desktop-ux.md`](07-desktop-ux.md) §§2–5.
+
+## 2. Modes (summary)
+
+Full menu and screen inventory: [`07-desktop-ux.md`](07-desktop-ux.md) §§2–5.
+
+| Mode | User expectation |
+| --- | --- |
+| Safe desktop | Web OK; clear threats → **Keep blocked** / **Allow this site** + URL |
+| My agents (wrap) | Per-program proxy; Pre-act Ask on new hosts |
+| Agents only (whole PC) | Settings → Advanced (strong warn); allowlist; messengers may break |
+| Off | No Protect computer mediation |
+
+## 3. Install channels (Dec 1 must)
+
+| Channel | Status |
+| --- | --- |
+| GitHub Releases + SHA256SUMS | Must |
+| `install.sh` → `~/.local/bin` (Linux/macOS) | Must |
+| Windows zip + short EN doc | Must |
+| Homebrew / winget / apt / `go install` | Later / stretch |
+
+What the user **sees** during install (terminal lines, silent tray, Your setup): [`07-desktop-ux.md`](07-desktop-ux.md) §1.
+
+## 4. HITL summary
+
+| Mode | Clear threat | New host |
 | --- | --- | --- |
-| **Ubuntu / Linux** | `curl -fsSL https://denyout.com/install.sh \| sh` → `~/.local/bin/denyout` (script fetches Release + verifies SHA256) | Manual `.tar.gz` from Release |
-| **macOS** | Same `install.sh` → `~/.local/bin` | Manual `.tar.gz`; Homebrew = **post–first release**, not required for M4 |
-| **Windows** | `.zip` from Release + short EN install doc (PATH to `denyout.exe`) | Mark OS **preview / unsupported** in release notes; **winget = optional stretch** |
+| Safe desktop | Post-block Keep blocked / Allow this site ~15s + remember | Allow (browse) |
+| Wrap / Agents only | Coalesced deny toast | Pre-act Ask |
 
-```bash
-# Unix (Linux / macOS) — preferred (silent)
-# Auto-detect: graphical session → Desktop; headless → Server (CLI).
-# Desktop: binary + login autostart + Safe desktop preference → tray.
-# Admin runs once when Protect computer starts; failure stays Off (no Session fallback).
-# Force: --desktop / --server, or DENYOUT_INSTALL_MODE=desktop|server
-curl -fsSL https://denyout.com/install.sh | sh
-curl -fsSL https://denyout.com/install.sh | sh -s -- --desktop
-curl -fsSL https://denyout.com/install.sh | sh -s -- --server
+Clear Safe threats: `secret_in_url` / header-body (when denied), `canary_detected`, `host_denied`, `unsafe_ip`. Normal API auth to ordinary web stays allowed (0.2.1 `blocklistHostOK`).
 
-denyout desktop                 # tray; restores Protect computer if left on
-denyout desktop --install       # silent register+start (used by install.sh)
-denyout profile create --name bot -- python app.py
-denyout run --profile bot
-# denyout desktop --web-ui      # optional / tests only
-denyout version
-denyout init                    # server / advanced path
-denyout run --sandbox=srt -- curl -I https://api.anthropic.com
-```
+## 5. Diagnostics paths
 
-### User-facing modes
-
-| Mode | Mechanism | Admin | Coverage |
-| --- | --- | --- | --- |
-| **Protect computer (Safe desktop)** | hostguard + browse policy | Yes (once) | This user’s TCP 80/443; web OK; scanners on |
-| **Agents only (whole PC)** | hostguard + agent allowlist | Yes | Strict allowlist; messengers may break — confirm required |
-| **My agents (wrap)** | per-profile proxy (+ optional `srt`) | No | Only the wrapped command |
-| **Off** | none | — | Does not stop running wraps |
-
-Tray: **Protect computer** / **My agents…** / **Agents only (whole PC)…** / **Off**, Learning counter, Open activity…, Always-allow + Undo, Resume asks, Help & logs, Test, version, Quit (leave Protect-on for next login).
-
-- **Activity** (native OS dialog): recent denials; Always allow selected hostname (not raw IPs).
-- **Ask** (toast then dialog): Allow once / Always allow / Keep blocked (default + 2 min timeout). Queued globally; sound on Ask only. **IP literals** never Ask.
-- **Learning:** Once → pending; Pin / Discard from tray. After Pin, learning defaults off.
-- **Diagnostics:** `~/.local/state/denyout/` (logs rotate / use disk). Elevation failures in `last-error.txt`.
-
-### Policy profiles
-
-| Profile | UI name | Default? | Behavior |
-| --- | --- | --- | --- |
-| **browse** | Safe desktop | Yes (Protect computer) | Blocklist — normal web allowed; secrets/canaries/SSRF still block. No host Ask. |
-| **agent** | Agents only | Opt-in confirm | Enforce + `presets/agent.yaml`. Unknown hosts → deny or Ask. |
-
-Upgrades still on Agents only get a one-time migration dialog offering Safe desktop. Examples: [`denyout.whole_device_browse.yaml`](../examples/policies/denyout.whole_device_browse.yaml), [`denyout.whole_device.yaml`](../examples/policies/denyout.whole_device.yaml).
-
-Manual QA: [`qa-desktop-ux.md`](qa-desktop-ux.md), [`qa-agent-seatbelt.md`](qa-agent-seatbelt.md).
-
-Install elevates **at most once** (in the tray process). Turning protection off may ask once more to remove host rules.
-
-```text
-Windows (MVP):
-1. Download denyout_*_windows_*.zip from GitHub Releases
-2. Verify SHA256 against SHA256SUMS
-3. Extract denyout.exe onto PATH (see docs/install-windows.md — short EN)
-4. denyout version && denyout init && denyout run -- ...
-```
-
-### 3.2 Channels — status
-
-| Channel | Dec 1 status |
-| --- | --- |
-| GitHub Releases + SHA256SUMS | **Must** (M6) |
-| `install.sh` (Linux/macOS) | **Must** (M4) |
-| Windows zip + short EN doc | **Must** (M4) |
-| Homebrew | After first Release (nice-to-have) |
-| winget | Optional stretch |
-| `go install` | Contributors only (needs Go toolchain) |
-| apt / yum / scoop / chocolatey | Deferred |
-| Container image | Server path (`denyout serve`), not laptop M4 |
-| denyout.com hosts `install.sh` | Same script as repo; site may redirect to GitHub raw/Release |
-
-One release pipeline feeds every channel; package managers only re-point at Release assets.
-
-## 3.3 Protect this computer (hostguard)
-
-| OS | Redirect | CA | Elevation |
-| --- | --- | --- | --- |
-| Linux | nftables table `denyout` (UID filter, TCP 80/443 → local proxy) | `/usr/local/share/ca-certificates` + `update-ca-certificates` | `pkexec` / sudo |
-| macOS | pf anchor `com.denyout` | System keychain `security add-trusted-cert` | admin osascript |
-| Windows | WinDivert + `denyout-windivert.exe` — see [`hostguard-windows.md`](hostguard-windows.md) | `certutil` Root store | UAC |
-
-CLI helper: `denyout hostctl render|apply|remove --port N --ca PATH --uid N`.  
-Default policy: [`examples/policies/denyout.whole_device.yaml`](../examples/policies/denyout.whole_device.yaml) (enforce + agent allowlist + scanners). Browse (legacy): `denyout.whole_device_browse.yaml`. Ask mode: `denyout.whole_device_ask.yaml`.
-
-Proxy accepts **transparent** connections (TLS SNI / HTTP Host), not only HTTP-proxy CONNECT.
-
-## 4. Runtime algorithm (`denyout run`)
-
-1. Parse args; find `--` command.  
-2. Load policy (D03 order).  
-3. Create session id (UUIDv4).  
-4. Create or load CA (`--session-ca` default true).  
-5. Bind `127.0.0.1:PORT`.  
-6. Write lockfile under `$XDG_RUNTIME_DIR/denyout/<session>.json` with port, pid, policy hash.  
-7. Build child env (section 5).  
-8. Start proxy loop.  
-9. Start child in new process group.  
-10. Wait; on exit stop proxy; shred session CA if ephemeral.  
-11. Exit with child’s code (or mapped codes).
-
-## 5. Child environment
-
-**MUST set:**
-
-```text
-HTTP_PROXY=http://127.0.0.1:PORT
-HTTPS_PROXY=http://127.0.0.1:PORT
-http_proxy=...
-https_proxy=...
-NO_PROXY=localhost,127.0.0.1,::1
-no_proxy=...
-DENYOUT_SESSION_ID=...
-DENYOUT_PROXY=http://127.0.0.1:PORT
-```
-
-**When `tls-mode=intercept` MUST also set (best-effort matrix):**
-
-```text
-SSL_CERT_FILE=<path-to-ca-or-bundle>
-REQUESTS_CA_BUNDLE=<path>
-CURL_CA_BUNDLE=<path>
-NODE_EXTRA_CA_CERTS=<path>
-GIT_SSL_CAINFO=<path>
-```
-
-Document that Node <20 may need additional flags; Python `httpx`/`requests` respect bundles; Go often uses system trust (macOS/Windows) — **Go children may need `SSL_CERT_FILE`** (crypto/x509 respects on Unix).
-
-## 6. What desktop MVP does **not** enforce
-
-Without OS sandbox integration (MVP: sandbox remains **optional**; desktop is still “supported” with this residual documented — see [`design-decisions.md`](design-decisions.md) and D10):
-
-- Raw sockets bypassing proxy.  
-- `curl --noproxy '*'`.  
-- Binaries using hard-coded DoH / custom stacks.  
-- Agents launched outside `denyout run`.
-
-### 6.1 Stronger isolation (`srt`)
-
-```bash
-denyout run --sandbox=srt -- claude
-# or profile require_isolation / sandbox: srt
-```
-
-When `sandbox=srt` (or require isolation), DenyOut wraps the child with Anthropic `srt` and fails closed if `srt` is missing. Without it, wrap still works and prints one residual line (tools may bypass the proxy). UI label: **Stronger isolation (extra install)**. Fence/nono not in this wave.
-
-## 7. CA UX policy
-
-| Action | Default |
-| --- | --- |
-| System keychain install | Off |
-| Session CA | On |
-| Persistent user CA | Opt-in `--session-ca=false` |
-| Print CA fingerprint at start | On when verbose |
-
-`denyout ca install-system` (post-MVP) must require typing `INSTALL SYSTEM CA`.
-
-## 8. File locations (XDG)
-
-| Path | Use |
-| --- | --- |
-| `~/.config/denyout/desktop.json` | Tray preferences |
-| `~/.config/denyout/profiles/*.yaml` | Named agent wrap profiles |
-| `~/.config/denyout/denyout.yaml` | User config |
-| `~/.config/denyout/ca/` | Persistent CA |
-| `~/.local/state/denyout/audit.jsonl` | Default audit |
-| `$XDG_RUNTIME_DIR/denyout/` | Session lockfiles |
-| `./denyout.yaml` | Project config |
-
-## 9. Integration snippets
-
-### Shell alias
-
-```bash
-alias claude='denyout run -- claude'
-alias agent='denyout run --'
-```
-
-### npm script
-
-```json
-"scripts": {
-  "agent": "denyout run -- node dist/agent.js"
-}
-```
-
-### systemd user unit (long-running local agent)
-
-Example under `examples/` — `Environment=HTTPS_PROXY=...` pointing at a user-level `denyout serve` daemon (phase 1.1). MVP focuses on `run`.
-
-## 10. Desktop threat residual
-
-Documented banner on first run (once):
-
-```text
-Note: without an OS sandbox, some tools can bypass the proxy.
-For stronger isolation, see docs: desktop hardening.
-```
-
-Suppressible via `ui.show_bypass_warning: false`.
+User state (Linux XDG): `~/.local/state/denyout/` (`audit.jsonl`, `desktop.log`, `last-error.txt`). Opened from **Problems** and Settings → Advanced → Open diagnostics folder — see UX doc §5.3–§5.4.

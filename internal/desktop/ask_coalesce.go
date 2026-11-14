@@ -15,7 +15,6 @@ const askTimeout = 2 * time.Minute
 const askStormWindow = 5 * time.Minute
 const askStormCount = 3
 const askPauseDefault = 15 * time.Minute
-const secretToastEvery = 3 * time.Minute
 
 type askCall struct {
 	wg     sync.WaitGroup
@@ -28,7 +27,6 @@ type askFlight struct {
 	pending     map[string]*askCall
 	suppress    map[string]time.Time
 	ipLast      map[string]time.Time
-	secretLast  map[string]time.Time
 	global      sync.Mutex // one Ask UI at a time
 	askTimes    []time.Time
 	pausedUntil time.Time
@@ -36,10 +34,9 @@ type askFlight struct {
 
 func newAskFlight() *askFlight {
 	return &askFlight{
-		pending:    make(map[string]*askCall),
-		suppress:   make(map[string]time.Time),
-		ipLast:     make(map[string]time.Time),
-		secretLast: make(map[string]time.Time),
+		pending:  make(map[string]*askCall),
+		suppress: make(map[string]time.Time),
+		ipLast:   make(map[string]time.Time),
 	}
 }
 
@@ -151,7 +148,7 @@ func maybeOfferAskPause(f *askFlight) {
 		"Keep asking",
 	) {
 		f.SetPaused(askPauseDefault)
-		notify.Info("DenyOut", "Asks paused for 15 minutes. New sites stay blocked. Resume from the menu.")
+		notify.Info("DenyOut", "Asks paused for 15 minutes. New sites stay blocked. Resume from Settings → Advanced.")
 	}
 }
 
@@ -169,20 +166,7 @@ func (f *askFlight) notifyIPBlocked(host string) {
 	f.ipLast[host] = now
 	f.mu.Unlock()
 	notify.Info("DenyOut blocked a direct IP",
-		host+"\nApps connecting by raw IP are blocked under Agents only. Use Safe desktop for messengers.")
-}
-
-func (f *askFlight) notifySecretCoalesced(host string, reasons []string) {
-	key := strings.ToLower(host) + "|" + strings.Join(reasons, ",")
-	now := time.Now()
-	f.mu.Lock()
-	if t, ok := f.secretLast[key]; ok && now.Sub(t) < secretToastEvery {
-		f.mu.Unlock()
-		return
-	}
-	f.secretLast[key] = now
-	f.mu.Unlock()
-	notify.Deny(host, reasons)
+		host+"\nConnections by raw IP are blocked in this mode. Prefer Protect computer for everyday apps.")
 }
 
 func (a *App) coalescedAsk(host, reason string) string {

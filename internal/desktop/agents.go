@@ -77,6 +77,26 @@ func (a *App) wizardNewAgent(start bool) {
 		notify.Info("DenyOut", "Could not save profile: "+err.Error())
 		return
 	}
+	packID := SuggestPackID(p.Name, p.Command)
+	if packID == "" {
+		packID = "cursor-starter"
+	}
+	if pack, err := LookupAllowPack(packID); err == nil {
+		if nativeConfirm(
+			"DenyOut — recommended hosts",
+			"Add recommended hosts?\n\n"+pack.Name+": "+pack.Description+"\n\nYou can Undo the pack later in My agents → Edit.",
+			"Add hosts",
+			"Skip",
+		) {
+			if added, err := ApplyPack(&p, pack.ID); err != nil {
+				notify.Info("DenyOut", "Could not apply pack: "+err.Error())
+			} else if err := SaveProfile(p); err != nil {
+				notify.Info("DenyOut", "Could not save pack hosts: "+err.Error())
+			} else if len(added) > 0 {
+				notify.Info("DenyOut", fmt.Sprintf("Added %d host(s) from %s", len(added), pack.Name))
+			}
+		}
+	}
 	notify.Info("DenyOut", "Saved agent: "+p.Name)
 	if start {
 		if err := a.startProfile(p.ID); err != nil {
@@ -125,6 +145,7 @@ func (a *App) startProfile(id string) error {
 	profileName := p.Name
 	profileID := p.ID
 	ask := p.AskMode
+	threats := a.ensureThreatStore(false)
 	sess, err := run.StartSession(run.SessionOptions{
 		Config:        cfg,
 		TLSMode:       proxy.TLSIntercept,
@@ -132,8 +153,9 @@ func (a *App) startProfile(id string) error {
 		Sandbox:       sandbox,
 		PolicyProfile: "agent",
 		Process:       "wrap:" + p.ID,
-		OnDeny: func(host string, reasons []string) {
-			a.onWrapDeny(sessRef, profileID, profileName, ask, host, reasons)
+		Threats:       threats,
+		OnDeny: func(host string, reasons []string, redactedURL string) {
+			a.onWrapDeny(sessRef, profileID, profileName, ask, host, reasons, redactedURL)
 		},
 	})
 	if err != nil {
@@ -199,23 +221,20 @@ func (a *App) startProfile(id string) error {
 	return nil
 }
 
-func (a *App) onWrapDeny(sess *run.Session, profileID, profileName string, ask bool, host string, reasons []string) {
+func (a *App) onWrapDeny(sess *run.Session, profileID, profileName string, ask bool, host string, reasons []string, redactedURL string) {
 	a.mu.Lock()
 	a.lastDeny = host
 	a.state.LastDenyHost = host
 	a.state.LastDenySummary = notify.HumanReasons(reasons)
+	a.state.LastDenyURL = strings.TrimSpace(redactedURL)
 	st := a.state
 	a.mu.Unlock()
 	_ = SaveState(st)
 
 	hostNotAllowed := false
-	secretish := false
 	for _, r := range reasons {
 		if r == "host_not_allowed" {
 			hostNotAllowed = true
-		}
-		if strings.HasPrefix(r, "secret_") || r == "canary_detected" {
-			secretish = true
 		}
 	}
 	if isIPLiteral(host) {
@@ -241,14 +260,11 @@ func (a *App) onWrapDeny(sess *run.Session, profileID, profileName string, ask b
 		}
 		return
 	}
-	if secretish {
-		if a.asks == nil {
-			a.asks = newAskFlight()
-		}
-		a.asks.notifySecretCoalesced(host, reasons)
+	if isClearPostBlock(reasons) {
+		go a.handlePostBlockDeny(host, reasons, redactedURL)
 		return
 	}
-	notify.Deny(host, reasons)
+	// Other denies (e.g. host_not_allowed without Ask): History only.
 }
 
 func (a *App) recordProfileOnce(id, host string) error {
@@ -348,6 +364,11 @@ func (a *App) runningWrapCount() int {
 }
 
 func (a *App) myAgentsMenu() {
+	// UX2 Q8: with Wails, open the My agents screen in-app (list lives in the window).
+	if a.opts.OpenUI != nil {
+		a.RequestOpenUI("profiles")
+		return
+	}
 	profiles, err := ListProfiles()
 	if err != nil {
 		notify.Info("DenyOut", "Could not list agents: "+err.Error())

@@ -22,10 +22,16 @@ type Decision struct {
 // Resolver looks up host addresses. nil → no DNS (check path / tests).
 type Resolver func(host string) ([]net.IP, error)
 
+// ThreatChecker is optional Book C (threat intel). nil = no subscriptions loaded.
+type ThreatChecker interface {
+	CheckThreat(host string) (feedID string, hit bool)
+}
+
 // Engine evaluates requests with optional DNS and simple rate limits.
 type Engine struct {
 	Cfg      *Config
 	Resolve  Resolver
+	Threats  ThreatChecker // Book C; optional
 	mu       sync.Mutex
 	hostHits map[string][]time.Time
 	global   []time.Time
@@ -113,6 +119,9 @@ func (e *Engine) Evaluate(rv RequestView) Decision {
 		return *early
 	}
 	if d := denyListedHost(cfg, host, reasons, detectors); d != nil {
+		return *d
+	}
+	if d := e.denyThreatList(cfg, host, reasons, detectors); d != nil {
 		return *d
 	}
 	if e.rateLimited(host) {
@@ -254,6 +263,51 @@ func denyListedHost(cfg *Config, host string, reasons, detectors []string) *Deci
 		}
 	}
 	return nil
+}
+
+// UserAllowSkipsThreat is true for Book B Always / Once / timed (user_once) on this host.
+// Pack / preset / profile allows do NOT skip Book C.
+func UserAllowSkipsThreat(cfg *Config, host string) bool {
+	if cfg == nil {
+		return false
+	}
+	host = normalizeHost(host)
+	for _, r := range cfg.Allow {
+		if !HostMatch(r.Host, host) {
+			continue
+		}
+		switch r.Reason {
+		case "user_always", "user_once":
+			return true
+		}
+	}
+	return false
+}
+
+func (e *Engine) denyThreatList(cfg *Config, host string, reasons, detectors []string) *Decision {
+	if e == nil || e.Threats == nil {
+		return nil
+	}
+	if UserAllowSkipsThreat(cfg, host) {
+		return nil
+	}
+	// Book D — product unbreak: skip threat lists only (scanners already ran).
+	if UnbreakSkipsThreat(host) {
+		return nil
+	}
+	feedID, hit := e.Threats.CheckThreat(host)
+	if !hit {
+		return nil
+	}
+	dets := detectors
+	if feedID != "" {
+		dets = append(dets, "threat:"+feedID)
+	}
+	return &Decision{
+		Verdict:   "deny",
+		Reasons:   uniq(append(reasons, ReasonThreatList)),
+		Detectors: uniq(dets),
+	}
 }
 
 // blocklistHostOK is true in Safe desktop (blocklist) when the host is not on deny[].

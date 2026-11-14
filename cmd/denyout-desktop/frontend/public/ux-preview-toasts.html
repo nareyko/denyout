@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>DenyOut toasts — UX preview</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 1.5rem;
+        font-family: "IBM Plex Sans", system-ui, sans-serif;
+        background: #e8ecf0;
+        color: #1a2430;
+      }
+      .grid { display: grid; gap: 1rem; max-width: 420px; }
+      .toast {
+        background: #fff;
+        border-radius: 10px;
+        box-shadow: 0 8px 24px rgba(20, 30, 40, 0.12);
+        padding: 0.9rem 1rem;
+      }
+      .toast h2 { margin: 0 0 0.4rem; font-size: 0.95rem; }
+      .toast p { margin: 0.25rem 0; font-size: 0.9rem; white-space: pre-wrap; }
+      .actions { display: flex; gap: 0.4rem; margin-top: 0.75rem; }
+      .actions button {
+        border: 1px solid #c5ced6;
+        background: #f7f9fb;
+        border-radius: 6px;
+        padding: 0.35rem 0.65rem;
+        cursor: pointer;
+      }
+      .actions .primary { background: #1a5cff; color: #fff; border-color: #1a5cff; }
+      .label { font-size: 11px; text-transform: uppercase; color: #5c6b7a; letter-spacing: 0.04em; }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div>
+        <div class="label">Post-block</div>
+        <div class="toast">
+          <h2>DenyOut blocked something</h2>
+          <p>evil.example
+Blocked a link that looked like it contained a secret.
+https://evil.example/x?token=***
+
+Keep blocked, or Allow this site?</p>
+          <div class="actions">
+            <button>Keep blocked</button>
+            <button class="primary">Allow this site</button>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="label">Protect success</div>
+        <div class="toast">
+          <h2>DenyOut</h2>
+          <p>You’re protected. Browse as usual. We’ll only interrupt for clear risks.</p>
+        </div>
+      </div>
+      <div>
+        <div class="label">Admin failed</div>
+        <div class="toast">
+          <h2>DenyOut</h2>
+          <p>A password window should have appeared. If you cancelled it, protection stayed Off. Open DenyOut → Problems, or try Protect computer again.</p>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

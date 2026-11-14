@@ -28,6 +28,7 @@ func stopPreviousUnix(selfPID int) {
 	if err != nil {
 		// Best-effort fallbacks.
 		_ = exec.Command("pkill", "-f", `denyout[[:space:]]+desktop`).Run()
+		_ = exec.Command("pkill", "-f", `[d]enyout-desktop`).Run()
 		_ = exec.Command("pkill", "-f", `denyout[[:space:]]+hostctl[[:space:]]+proxyd`).Run()
 		return
 	}
@@ -61,7 +62,11 @@ func stopPreviousUnix(selfPID int) {
 func isDenyoutDesktopOrProxyd(args string) bool {
 	parts := strings.Fields(strings.ToLower(args))
 	for i, p := range parts {
-		if !strings.HasSuffix(p, "denyout") && !strings.HasSuffix(p, "denyout.exe") {
+		base := p
+		if strings.HasSuffix(base, "denyout-desktop") || strings.HasSuffix(base, "denyout-desktop.exe") {
+			return true
+		}
+		if !strings.HasSuffix(base, "denyout") && !strings.HasSuffix(base, "denyout.exe") {
 			continue
 		}
 		if i+1 < len(parts) && parts[i+1] == "desktop" {

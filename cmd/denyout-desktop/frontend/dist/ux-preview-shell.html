@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>DenyOut shell — compact layout</title>
+    <link rel="stylesheet" href="/src/styles/app.css" />
+    <style>
+      html, body { height: 100%; margin: 0; }
+      #frame { height: 100vh; width: 960px; max-width: 100%; margin: 0 auto; border: 1px solid #c5ced6; }
+    </style>
+  </head>
+  <body>
+    <div id="frame" class="app">
+      <nav class="nav">
+        <div class="brand">DenyOut</div>
+        <button class="active">Home</button>
+        <button>History</button>
+        <button>Settings</button>
+        <button>Problems</button>
+        <button class="nav-secondary">My agents</button>
+      </nav>
+      <div class="main">
+        <header class="topbar">
+          <span class="pill">Protected</span>
+          <span style="flex: 1"></span>
+          <button class="btn subtle">Refresh</button>
+        </header>
+        <div class="content">
+          <div class="stack home">
+            <section class="home-hero card">
+              <h1 class="home-headline">You are protected</h1>
+              <p class="muted">Browse as usual. We’ll only interrupt for clear risks.</p>
+              <div class="row-actions"><button class="btn danger">Turn off</button></div>
+            </section>
+            <section class="card">
+              <h2>Last blocked</h2>
+              <p><strong>evil.example</strong></p>
+              <p class="muted">That link looked like it contained a secret.</p>
+              <div class="row-actions">
+                <button class="btn primary">Allow this site</button>
+                <button class="btn">See history</button>
+              </div>
+            </section>
+            <p class="home-quiet muted">Blocked today: 2</p>
+            <nav class="home-doors">
+              <button type="button" class="linkish">Settings</button>
+              <span class="muted">·</span>
+              <button type="button" class="linkish">For AI tools</button>
+            </nav>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

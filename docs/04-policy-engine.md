@@ -43,25 +43,36 @@ RequestView {
 
 ## 3. Evaluation order (normative)
 
-Given `RequestView` R and `Policy` P:
+Given `RequestView` R and `Policy` P.
+
+List books (see [`ux-iters/threat-lists-plan.md`](ux-iters/threat-lists-plan.md)): **A** agent allow, **B** personal decisions, **C** threat intel subscriptions, **D** product unbreak.
 
 1. **Normalize host** (lowercase, strip trailing dot; IDNA to ASCII).  
 2. **DNS resolve** (unless IP literal).  
 3. **Unsafe IP check** on all resolved addresses → if any unsafe and not explicitly allowed → `deny` reason `unsafe_ip`.  
 4. **Port check** — if `allowed_ports` set and port ∉ set → deny `port_not_allowed`.  
-5. **Secret scanners** on available fields (D05) → on hit:  
-   - `enforce` / `ask` / `blocklist`: `deny` reason `secret_*`  
+5. **Secret / canary scanners** on available fields (D05) → on hit:  
+   - `enforce` / `ask` / `blocklist`: `deny` reason `secret_*` / `canary_detected`  
    - `audit`: do **not** forward if `audit.hard_secrets: true` (default **true** for URL secrets); else log `would_deny` and forward.  
-6. **Mode branch:**
-   - `enforce`: match allow rules; else deny `host_not_allowed` (or `path_not_allowed`).  
-   - `blocklist`: match deny hosts → deny; else allow (scanners already applied).  
-   - `audit`: allow (unless hard denies). Log `would_deny` if enforce would deny.  
-   - `ask`: if allow match → allow; else prompt; on approve → allow once/session; on deny/timeout → deny.  
-7. **Rate limits** → deny `rate_limited`.  
-8. **Emit audit** with final verdict.  
-9. Return decision to proxy.
+6. **Book B — user Allow forever / timed allow** (host-specific Always / timed) → `allow` (skips Book C).  
+7. **Book D — product unbreak** → allow for **threat-list purposes only** (scanners still apply).  
+8. **Explicit deny hosts** (policy `deny:`) → `deny` reason `host_denied`.  
+9. **Book C — enabled threat subscriptions** (phishing / malware / stronger / later telemetry) → `deny` reason `threat_list` (map to clear post-block HITL). Applies in **all modes**.  
+10. **Book B — remembered Keep / timed deny** → quiet / throttled path as on desktop today.  
+11. **Mode branch:**
+   - `enforce`: match Book A allow rules; else deny `host_not_allowed` (or `path_not_allowed`).  
+   - `blocklist`: match deny hosts → deny; else allow (scanners + Book C already applied).  
+   - `audit`: allow (unless hard denies / Book C). Log `would_deny` if enforce would deny.  
+   - `ask`: if Book A allow match → allow; else prompt; on approve → allow once/session; on deny/timeout → deny.  
+12. **Rate limits** → deny `rate_limited`.  
+13. **Emit audit** with final verdict.  
+14. Return decision to proxy.
 
-**Invariant:** Scanner deny in enforce cannot be overridden by a wide host allow rule.
+**Invariants:**
+
+- Scanner deny in enforce cannot be overridden by a wide host allow rule.  
+- Book A pack / profile allows do **not** bypass Book C; only Book B **Always / timed allow on that host** (and Book D unbreak for threat lists) do.  
+- Book B Allow and Book D beat Book C. Book C does not replace agent default-deny.
 
 ## 4. Allow rule schema
 
@@ -102,9 +113,7 @@ deny:
   - reason: "known exfil paste"
 ```
 
-Deny list evaluated in enforce **after** scanners? → Actually: deny list **SHOULD** be checked before allow to provide clear reasons. Normative addition:
-
-Between steps 5 and 6: **explicit deny host match → deny `host_denied`.**
+Explicit policy `deny:` hosts are step **8** in §3 (after user Allow / unbreak, before Book C). Reason: `host_denied`.
 
 ## 6. Private / metadata ranges (default unsafe)
 
@@ -155,6 +164,7 @@ Same `(Policy, RequestView, rate-state)` → same verdict. Timeouts in `ask` are
 | `allow` | Permitted |
 | `host_not_allowed` | Enforce miss |
 | `host_denied` | Explicit deny |
+| `threat_list` | Book C threat subscription hit |
 | `path_not_allowed` | L2 path miss |
 | `method_not_allowed` | L2 method miss |
 | `unsafe_ip` | SSRF/metadata/private |

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>DenyOut History — UX preview</title>
+    <link rel="stylesheet" href="/src/styles/app.css" />
+    <style>
+      body { margin: 0; background: #f4f6f8; font-family: "IBM Plex Sans", system-ui, sans-serif; }
+      .wrap { padding: 1.25rem; max-width: 960px; }
+      .label { font-size: 11px; text-transform: uppercase; color: #5c6b7a; margin-bottom: 0.5rem; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="label">History + drawer</div>
+      <div class="layout-split">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Time</th><th>Site</th><th>Why</th><th></th></tr>
+            </thead>
+            <tbody>
+              <tr class="selected">
+                <td class="mono">14:02:11</td>
+                <td>evil.example</td>
+                <td>Blocked a link that looked like it contained a secret.</td>
+                <td><button class="btn subtle">Always allow</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <aside class="drawer">
+          <h3>evil.example</h3>
+          <p>Blocked a link that looked like it contained a secret.</p>
+          <p class="url muted">https://evil.example/x?token=***</p>
+          <div class="row-actions" style="margin-top: 0.75rem">
+            <button class="btn primary">Allow this site</button>
+            <button class="btn">Always allow host</button>
+            <button class="btn">Copy URL</button>
+          </div>
+          <details class="tech-details" open>
+            <summary>Technical details</summary>
+            <dl>
+              <dt>Reason codes</dt>
+              <dd class="mono">secret_in_url</dd>
+              <dt>Method</dt>
+              <dd>GET</dd>
+            </dl>
+          </details>
+        </aside>
+      </div>
+      <div class="label" style="margin-top: 1.5rem">Empty</div>
+      <div class="empty card">
+        <p><strong>Nothing blocked yet — that is OK.</strong></p>
+        <p>When DenyOut blocks something, you’ll get a short Keep blocked / Allow this site toast, and it will show up here.</p>
+        <button class="btn">Try a safe check…</button>
+      </div>
+    </div>
+  </body>
+</html>

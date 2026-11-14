@@ -8,9 +8,12 @@ import (
 	"time"
 
 	"github.com/gogpu/systray"
-
-	"github.com/nareyko/denyout/internal/notify"
 )
+
+// RunTray runs the system tray until ctx is cancelled or Quit.
+func (a *App) RunTray(ctx context.Context) error {
+	return a.runTray(ctx)
+}
 
 func (a *App) runTray(ctx context.Context) error {
 	tray := systray.New()
@@ -18,85 +21,47 @@ func (a *App) runTray(ctx context.Context) error {
 	tray.SetTooltip("DenyOut — Off")
 	tray.SetAppName("DenyOut")
 
-	menu := systray.NewMenu()
-	statusItem := menu.Add("Status: Off", nil)
-	statusItem.SetDisabled(true)
-	lastItem := menu.Add("Last block: none", nil)
-	lastItem.SetDisabled(true)
-	learningItem := menu.Add("Learning: none", func() {
-		go a.pinLearningFromTray()
+	// Left-click: Home, or History when needs attention / last deny pending review.
+	tray.OnClick(func() {
+		go func() {
+			a.mu.Lock()
+			alert := problemsUnhealthyLocked(a) || a.state.LastDenyHost != "" && !a.state.ProtectionOn
+			pause := a.state.ProtectPausedUntil != ""
+			a.mu.Unlock()
+			if alert {
+				a.RequestOpenUI("activity")
+				return
+			}
+			if pause {
+				a.RequestOpenUI("home")
+				return
+			}
+			a.RequestOpenUI("home")
+		}()
 	})
+
+	menu := systray.NewMenu()
+	statusItem := menu.Add("Off", nil)
+	statusItem.SetDisabled(true)
 	menu.AddSeparator()
 
 	computerItem := menu.Add("Protect computer", func() {
 		_ = a.enableSafeDesktop()
 	})
-	myAgentsItem := menu.Add("My agents…", func() {
+	menu.Add("My agents…", func() {
 		go a.myAgentsMenu()
-	})
-	_ = myAgentsItem
-	agentsOnlyItem := menu.Add("Agents only (whole PC)…", func() {
-		go a.confirmAgentsOnlyWholePC()
-	})
-	safeBackItem := menu.Add("Switch to Safe desktop", func() {
-		a.switchToSafeDesktopFromTray()
 	})
 	offItem := menu.Add("Off", func() {
 		a.stopProtectionFromTray()
 	})
 	menu.AddSeparator()
 
-	menu.Add("Open activity…", func() {
-		go a.nativeShowActivity()
-	})
-	menu.Add("Always-allow list…", func() {
-		go a.nativeManageAlwaysAllow()
-	})
-	menu.Add("Undo last always-allow", func() {
-		a.undoLastAlwaysAllow()
-	})
-	resumeAskItem := menu.Add("Resume asks", func() {
-		if a.asks != nil {
-			a.asks.ClearPause()
-		}
-		a.mu.Lock()
-		a.state.AskPausedUntil = ""
-		st := a.state
-		a.mu.Unlock()
-		_ = SaveState(st)
-		notify.Info("DenyOut", "Asks resumed.")
+	menu.Add("Open DenyOut…", func() {
+		go a.RequestOpenUI("home")
 	})
 	menu.AddSeparator()
-
-	notifyItem := menu.Add("Notifications", func() {
-		a.mu.Lock()
-		a.state.Notify = !a.state.Notify
-		on := a.state.Notify
-		st := a.state
-		a.mu.Unlock()
-		_ = SaveState(st)
-		notify.SetEnabled(on)
-	})
-	menu.Add("Help & logs…", func() {
-		go a.helpAndLogs()
-	})
-	menu.Add("Copy last error", func() {
-		copyLastErrorOrPrint()
-	})
-	menu.Add("Test protection…", func() {
-		go a.testProtection()
-	})
-	menu.AddSeparator()
-
-	ver := a.opts.Version
-	if ver == "" {
-		ver = "dev"
-	}
-	verItem := menu.Add("DenyOut "+ver, nil)
-	verItem.SetDisabled(true)
 
 	menu.Add("Quit DenyOut", func() {
-		// Quit leave-on: keep ProtectionOn so next login restores Computer.
 		a.stopAllKeepRestore()
 		a.stopAllWrapsOpts("Quit", true)
 		a.stopProtect()
@@ -122,39 +87,35 @@ func (a *App) runTray(ctx context.Context) error {
 				mode := a.currentMode()
 				a.mu.Lock()
 				st := a.status
-				last := a.lastDeny
-				notifyOn := a.state.Notify
 				profile := normalizePolicyProfile(a.state.PolicyProfile)
 				avail := a.state.ComputerAvailable
-				askPaused := a.state.AskPaused() || (a.asks != nil && a.asks.Paused())
+				pauseUntil := a.state.ProtectPausedUntil
+				needsAttention := problemsUnhealthyLocked(a)
 				a.mu.Unlock()
 
 				label := userModeLabel(mode, profile)
-				if mode == ModeOff && !avail {
-					label = "Off (computer unavailable)"
+				if mode == ModeOff && pauseUntil != "" {
+					label = "Paused"
+					if t, err := time.Parse(time.RFC3339, pauseUntil); err == nil {
+						label = "Paused until " + t.Local().Format("15:04")
+					}
+				} else if mode == ModeOff && !avail {
+					label = "Off (unavailable)"
 				}
-				statusItem.SetLabel("Status: " + label)
-				if last == "" {
-					lastItem.SetLabel("Last block: none")
-				} else {
-					lastItem.SetLabel("Last block: " + truncate(last, 40))
+				if needsAttention {
+					label = "Needs attention"
 				}
-				learningItem.SetLabel(a.learningMenuLabel())
+				statusItem.SetLabel(label)
 
 				computerItem.SetLabel(checkedLabel("Protect computer", mode == ModeComputer && profile == PolicyProfileBrowse))
 				computerItem.SetDisabled(mode == ModeComputer && profile == PolicyProfileBrowse)
-				agentsOnlyItem.SetLabel(checkedLabel("Agents only (whole PC)…", mode == ModeComputer && profile == PolicyProfileAgent))
-				safeBackItem.SetDisabled(!(mode == ModeComputer && profile == PolicyProfileAgent))
-				offItem.SetLabel(checkedLabel("Off", mode == ModeOff))
+				offItem.SetLabel(checkedLabel("Off", mode == ModeOff && pauseUntil == ""))
 				offItem.SetDisabled(mode == ModeOff)
-
-				notifyItem.SetLabel(checkedLabel("Notifications", notifyOn))
-				resumeAskItem.SetDisabled(!askPaused)
 
 				tray.SetTooltip("DenyOut — " + label)
 
 				switch {
-				case strings.Contains(strings.ToLower(st), "error"), strings.Contains(st, "Needs"):
+				case needsAttention, strings.Contains(strings.ToLower(st), "error"), strings.Contains(st, "Needs"):
 					tray.SetIcon(iconAlertPNG)
 				case mode != ModeOff || a.runningWrapCount() > 0:
 					tray.SetIcon(iconOnPNG)
@@ -165,7 +126,7 @@ func (a *App) runTray(ctx context.Context) error {
 		}
 	}()
 
-	fmt.Fprintln(os.Stderr, "denyout desktop: tray ready — Protect computer / My agents / Off")
+	fmt.Fprintln(os.Stderr, "denyout desktop: tray ready — left-click opens DenyOut")
 	errCh := make(chan error, 1)
 	go func() { errCh <- tray.Run() }()
 
@@ -194,18 +155,13 @@ func checkedLabel(base string, on bool) string {
 func userModeLabel(mode, profile string) string {
 	switch mode {
 	case ModeComputer:
-		return policyProfileLabel(profile)
+		if normalizePolicyProfile(profile) == PolicyProfileBrowse {
+			return "Protected"
+		}
+		return "Agents only"
 	case ModeSession:
-		// Hidden as user mode; show honestly if somehow active.
 		return "Limited (session)"
 	default:
 		return "Off"
 	}
-}
-
-func truncate(s string, n int) string {
-	if len(s) <= n {
-		return s
-	}
-	return s[:n-1] + "…"
 }

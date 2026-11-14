@@ -28,7 +28,10 @@ If a later code change conflicts with this spec, either update the code or revis
 | D04 | [04-policy-engine.md](04-policy-engine.md) | **Normative** decision algorithm |
 | D05 | [05-secret-detection.md](05-secret-detection.md) | **Normative** scanner contracts |
 | D06 | [06-cli-and-ux.md](06-cli-and-ux.md) | **Normative** CLI surface; UX informative |
-| D07 | [07-desktop.md](07-desktop.md) | **Normative** desktop deployment |
+| D07 | [07-desktop.md](07-desktop.md) | **Normative** desktop deployment / binaries |
+| D07-UX | [07-desktop-ux.md](07-desktop-ux.md) | **Normative** install/tray/menu/screens inventory |
+| D07-UX-CAT | [07-desktop-ux-catalog.md](07-desktop-ux-catalog.md) | Catalog of all screens & user-visible messages |
+| D07-UX-SIMPLE | [07-desktop-ux-simplicity.md](07-desktop-ux-simplicity.md) | Simplicity review: home dashboard, friction, gaps |
 | D08 | [08-server.md](08-server.md) | **Normative** server deployment |
 | D09 | [09-audit-and-ops.md](09-audit-and-ops.md) | **Normative** audit fields |
 | D10 | [10-security-boundaries.md](10-security-boundaries.md) | **Normative** claims / non-claims |
@@ -36,6 +39,8 @@ If a later code change conflicts with this spec, either update the code or revis
 | D12 | [12-mvp-and-roadmap.md](12-mvp-and-roadmap.md) | Planning (informative) |
 | D13 | [13-competitors.md](13-competitors.md) | Informative |
 | D14 | [14-testing.md](14-testing.md) | **Normative** acceptance tests for MVP |
+| — | [updates/README.md](updates/README.md) | Public app update manifest (no account) |
+| — | [cloud-sync.md](cloud-sync.md) | Optional account settings sync schema (no secrets) |
 | — | [design-decisions.md](design-decisions.md) | Locked technical decisions (public) |
 | — | [IMPLEMENTATION.md](IMPLEMENTATION.md) | Public engineering checklist |
 
@@ -77,11 +82,15 @@ If a later code change conflicts with this spec, either update the code or revis
 
 ### 4.3 Primary UX
 
+**Desktop (P1):** silent install → tray icon + compact menu → left-click opens **Home**; clear blocks as **Keep blocked** / **Allow this site**; power in Settings tabs. Full surface inventory (install / tray / menu / every screen): [`07-desktop-ux.md`](07-desktop-ux.md).
+
+**CLI / wrap:**
+
 ```text
 denyout run [--policy PATH] [--mode MODE] -- <command> [args...]
 ```
 
-Zero-thinking path: install → `denyout run -- <agent>` → first denials appear as notifications + log; expand allowlist only as needed.
+Zero-thinking wrap path: install → `denyout run -- <agent>` → first denials as notifications + log; expand allowlist only as needed.
 
 ## 5. High-level decision flow (normative sketch)
 
@@ -118,7 +127,7 @@ outbound request from workload
 └───────────────────┘
 ```
 
-Exact order is specified in [04-policy-engine.md](04-policy-engine.md). Secret scanners **MUST** run before allowlist success is finalized so that `api.evil.com` is not required for blocking `https://cdn.allowed.example/x?token=SECRET`.
+Exact order is specified in [04-policy-engine.md](04-policy-engine.md) (including Books A–D: agent allow, personal decisions, threat intel, product unbreak). Secret scanners **MUST** run before allowlist success is finalized so that `api.evil.com` is not required for blocking `https://cdn.allowed.example/x?token=SECRET`. Desktop threat-list UX: [ux-iters/threat-lists-plan.md](ux-iters/threat-lists-plan.md).
 
 ## 6. Deployment shapes
 

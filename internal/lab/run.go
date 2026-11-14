@@ -190,10 +190,6 @@ func containsAny(have, want []string) bool {
 	return false
 }
 
-func insertResult(db *sql.DB, runID string, cr CaseResult) error {
-	return insertResultTx(db, runID, cr)
-}
-
 type execer interface {
 	Exec(query string, args ...any) (sql.Result, error)
 }

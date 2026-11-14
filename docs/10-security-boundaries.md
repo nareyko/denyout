@@ -57,7 +57,7 @@ Marketing one-liners **MUST** match §1–§2 (no “unbypassable”).
 
 ## 6. Vulnerability reporting
 
-GitHub Security Advisories on [`nareyko/denyout`](https://github.com/nareyko/denyout); mailbox `security@denyout.com` when DNS mail is live.  
+GitHub Security Advisories on [`nareyko/denyout`](https://github.com/nareyko/denyout); mailbox `security@denyout.com` (forwarding live).  
 Fix policy: fail-closed bugs prioritized over UX bugs.
 
 ## 7. Ship-check (M5)

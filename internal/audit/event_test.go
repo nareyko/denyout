@@ -7,6 +7,23 @@ import (
 	"github.com/nareyko/denyout/internal/audit"
 )
 
+func TestDisplayURL(t *testing.T) {
+	got := audit.DisplayURL(
+		audit.Network{DestHost: "evil.example", DestPort: 443},
+		&audit.HTTPInfo{Path: "/leak", QueryRedacted: "api_key=***"},
+	)
+	want := "https://evil.example/leak?api_key=***"
+	if got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+	if audit.TruncateMiddle(want, 20) == want {
+		t.Fatal("expected truncation")
+	}
+	if audit.DisplayURL(audit.Network{}, nil) != "" {
+		t.Fatal("empty host")
+	}
+}
+
 func TestEventPolicyProfileJSON(t *testing.T) {
 	ev := audit.Event{
 		SessionID:     "sess-1",

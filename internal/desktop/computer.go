@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -59,7 +60,7 @@ func (a *App) startComputer() error {
 		AppendDesktopLog("INFO browser CA trusted in user NSS DB")
 	}
 
-	self, err := os.Executable()
+	self, err := hostguard.SelfExe()
 	if err != nil {
 		_ = hostguard.ElevateRemove(port, uid)
 		a.setStatus("Error")
@@ -249,7 +250,6 @@ func (a *App) allowHostAlways(host string) error {
 
 func (a *App) enableComputerFromTray() error {
 	if a.currentMode() == ModeComputer {
-		notify.Info("DenyOut", "Already protecting whole computer.")
 		return nil
 	}
 	a.stopSession()
@@ -268,7 +268,7 @@ func (a *App) enableComputerFromTray() error {
 		stFail := a.state
 		a.mu.Unlock()
 		_ = SaveState(stFail)
-		notify.Info("DenyOut", "Admin failed — protection stays Off. Tray → Protect computer to retry, or Help & logs.")
+		notify.Emit(notify.KindProtectFailed, "DenyOut", "A password window should have appeared. If you cancelled it, protection stayed Off. Open DenyOut → Problems, or try Protect computer again.")
 		return err
 	}
 	AppendDesktopLog("INFO computer mode on profile=%s", normalizePolicyProfile(a.state.PolicyProfile))
@@ -278,13 +278,12 @@ func (a *App) enableComputerFromTray() error {
 	if !clipboardAvailable() {
 		AppendDesktopLog("INFO hint: install wl-clipboard for Copy last error")
 	}
-	notify.Info("DenyOut", "Protect computer is on ("+policyProfileLabel(a.state.PolicyProfile)+").")
+	// Success: Home/tray status only — no OS “You’re protected” toast (notifications whitelist).
 	return nil
 }
 
 func (a *App) enableSessionFromTray() error {
 	if a.currentMode() == ModeSession {
-		notify.Info("DenyOut", "Already in session mode.")
 		return nil
 	}
 	a.stopComputerOpts(false, true) // leaving computer → Remove once
@@ -293,17 +292,87 @@ func (a *App) enableSessionFromTray() error {
 		a.setStatus("Error")
 		return err
 	}
-	notify.Info("DenyOut", "Session mode: apps that use system proxy. Browsers may ignore it.")
 	return nil
 }
 
 func (a *App) stopProtectionFromTray() {
 	if a.currentMode() == ModeOff {
-		notify.Info("DenyOut", "Protection is already off. (Running agents are separate — use My agents → Stop.)")
 		return
 	}
+	choice := a.chooseProtectPause()
 	a.stopProtection()
-	notify.Info("DenyOut", "Protect computer is off. Running agents (if any) keep going — Stop them from My agents.")
+	a.applyProtectPauseChoice(choice)
+	// Intentional Off: no OS nag — Home/tray show status.
+}
+
+// chooseProtectPause asks how long to leave Protect off. Empty = until manual On.
+func (a *App) chooseProtectPause() string {
+	a.mu.Lock()
+	last := a.state.ProtectPauseLast
+	a.mu.Unlock()
+	def := "1h"
+	if last != "" {
+		def = last
+	}
+	title := "DenyOut — Pause protection"
+	text := "How long should Protect stay off?\n(Default: " + def + "; forever is available but not the default.)"
+	if runtime.GOOS == "linux" {
+		if zenity, err := exec.LookPath("zenity"); err == nil {
+			cmd := exec.Command(zenity, "--list",
+				"--title="+title,
+				"--text="+text,
+				"--column=Choice",
+				"--hide-header",
+				"--width=420",
+				"--height=280",
+				"15 minutes",
+				"1 hour",
+				"Until tomorrow",
+				"Until I turn it on",
+			)
+			out, err := cmd.Output()
+			if err != nil {
+				return def
+			}
+			return mapPauseLabel(strings.TrimSpace(string(out)), def)
+		}
+	}
+	return def
+}
+
+func mapPauseLabel(s, def string) string {
+	switch s {
+	case "15 minutes":
+		return "15m"
+	case "1 hour":
+		return "1h"
+	case "Until tomorrow":
+		return "tomorrow"
+	case "Until I turn it on":
+		return "forever"
+	default:
+		return def
+	}
+}
+
+func (a *App) applyProtectPauseChoice(choice string) {
+	a.mu.Lock()
+	a.state.ProtectPauseLast = choice
+	var until string
+	switch choice {
+	case "15m":
+		until = time.Now().Add(15 * time.Minute).UTC().Format(time.RFC3339)
+	case "1h":
+		until = time.Now().Add(time.Hour).UTC().Format(time.RFC3339)
+	case "tomorrow":
+		until = time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339)
+	default: // forever
+		until = ""
+	}
+	a.state.ProtectPausedUntil = until
+	st := a.state
+	a.mu.Unlock()
+	_ = SaveState(st)
 }
 
 func (a *App) restartActiveProtector() {
@@ -324,7 +393,7 @@ func (a *App) restartActiveProtector() {
 		if err := a.startComputer(); err != nil {
 			fmt.Fprintf(os.Stderr, "denyout desktop: restart computer failed: %v — staying Off\n", err)
 			a.setStatus("Needs admin")
-			notify.Info("DenyOut", "Could not restart Protect computer — staying Off. Retry from the tray.")
+			notify.Emit(notify.KindProtectFailed, "DenyOut", "Could not restart Protect computer — staying Off. Retry from Open DenyOut or the tray.")
 		}
 	case ScopeSession:
 		// Session is not a user-facing restore target after UX v2.
@@ -354,7 +423,6 @@ func (a *App) restoreProtection() {
 		st := a.state
 		a.mu.Unlock()
 		_ = SaveState(st)
-		notify.Info("DenyOut", "Previous Session mode was cleared. Use Protect computer (Safe desktop) when ready.")
 		return
 	}
 	if scope == "" {
@@ -374,6 +442,6 @@ func (a *App) restoreProtection() {
 		st := a.state
 		a.mu.Unlock()
 		_ = SaveState(st)
-		notify.Info("DenyOut", "Admin failed — protection stays Off. Tray → Protect computer to retry.")
+		notify.Emit(notify.KindProtectFailed, "DenyOut", "A password window should have appeared. If you cancelled it, protection stayed Off. Try Protect computer again from Open DenyOut or the tray.")
 	}
 }

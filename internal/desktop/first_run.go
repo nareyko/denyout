@@ -33,9 +33,10 @@ func (a *App) runFirstRunWizard() {
 		_ = SaveState(st)
 		a.maybeAskAutostart()
 		if err := a.enableSafeDesktop(); err != nil {
-			notify.Info("DenyOut", "Could not turn on Protect computer (admin may be required). You can retry from the tray.")
+			notify.Emit(notify.KindProtectFailed, "DenyOut", "Could not turn on Protect computer (admin may be required). You can retry from the tray.")
+			a.showYourSetup("off")
 		} else {
-			notify.Info("DenyOut", "Protect computer is on — Safe desktop. Web works as usual; suspicious links may be blocked.")
+			a.showYourSetup("safe")
 		}
 	case "agents":
 		a.mu.Lock()
@@ -50,11 +51,18 @@ func (a *App) runFirstRunWizard() {
 		a.mu.Unlock()
 		_ = SaveState(st)
 		a.maybeAskAutostart()
-		notify.Info("DenyOut", "Create an agent profile — your computer stays unprotected until you turn Protect computer on.")
-		go a.wizardNewAgent(true)
+		a.showYourSetup("agents")
+		go func() {
+			if a.opts.OpenUI != nil {
+				a.RequestOpenUI("profiles-new")
+				return
+			}
+			a.wizardNewAgent(true)
+		}()
 	default: // not now / cancel
 		a.finishSetupNotNow("")
 		a.maybeAskAutostart()
+		a.showYourSetup("off")
 	}
 }
 
@@ -76,6 +84,47 @@ func (a *App) finishSetupNotNow(extra string) {
 		msg = extra + "\n" + msg
 	}
 	notify.Info("DenyOut", msg)
+}
+
+// showYourSetup explains current mode once after first-run / install.
+func (a *App) showYourSetup(mode string) {
+	a.mu.Lock()
+	if a.state.YourSetupShown {
+		a.mu.Unlock()
+		return
+	}
+	a.state.YourSetupShown = true
+	st := a.state
+	a.mu.Unlock()
+	_ = SaveState(st)
+
+	text := YourSetupText(mode)
+	if dialogToolkitAvailable() {
+		// Q2: offer Open DenyOut once (primary); Got it dismisses without opening.
+		if nativeConfirm("DenyOut — Your setup", text, "Open DenyOut", "Got it") {
+			a.RequestOpenUI("home")
+		}
+		return
+	}
+	notify.Info("DenyOut — Your setup", text)
+}
+
+// YourSetupText is shared EN copy for native + Wails Your setup (Q6).
+func YourSetupText(mode string) string {
+	var status string
+	switch mode {
+	case "safe":
+		status = "You are protected.\nBrowse as usual — we’ll only interrupt for clear risks."
+	case "agents":
+		status = "Protect computer is off for now.\nUse My agents for AI tools, or turn on Protect computer from Home or the tray."
+	default:
+		status = "Protection is off.\nTurn on Protect computer from Home or the tray when you are ready."
+	}
+	return status + "\n\n" +
+		"• When something is blocked: Keep blocked or Allow this site.\n" +
+		"• Open DenyOut (Home) to see if you are protected and what was blocked.\n" +
+		"• If Protect failed, open Problems.\n\n" +
+		"Privacy: decisions stay on this computer."
 }
 
 func nativeFirstRunChoice() string {
@@ -206,7 +255,7 @@ func (a *App) maybeMigrateUXv2() {
 	a.mu.Unlock()
 	_ = SaveState(st)
 	if switchToSafe {
-		notify.Info("DenyOut", "Switched to Safe desktop. Protect AI agents from My agents.")
+		notify.Info("DenyOut", "Switched to Protect computer. Use My agents for AI tools.")
 		if wasOn {
 			a.restartActiveProtector()
 		}
@@ -291,7 +340,7 @@ func (a *App) maybeNotNowNudge() {
 	if time.Since(t) < 36*time.Hour {
 		return
 	}
-	notify.Info("DenyOut", "Protection is still off. Tray → Protect computer when you are ready.")
+	// Intentional Off after Not now: no OS nag (Home/tray stay truthful).
 	a.mu.Lock()
 	a.state.NotNowReminded = true
 	st2 := a.state
@@ -310,34 +359,6 @@ func (a *App) enableSafeDesktop() error {
 	return a.enableComputerFromTray()
 }
 
-// confirmAgentsOnlyWholePC confirms switching Computer to Agents only (default No).
-func (a *App) confirmAgentsOnlyWholePC() {
-	ok := nativeConfirm(
-		"DenyOut — Agents only",
-		"Turn on Agents only for the whole computer?\n\n"+
-			"Messengers and many websites may stop working (raw IPs and unknown hosts are blocked).\n\n"+
-			"Prefer My agents (wrap) for AI tools. You can switch back to Safe desktop anytime.",
-		"Turn on Agents only",
-		"Keep Safe desktop",
-	)
-	if !ok {
-		return
-	}
-	a.stopAllWraps("Agents only on whole PC — stopping wraps")
-	a.mu.Lock()
-	a.state.PolicyProfile = PolicyProfileAgent
-	a.state.AskMode = true
-	a.state.ActiveProfileID = ""
-	st := a.state
-	a.mu.Unlock()
-	_ = SaveState(st)
-	if err := a.enableComputerFromTray(); err != nil {
-		notify.Info("DenyOut", "Could not enable Agents only (admin may be required).")
-		return
-	}
-	notify.Info("DenyOut", "Agents only is on for the whole computer. Tray → Safe desktop to go back.")
-}
-
 func (a *App) switchToSafeDesktopFromTray() {
 	a.mu.Lock()
 	a.state.PolicyProfile = PolicyProfileBrowse
@@ -347,7 +368,6 @@ func (a *App) switchToSafeDesktopFromTray() {
 	wasOn := a.proxyd != nil || a.session != nil
 	a.mu.Unlock()
 	_ = SaveState(st)
-	notify.Info("DenyOut", "Safe desktop — web works as usual.")
 	if wasOn {
 		a.restartActiveProtector()
 	} else {

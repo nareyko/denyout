@@ -6,6 +6,7 @@ const (
 	ReasonUnsafeIP         = "unsafe_ip"
 	ReasonHostNotAllowed   = "host_not_allowed"
 	ReasonHostDenied       = "host_denied"
+	ReasonThreatList       = "threat_list" // Book C subscription hit
 	ReasonPortNotAllowed   = "port_not_allowed"
 	ReasonSecretInURL      = "secret_in_url"
 	ReasonCanaryDetected   = "canary_detected"

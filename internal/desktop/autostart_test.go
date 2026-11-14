@@ -1,33 +1,40 @@
-//go:build linux
-
-package desktop_test
+package desktop
 
 import (
 	"os"
 	"path/filepath"
-	"strings"
+	"runtime"
 	"testing"
-
-	"github.com/nareyko/denyout/internal/desktop"
 )
 
-func TestRegisterAutostartLinux(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	// XDG paths under HOME for this test user
-	if err := desktop.RegisterAutostart(); err != nil {
+func TestAutostartExecLine(t *testing.T) {
+	desktop := filepath.Join("/opt", "denyout-desktop")
+	if got := autostartExecLine(desktop); got != desktop {
+		t.Fatalf("desktop binary: got %q", got)
+	}
+	cli := filepath.Join("/opt", "denyout")
+	want := cli + " desktop"
+	if got := autostartExecLine(cli); got != want {
+		t.Fatalf("cli binary: got %q want %q", got, want)
+	}
+}
+
+func TestDesktopLaunchArgs(t *testing.T) {
+	dir := t.TempDir()
+	self := filepath.Join(dir, "denyout")
+	bin, args := desktopLaunchArgs(self)
+	if bin != self || len(args) != 1 || args[0] != "desktop" {
+		t.Fatalf("without sibling: bin=%q args=%v", bin, args)
+	}
+	sib := filepath.Join(dir, "denyout-desktop")
+	if runtime.GOOS == "windows" {
+		sib += ".exe"
+	}
+	if err := os.WriteFile(sib, []byte{}, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	desktopFile := filepath.Join(home, ".config", "autostart", "denyout.desktop")
-	b, err := os.ReadFile(desktopFile)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(b), "desktop") || !strings.Contains(string(b), "Exec=") {
-		t.Fatalf("unexpected desktop entry:\n%s", b)
-	}
-	unit := filepath.Join(home, ".config", "systemd", "user", "denyout-desktop.service")
-	if _, err := os.Stat(unit); err != nil {
-		t.Fatalf("missing user unit: %v", err)
+	bin, args = desktopLaunchArgs(self)
+	if bin != sib || len(args) != 0 {
+		t.Fatalf("with sibling: bin=%q args=%v", bin, args)
 	}
 }

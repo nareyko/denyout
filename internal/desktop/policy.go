@@ -21,15 +21,6 @@ func normalizePolicyProfile(p string) string {
 	}
 }
 
-func policyProfileLabel(p string) string {
-	switch normalizePolicyProfile(p) {
-	case PolicyProfileAgent:
-		return "Agents only"
-	default:
-		return "Safe desktop"
-	}
-}
-
 // desktopPolicyConfig builds the live policy for proxyd/session from state.
 func (a *App) desktopPolicyConfig() (*policy.Config, error) {
 	a.mu.Lock()
