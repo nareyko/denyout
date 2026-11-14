@@ -39,6 +39,8 @@ If a later code change conflicts with this spec, either update the code or revis
 | D12 | [12-mvp-and-roadmap.md](12-mvp-and-roadmap.md) | Planning (informative) |
 | D13 | [13-competitors.md](13-competitors.md) | Informative |
 | D14 | [14-testing.md](14-testing.md) | **Normative** acceptance tests for MVP |
+| — | [updates/README.md](updates/README.md) | Public app update manifest (no account) |
+| — | [cloud-sync.md](cloud-sync.md) | Optional account settings sync schema (no secrets) |
 | — | [design-decisions.md](design-decisions.md) | Locked technical decisions (public) |
 | — | [IMPLEMENTATION.md](IMPLEMENTATION.md) | Public engineering checklist |
 

@@ -23,7 +23,7 @@ Internal success metrics (M1–M6) and Bet Tree sheets live in private HQ (`deny
 | JSONL audit + stderr denials | |
 | SQLite lab fixture DB + `denyout test run` | M1 corpus |
 | Notifications on Linux/macOS (best-effort); Windows best-effort | |
-| Docs site stub on denyout.com pointing to GitHub | English only |
+| Docs site on denyout.com (install, trust, modes, why-it-blocks, known issues) | English only; private `denyout-web` repo |
 | Examples + acceptance tests for R-20 canaries | |
 
 ### Out of MVP
@@ -82,7 +82,8 @@ Internal success metrics (M1–M6) and Bet Tree sheets live in private HQ (`deny
 
 ### Phase 3 — Productize
 
-- Optional hosted policy sync (still local enforce).  
+- Optional hosted policy sync (still local enforce) — **scaffold shipped**: desktop Account + sync client; interim API in private HQ `services/denyout-api`; production site/API stay in the **private denyout.com web repo**.  
+- Public app update manifest client + Settings check (no account).  
 - Browser helper for R-20 in human UIs.  
 - Commercial support / Arviser bundling.
 

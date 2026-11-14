@@ -58,19 +58,21 @@ type Options struct {
 type App struct {
 	opts Options
 
-	mu         sync.Mutex
-	state      State
-	lastDeny   string
-	status     string
-	protect    *exec.Cmd    // advanced process wrap
-	session    *run.Session // session-mode in-process proxy
-	proxyd     *exec.Cmd    // computer-mode transparent proxy subprocess
-	proxyPort  int
-	wizardURL  string // only set when WebUI is enabled
-	controlURL string // Ask IPC for proxyd
-	asks       *askFlight
-	wraps      map[string]*wrapProc
-	threats    *threatlists.Store // Book C cache (shared across Protect restarts)
+	mu          sync.Mutex
+	state       State
+	lastDeny    string
+	status      string
+	protect     *exec.Cmd    // advanced process wrap
+	session     *run.Session // session-mode in-process proxy
+	proxyd      *exec.Cmd    // computer-mode transparent proxy subprocess
+	proxyPort   int
+	wizardURL   string // only set when WebUI is enabled
+	controlURL  string // Ask IPC for proxyd
+	asks        *askFlight
+	wraps       map[string]*wrapProc
+	threats     *threatlists.Store // Book C cache (shared across Protect restarts)
+	updateHTTP  *http.Client       // optional; tests inject; nil → default
+	accountHTTP *http.Client       // optional; tests inject for account API
 }
 
 func applyNotifyPrefs(st State) {

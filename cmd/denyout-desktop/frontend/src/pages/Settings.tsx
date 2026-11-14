@@ -24,6 +24,9 @@ export function Settings({
   const [filter, setFilter] = useState("");
   const [find, setFind] = useState("");
   const [tab, setTab] = useState<Tab>(initialTab ?? "basic");
+  const [acctEmail, setAcctEmail] = useState("");
+  const [acctCode, setAcctCode] = useState("");
+  const [apiBase, setApiBase] = useState("");
 
   async function reloadThreats() {
     const t = await api.threatLists();
@@ -109,6 +112,9 @@ export function Settings({
               q.includes("agents only") ||
               q.includes("oisd") ||
               q.includes("steven") ||
+              q.includes("account") ||
+              q.includes("sign") ||
+              q.includes("sync") ||
               q.includes("advanced")
             ) {
               setTab("advanced");
@@ -442,6 +448,152 @@ export function Settings({
             </Tip>
           )}
 
+          {showSection(["account", "sign", "sync", "email", "login"]) && (
+            <section className="card" id="settings-account">
+              <h2>Account</h2>
+              <p className="muted">
+                {snap.account_trust_line ||
+                  "Sign in to sync settings across computers. DenyOut works fully without an account."}
+              </p>
+              {snap.account_signed_in ? (
+                <>
+                  <p>
+                    Signed in as <strong className="mono">{snap.account_email}</strong>
+                  </p>
+                  <label className="row-actions" style={{ gap: "0.5rem", alignItems: "center" }}>
+                    <input
+                      type="checkbox"
+                      checked={!!snap.sync_enabled}
+                      onChange={(e) =>
+                        void api
+                          .setSyncEnabled(e.target.checked)
+                          .then(reload)
+                          .catch((err) => setMsg(String(err)))
+                      }
+                    />
+                    <span>Sync settings when signed in</span>
+                  </label>
+                  <div className="row-actions">
+                    <button
+                      className="btn primary"
+                      onClick={() =>
+                        void api
+                          .syncNow()
+                          .then((r) => {
+                            setMsg(r.message);
+                            return reload();
+                          })
+                          .catch((e) => setMsg(String(e)))
+                      }
+                    >
+                      Sync now
+                    </button>
+                    <button
+                      className="btn"
+                      onClick={() => void api.signOut().then(reload).catch((e) => setMsg(String(e)))}
+                    >
+                      Sign out
+                    </button>
+                    <button
+                      className="btn danger"
+                      onClick={() => {
+                        if (
+                          !confirm(
+                            "Delete your DenyOut cloud account and synced settings? Local Protect settings stay on this computer.",
+                          )
+                        ) {
+                          return;
+                        }
+                        void api
+                          .deleteCloudData()
+                          .then(() => {
+                            setMsg("Cloud account deleted. Local settings unchanged.");
+                            return reload();
+                          })
+                          .catch((e) => setMsg(String(e)));
+                      }}
+                    >
+                      Delete cloud data
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="muted">Protect does not need an account.</p>
+                  <div className="stack" style={{ gap: "0.5rem", maxWidth: "28rem" }}>
+                    <input
+                      placeholder="Email"
+                      value={acctEmail}
+                      onChange={(e) => setAcctEmail(e.target.value)}
+                      autoComplete="email"
+                    />
+                    <div className="row-actions">
+                      <button
+                        className="btn"
+                        onClick={() =>
+                          void api
+                            .requestMagicLink(acctEmail)
+                            .then(() =>
+                              setMsg(
+                                "If the API is reachable, check email (or API logs in local stub) for a one-time code.",
+                              ),
+                            )
+                            .catch((e) => setMsg(String(e)))
+                        }
+                      >
+                        Email me a code
+                      </button>
+                    </div>
+                    <input
+                      placeholder="One-time code"
+                      value={acctCode}
+                      onChange={(e) => setAcctCode(e.target.value)}
+                      autoComplete="one-time-code"
+                    />
+                    <div className="row-actions">
+                      <button
+                        className="btn primary"
+                        onClick={() =>
+                          void api
+                            .verifyMagicLink(acctEmail, acctCode)
+                            .then(() => {
+                              setAcctCode("");
+                              setMsg("Signed in.");
+                              return reload();
+                            })
+                            .catch((e) => setMsg(String(e)))
+                        }
+                      >
+                        Sign in
+                      </button>
+                    </div>
+                    <details>
+                      <summary className="muted">API server (advanced)</summary>
+                      <input
+                        placeholder="https://api.denyout.com"
+                        value={apiBase}
+                        onChange={(e) => setApiBase(e.target.value)}
+                        style={{ marginTop: "0.5rem", width: "100%" }}
+                      />
+                      <button
+                        className="btn"
+                        style={{ marginTop: "0.35rem" }}
+                        onClick={() =>
+                          void api
+                            .setAccountAPIBase(apiBase)
+                            .then(() => setMsg("API base saved."))
+                            .catch((e) => setMsg(String(e)))
+                        }
+                      >
+                        Save API base
+                      </button>
+                    </details>
+                  </div>
+                </>
+              )}
+            </section>
+          )}
+
           {showSection([
             "always allow",
             "always-allow",
@@ -674,7 +826,7 @@ export function Settings({
             </section>
           )}
 
-          {showSection(["diagn", "log", "audit", "test", "version"]) && (
+          {showSection(["diagn", "log", "audit", "test", "version", "update"]) && (
             <section className="card" id="settings-diagnostics">
               <h2>Diagnostics</h2>
               <p className="mono muted">Version {snap.version || "dev"}</p>
@@ -693,7 +845,33 @@ export function Settings({
                 >
                   Test protection…
                 </button>
+                <button
+                  className="btn"
+                  onClick={() =>
+                    void api
+                      .checkForUpdates()
+                      .then((v) => {
+                        setMsg(v.message);
+                        return reload();
+                      })
+                      .catch((e) => setMsg(String(e)))
+                  }
+                >
+                  Check for updates
+                </button>
+                {snap.update_available && snap.update_url ? (
+                  <button
+                    className="btn primary"
+                    onClick={() => void api.openUpdateURL().catch((e) => setMsg(String(e)))}
+                  >
+                    Open update {snap.update_version || ""}
+                  </button>
+                ) : null}
               </div>
+              <p className="muted" style={{ marginTop: "0.75rem" }}>
+                Update checks use a public version file — no sign-in. Protect still works if the check
+                fails.
+              </p>
               <p className="muted" style={{ marginTop: "0.75rem" }}>
                 Privacy: decisions stay on this computer.
               </p>

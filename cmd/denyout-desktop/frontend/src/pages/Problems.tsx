@@ -78,6 +78,22 @@ export function Problems({ onOpenActivity }: { onOpenActivity?: () => void }) {
         )}
       </section>
 
+      {p.update_available && (
+        <section className="card">
+          <h2>Update available</h2>
+          <p className="muted">
+            DenyOut {p.update_version || "newer"} is ready. No sign-in needed — open the release when
+            you want.
+          </p>
+          <button
+            className="btn"
+            onClick={() => void api.openUpdateURL().catch((e) => setMsg(String(e)))}
+          >
+            Open release
+          </button>
+        </section>
+      )}
+
       {(p.last_deny_host || unhealthy) && (
         <section className="card">
           <h2>Last blocked</h2>

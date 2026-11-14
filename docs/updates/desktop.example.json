@@ -1,0 +1,7 @@
+{
+  "version": "0.3.0",
+  "channel": "stable",
+  "url": "https://github.com/nareyko/denyout/releases/tag/v0.3.0",
+  "notes": "Example public update manifest. No authentication required.",
+  "published_at": "2026-11-14T00:00:00Z"
+}

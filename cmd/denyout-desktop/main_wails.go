@@ -203,6 +203,24 @@ func (b *Bridge) UISetThreatPollHours(hours int) error {
 func (b *Bridge) UIRefreshThreatLists() (desktop.ThreatListsView, error) {
 	return b.app.UIRefreshThreatLists()
 }
+func (b *Bridge) UICheckForUpdates() (desktop.UpdateCheckView, error) {
+	return b.app.UICheckForUpdates()
+}
+func (b *Bridge) UIOpenUpdateURL() error              { return b.app.UIOpenUpdateURL() }
+func (b *Bridge) GetAccountView() desktop.AccountView { return b.app.GetAccountView() }
+func (b *Bridge) UIRequestMagicLink(email string) error {
+	return b.app.UIRequestMagicLink(email)
+}
+func (b *Bridge) UIVerifyMagicLink(email, code string) error {
+	return b.app.UIVerifyMagicLink(email, code)
+}
+func (b *Bridge) UISignOut() error         { return b.app.UISignOut() }
+func (b *Bridge) UIDeleteCloudData() error { return b.app.UIDeleteCloudData() }
+func (b *Bridge) UISetAccountAPIBase(base string) error {
+	return b.app.UISetAccountAPIBase(base)
+}
+func (b *Bridge) UISetSyncEnabled(on bool) error         { return b.app.UISetSyncEnabled(on) }
+func (b *Bridge) UISyncNow() (desktop.SyncResult, error) { return b.app.UISyncNow() }
 
 func main() {
 	noTray := flag.Bool("no-tray", false, "disable system tray (debug)")

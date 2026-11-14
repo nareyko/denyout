@@ -199,12 +199,15 @@ Dropped — Home covers first open.
 
 | Card | Copy / controls |
 | --- | --- |
+| Account | Sign in to sync settings across computers. DenyOut works fully without an account. |
+| | Email · **Email me a code** · One-time code · **Sign in** · (signed in) Sync settings · **Sync now** · **Sign out** · **Delete cloud data** |
 | Sites I’ve allowed or silenced | Allowed + Silenced (Keep blocked) · Filter · **Undo last allow** · Remove / Clear |
 | Agents only (whole PC) | Almost nobody needs this… Prefer My agents. |
 | | **Enable Agents only (whole PC)…** |
 | Confirm | Turn on Agents only for the whole computer? Messengers… Prefer My agents… Only continue if you understand the risk. |
 | Asks | After many Ask prompts… · **Resume asks** / **Asks not paused** |
-| Diagnostics | Version · Logs · Audit · **Open diagnostics folder** · **Test protection…** |
+| Diagnostics | Version · Logs · Audit · **Open diagnostics folder** · **Test protection…** · **Check for updates** · Open update |
+| | Update checks use a public version file — no sign-in. Protect still works if the check fails. |
 | | Privacy: decisions stay on this computer. |
 
 ---
@@ -214,6 +217,7 @@ Dropped — Home covers first open.
 | Card | Copy / controls |
 | --- | --- |
 | Summary | Fix-first headline · **Retry Protect computer** · **Copy last error** · **Open diagnostics** · error pre when present |
+| Update available | DenyOut {version} is ready. No sign-in needed — **Open release** |
 | Last blocked | Host / URL / summary · **Open in History** · Empty: No recent denial recorded. |
 | Details | Health: Mode · Control IPC · Proxyd · Session proxy · CA · Clipboard · log path |
 

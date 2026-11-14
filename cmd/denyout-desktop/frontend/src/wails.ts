@@ -59,6 +59,24 @@ export type UISnapshot = {
   problems_alert: boolean;
   your_setup_text: string;
   checklist_done: boolean;
+  update_available?: boolean;
+  update_version?: string;
+  update_url?: string;
+  update_notes?: string;
+  account_signed_in?: boolean;
+  account_email?: string;
+  account_trust_line?: string;
+  sync_enabled?: boolean;
+};
+
+export type UpdateCheckView = {
+  newer: boolean;
+  local: string;
+  remote_version?: string;
+  url?: string;
+  notes?: string;
+  message: string;
+  checked_at?: string;
 };
 
 export type ThreatFeedView = {
@@ -104,6 +122,9 @@ export type ProblemsView = {
   audit_path: string;
   status: string;
   mode_label: string;
+  update_available?: boolean;
+  update_version?: string;
+  update_url?: string;
 };
 
 export type AppliedPack = {
@@ -186,6 +207,22 @@ type Bridge = {
   UISetAdvancedThreatFeed(id: string, on: boolean): Promise<void>;
   UISetThreatPollHours(hours: number): Promise<void>;
   UIRefreshThreatLists(): Promise<ThreatListsView>;
+  UICheckForUpdates(): Promise<UpdateCheckView>;
+  UIOpenUpdateURL(): Promise<void>;
+  GetAccountView(): Promise<{
+    signed_in: boolean;
+    email?: string;
+    api_base?: string;
+    sync_enabled: boolean;
+    trust_line: string;
+  }>;
+  UIRequestMagicLink(email: string): Promise<void>;
+  UIVerifyMagicLink(email: string, code: string): Promise<void>;
+  UISignOut(): Promise<void>;
+  UIDeleteCloudData(): Promise<void>;
+  UISetAccountAPIBase(base: string): Promise<void>;
+  UISetSyncEnabled(on: boolean): Promise<void>;
+  UISyncNow(): Promise<{ ok: boolean; message: string; pushed?: boolean; pulled?: boolean }>;
   UIReady(): Promise<void>;
   UIResolveDecision(id: string, action: string): Promise<void>;
 };
@@ -258,6 +295,16 @@ export const api = {
     bridge().UISetAdvancedThreatFeed(id, on),
   setThreatPollHours: (hours: number) => bridge().UISetThreatPollHours(hours),
   refreshThreatLists: () => bridge().UIRefreshThreatLists(),
+  checkForUpdates: () => bridge().UICheckForUpdates(),
+  openUpdateURL: () => bridge().UIOpenUpdateURL(),
+  accountView: () => bridge().GetAccountView(),
+  requestMagicLink: (email: string) => bridge().UIRequestMagicLink(email),
+  verifyMagicLink: (email: string, code: string) => bridge().UIVerifyMagicLink(email, code),
+  signOut: () => bridge().UISignOut(),
+  deleteCloudData: () => bridge().UIDeleteCloudData(),
+  setAccountAPIBase: (base: string) => bridge().UISetAccountAPIBase(base),
+  setSyncEnabled: (on: boolean) => bridge().UISetSyncEnabled(on),
+  syncNow: () => bridge().UISyncNow(),
   ready: () => bridge().UIReady(),
   resolveDecision: (id: string, action: string) => bridge().UIResolveDecision(id, action),
   onNavigate: (cb: (route: string) => void) => {

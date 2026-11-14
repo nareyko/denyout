@@ -69,6 +69,14 @@ type UISnapshot struct {
 	ProblemsAlert      bool        `json:"problems_alert"`
 	YourSetupText      string      `json:"your_setup_text"`
 	ChecklistDone      bool        `json:"checklist_done"`
+	UpdateAvailable    bool        `json:"update_available"`
+	UpdateVersion      string      `json:"update_version,omitempty"`
+	UpdateURL          string      `json:"update_url,omitempty"`
+	UpdateNotes        string      `json:"update_notes,omitempty"`
+	AccountSignedIn    bool        `json:"account_signed_in"`
+	AccountEmail       string      `json:"account_email,omitempty"`
+	AccountTrustLine   string      `json:"account_trust_line,omitempty"`
+	SyncEnabled        bool        `json:"sync_enabled"`
 }
 
 // ProblemsView is the Problems screen payload.
@@ -86,6 +94,9 @@ type ProblemsView struct {
 	AuditPath       string `json:"audit_path"`
 	Status          string `json:"status"`
 	ModeLabel       string `json:"mode_label"`
+	UpdateAvailable bool   `json:"update_available"`
+	UpdateVersion   string `json:"update_version,omitempty"`
+	UpdateURL       string `json:"update_url,omitempty"`
 }
 
 // ProfileView is a profile row for the Profiles screen.
@@ -100,7 +111,7 @@ func (a *App) GetUISnapshot() UISnapshot {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	mode := uiModeLocked(a)
-	return UISnapshot{
+	snap := UISnapshot{
 		Version:            a.opts.Version,
 		Status:             a.status,
 		Mode:               mode,
@@ -132,6 +143,18 @@ func (a *App) GetUISnapshot() UISnapshot {
 		YourSetupText:      YourSetupText(mode),
 		ChecklistDone:      tipDismissedLocked(a, "checklist"),
 	}
+	if newer, ver, url, notes := updateTipLocked(a); newer {
+		snap.UpdateAvailable = true
+		snap.UpdateVersion = ver
+		snap.UpdateURL = url
+		snap.UpdateNotes = notes
+	}
+	acc := accountViewLocked(a)
+	snap.AccountSignedIn = acc.SignedIn
+	snap.AccountEmail = acc.Email
+	snap.AccountTrustLine = acc.TrustLine
+	snap.SyncEnabled = acc.SyncEnabled
+	return snap
 }
 
 // countBlockedToday counts audit denials whose timestamp falls on local calendar day of now.
@@ -565,7 +588,7 @@ func (a *App) GetProblems() ProblemsView {
 	defer a.mu.Unlock()
 	ca := filepath.Join(CADir(), "ca.crt")
 	_, caErr := os.Stat(ca)
-	return ProblemsView{
+	pv := ProblemsView{
 		LastError:       LastErrorSummary(),
 		LastDenyHost:    a.state.LastDenyHost,
 		LastDenyURL:     a.state.LastDenyURL,
@@ -580,6 +603,12 @@ func (a *App) GetProblems() ProblemsView {
 		Status:          a.status,
 		ModeLabel:       uiModeLabel(uiModeLocked(a)),
 	}
+	if newer, ver, url, _ := updateTipLocked(a); newer {
+		pv.UpdateAvailable = true
+		pv.UpdateVersion = ver
+		pv.UpdateURL = url
+	}
+	return pv
 }
 
 // UIOpenLogs opens the diagnostics folder.

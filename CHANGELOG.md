@@ -4,6 +4,9 @@
 
 ### Added
 
+- **Optional Account + sync** (Settings → Advanced): magic-link sign-in / sign out; **Sync now** pull/push with last-write-wins; **Delete cloud data** (server account + blob); local-only when signed out. Protect never requires an account. UX: [`docs/07-desktop-ux.md`](docs/07-desktop-ux.md), [`docs/cloud-sync.md`](docs/cloud-sync.md).
+- **Cloud sync schema** (`internal/cloudsync` + desktop export/apply map): versioned settings blob for optional signed-in sync; never includes audit/secrets.
+- **App updates (no account):** `internal/updates` public JSON client + desktop **Check for updates** (Settings → Diagnostics); Home/Problems tip when newer; fail-open if offline. Example: [`docs/updates/desktop.example.json`](docs/updates/desktop.example.json).
 - **Threat lists (Book C):** Phishing Army + URLhaus (on after first good fetch) + optional Stronger (HaGeZi TIF medium); Settings Basic toggles, poll interval, Refresh now; reason `threat_list` → post-block HITL. Advanced optional OISD / StevenBlack (off). Product unbreak (Book D) + read-only Product exceptions. Plan/QA: [`docs/ux-iters/threat-lists-plan.md`](docs/ux-iters/threat-lists-plan.md), [`docs/ux-iters/threat-lists-qa.md`](docs/ux-iters/threat-lists-qa.md).
 - **Agent allow packs:** `cursor-starter` / `claude-starter`; ask on new agent; Undo pack in My agents.
 - Docs: normative desktop UX inventory [`docs/07-desktop-ux.md`](docs/07-desktop-ux.md) (install, tray, menu, every screen).

@@ -177,7 +177,7 @@ Normative detail: [`ux-iters/home.md`](ux-iters/home.md) (v2). Research: [`ux-it
 
 **Must not on Home:** tables, Filters, charts, reason codes, health/IPC, Jump, allow-lists, Agents only.
 
-Optional quiet line only: `Blocked today: N`. Footer text links at most: Settings · For AI tools.
+Optional quiet lines: `Blocked today: N`; when a newer app build was detected — **Newer DenyOut available** · Open release · Settings (never asks to sign in). Footer text links at most: Settings · For AI tools.
 
 ---
 
@@ -232,19 +232,21 @@ Tip: everyday protection; Agents only under Advanced.
 
 Tip: lists, diagnostics, whole-PC Agents only.  
 
+**Account** (optional) — trust line: *Sign in to sync settings across computers. DenyOut works fully without an account.* Email one-time code · Sign in · Sign out · **Sync settings when signed in** · **Sync now** · **Delete cloud data** (cloud account only; local Protect unchanged). API base under a collapsed advanced detail (local/stub). **Protect never requires an account.** Detail: [`cloud-sync.md`](cloud-sync.md).
+
 **Sites I’ve allowed or silenced** — Allowed + Silenced (Keep blocked) + filter + Undo last allow.  
 
 **Optional lists (not core)** — OISD small / OISD big / StevenBlack (default off; ad/tracker warning on enable). Not network-wide adblocking.  
 
 **Agents only (whole PC)** — “Almost nobody needs this” + confirm.  
 
-**Asks** (Resume asks) · **Diagnostics** · Privacy.
+**Asks** (Resume asks) · **Diagnostics** (version · logs · audit · Test protection · **Check for updates** / Open update — public manifest, no sign-in; fail-open) · Privacy.
 
 ---
 
 ## 5.4 Screen: Problems — additional (when broken)
 
-Fix-first summary · **Retry Protect computer** · **Copy last error** · Open diagnostics · Last blocked → History · Health under **Details**.  
+Fix-first summary · **Retry Protect computer** · **Copy last error** · Open diagnostics · optional **Update available** card (Open release; no sign-in) · Last blocked → History · Health under **Details**.  
 Surfaces on Home only via needs-help state + nav badge — not as a peer home.
 
 ---
@@ -289,3 +291,5 @@ No false-deny of normal API auth on Safe (0.2.1).
 
 Tips / Your setup / checklist in desktop state JSON. Logs under `~/.local/state/denyout/` (Linux XDG).  
 Threat list cache: `~/.local/state/denyout/threatlists/` (feeds stay on this computer).
+
+**Optional account:** signing in may sync a settings document (allows, keeps, toggles — never audit bodies or secrets) to `api.denyout.com`. App **update checks** use a public version file with no account. Signed-out users keep full Protect and local settings.

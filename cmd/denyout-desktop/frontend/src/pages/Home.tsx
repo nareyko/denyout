@@ -158,6 +158,25 @@ export function Home({
         </p>
       )}
 
+      {snap?.update_available && (
+        <p className="home-quiet muted">
+          Newer DenyOut available{snap.update_version ? ` (${snap.update_version})` : ""}.{" "}
+          <button
+            type="button"
+            className="linkish"
+            onClick={() =>
+              void api.openUpdateURL().catch((e) => setMsg(String(e)))
+            }
+          >
+            Open release
+          </button>
+          {" · "}
+          <button type="button" className="linkish" onClick={() => onOpenSettings?.()}>
+            Settings
+          </button>
+        </p>
+      )}
+
       <nav className="home-doors" aria-label="More">
         <button type="button" className="linkish" onClick={() => onOpenSettings?.()}>
           Settings

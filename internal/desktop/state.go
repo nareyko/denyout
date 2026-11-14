@@ -51,6 +51,25 @@ type State struct {
 	PostBlockTaught    bool        `json:"post_block_taught,omitempty"`
 	YourSetupShown     bool        `json:"your_setup_shown,omitempty"`
 	DismissedTips      []string    `json:"dismissed_tips,omitempty"` // tip ids closed forever
+	// Program update tip (public manifest; no account).
+	UpdateManifestURL      string `json:"update_manifest_url,omitempty"` // empty → default denyout.com URL
+	UpdateAvailableVersion string `json:"update_available_version,omitempty"`
+	UpdateAvailableURL     string `json:"update_available_url,omitempty"`
+	UpdateAvailableNotes   string `json:"update_available_notes,omitempty"`
+	UpdateCheckedAt        string `json:"update_checked_at,omitempty"` // RFC3339
+	// Cloud sync (opt-in when signed in) — local copy of syncable prefs.
+	RememberedSignalAllows []string `json:"remembered_signal_allows,omitempty"` // host|signal_type
+	SensitiveSinksEnabled  *bool    `json:"sensitive_sinks_enabled,omitempty"`  // nil = default ON when feature ships
+	SensitiveWritesEnabled *bool    `json:"sensitive_writes_enabled,omitempty"`
+	BodyPureA              bool     `json:"body_pure_a,omitempty"`
+	AntiChunkEnabled       bool     `json:"anti_chunk_enabled,omitempty"`
+	ConfigUpdatedAt        string   `json:"config_updated_at,omitempty"` // RFC3339 for sync LWW
+	// Optional denyout.com account (never required for Protect).
+	AccountAPIBase string `json:"account_api_base,omitempty"`
+	AccountEmail   string `json:"account_email,omitempty"`
+	AccountToken   string `json:"account_token,omitempty"` // local session; not synced to cloud blob
+	SyncEnabled    bool   `json:"sync_enabled,omitempty"`
+	SyncEnabledSet bool   `json:"sync_enabled_set,omitempty"` // distinguish default vs user choice
 }
 
 // TimedRule is a temporary allow or deny for a host (optional reason key).
