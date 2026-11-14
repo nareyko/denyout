@@ -2,22 +2,21 @@ package desktop_test
 
 import (
 	"context"
-	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/nareyko/denyout/internal/desktop"
 )
 
-func TestSessionEnvWrittenOnRestore(t *testing.T) {
+func TestLegacySessionClearedOnRestore(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
 
 	st := desktop.DefaultState()
 	st.SetupDone = true
+	st.UXv2Migrated = true
 	st.Scope = desktop.ScopeSession
 	st.ProtectionOn = true
 	st.ComputerAvailable = false
@@ -32,15 +31,10 @@ func TestSessionEnvWrittenOnRestore(t *testing.T) {
 		errCh <- desktop.Run(ctx, desktop.Options{NoTray: true, Version: "test"})
 	}()
 
-	deadline := time.Now().Add(8 * time.Second)
-	envPath := filepath.Join(home, ".config", "denyout", "session-env")
+	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
-		b, err := os.ReadFile(envPath)
-		if err == nil && strings.Contains(string(b), "HTTP_PROXY=http://127.0.0.1:") {
-			linuxEnv := filepath.Join(home, ".config", "environment.d", "90denyout.conf")
-			if _, err := os.Stat(linuxEnv); err != nil {
-				t.Fatalf("missing environment.d drop-in: %v", err)
-			}
+		got := desktop.LoadState()
+		if !got.ProtectionOn && got.Scope != desktop.ScopeSession {
 			cancel()
 			select {
 			case err := <-errCh:
@@ -48,12 +42,12 @@ func TestSessionEnvWrittenOnRestore(t *testing.T) {
 					t.Fatal(err)
 				}
 			case <-time.After(5 * time.Second):
-				t.Fatal("desktop did not exit after cancel (session stop hang?)")
+				t.Fatal("desktop did not exit")
 			}
 			return
 		}
 		time.Sleep(40 * time.Millisecond)
 	}
 	cancel()
-	t.Fatal("session-env not written after restore")
+	t.Fatalf("expected legacy session cleared, got %+v", desktop.LoadState())
 }

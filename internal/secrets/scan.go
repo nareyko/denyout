@@ -19,7 +19,7 @@ var highConfidenceQueryParams = map[string]struct{}{
 	"access_token": {}, "refresh_token": {}, "id_token": {},
 	"api_key": {}, "apikey": {}, "api-key": {},
 	"authorization": {},
-	"private_key": {}, "client_secret": {}, "aws_secret_access_key": {},
+	"private_key":   {}, "client_secret": {}, "aws_secret_access_key": {},
 	// Vendor / connection params (egress exfil often uses these names).
 	"dd_api_key": {}, "dd_app_key": {}, "datadog_api_key": {}, "datadog_app_key": {},
 	"database_url": {}, "db_url": {}, "connection_string": {},
@@ -46,32 +46,32 @@ var namedQueryParams = func() map[string]struct{} {
 }()
 
 var (
-	reOpenAI    = regexp.MustCompile(`sk-[A-Za-z0-9_\-]{20,}`) // covers sk-ant- too
-	reStripe    = regexp.MustCompile(`(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{16,}`)
-	reGitHub    = regexp.MustCompile(`gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}`)
-	reGitLab    = regexp.MustCompile(`gl(?:pat|ptt|rt|dt)-[A-Za-z0-9_\-]{10,}`)
-	reAWS       = regexp.MustCompile(`(?:AKIA|ASIA)[0-9A-Z]{16}`) // not AROA (role id, not a secret)
+	reOpenAI      = regexp.MustCompile(`sk-[A-Za-z0-9_\-]{20,}`) // covers sk-ant- too
+	reStripe      = regexp.MustCompile(`(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{16,}`)
+	reGitHub      = regexp.MustCompile(`gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}`)
+	reGitLab      = regexp.MustCompile(`gl(?:pat|ptt|rt|dt)-[A-Za-z0-9_\-]{10,}`)
+	reAWS         = regexp.MustCompile(`(?:AKIA|ASIA)[0-9A-Z]{16}`)        // not AROA (role id, not a secret)
 	reAWSSecret40 = regexp.MustCompile(`[A-Za-z0-9]{20}[A-Za-z0-9+/]{20}`) // 40-char secret-ish; gated by access-key pair
-	reGoogle    = regexp.MustCompile(`AIza[0-9A-Za-z\-_]{35}`)
-	reSlack     = regexp.MustCompile(`xox[baprst]-[A-Za-z0-9\-]{10,}`)
-	reSlackHook = regexp.MustCompile(`hooks\.slack\.com/services/[A-Za-z0-9/_-]+`)
-	reSendGrid  = regexp.MustCompile(`SG\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}`)
+	reGoogle      = regexp.MustCompile(`AIza[0-9A-Za-z\-_]{35}`)
+	reSlack       = regexp.MustCompile(`xox[baprst]-[A-Za-z0-9\-]{10,}`)
+	reSlackHook   = regexp.MustCompile(`hooks\.slack\.com/services/[A-Za-z0-9/_-]+`)
+	reSendGrid    = regexp.MustCompile(`SG\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}`)
 	reHuggingFace = regexp.MustCompile(`hf_[A-Za-z0-9]{20,}`)
-	reNPM       = regexp.MustCompile(`npm_[A-Za-z0-9]{20,}`)
-	rePyPI      = regexp.MustCompile(`pypi-AgEIcHlwaS5vcmc[A-Za-z0-9_-]+`)
-	reTelegram  = regexp.MustCompile(`[0-9]{8,10}:[A-Za-z0-9_-]{35,}`)
+	reNPM         = regexp.MustCompile(`npm_[A-Za-z0-9]{20,}`)
+	rePyPI        = regexp.MustCompile(`pypi-AgEIcHlwaS5vcmc[A-Za-z0-9_-]+`)
+	reTelegram    = regexp.MustCompile(`[0-9]{8,10}:[A-Za-z0-9_-]{35,}`)
 	// Discord: require bot-like first segment prefix (M/N/O) to cut semver/package FPs.
-	reDiscord   = regexp.MustCompile(`[MNO][A-Za-z0-9_-]{23,29}\.[A-Za-z0-9_-]{5,7}\.[A-Za-z0-9_-]{25,}`)
+	reDiscord      = regexp.MustCompile(`[MNO][A-Za-z0-9_-]{23,29}\.[A-Za-z0-9_-]{5,7}\.[A-Za-z0-9_-]{25,}`)
 	reDigitalOcean = regexp.MustCompile(`dop_v1_[a-f0-9]{32,}`)
-	reShopify   = regexp.MustCompile(`shp(?:at|ca|pa|ss)_[A-Za-z0-9]{20,}`)
-	reHex32     = regexp.MustCompile(`(?i)^[a-f0-9]{32}$`)
+	reShopify      = regexp.MustCompile(`shp(?:at|ca|pa|ss)_[A-Za-z0-9]{20,}`)
+	reHex32        = regexp.MustCompile(`(?i)^[a-f0-9]{32}$`)
 	// In URL/body require the header name; bare "Basic …" is too noisy.
-	reBasicAuth = regexp.MustCompile(`(?i)Authorization:\s*Basic\s+[A-Za-z0-9+/]{12,}={0,2}`)
+	reBasicAuth      = regexp.MustCompile(`(?i)Authorization:\s*Basic\s+[A-Za-z0-9+/]{12,}={0,2}`)
 	reBasicAuthValue = regexp.MustCompile(`(?i)^Basic\s+[A-Za-z0-9+/]{12,}={0,2}$`)
-	reDBURI     = regexp.MustCompile(`(?i)\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|rediss|amqp|amqps|mssql|sqlserver)://[^\s/:]+:[^\s/@]+@`)
-	reAzureConn = regexp.MustCompile(`(?i)AccountKey=[A-Za-z0-9+/=]{20,}`)
-	reJWT       = regexp.MustCompile(`eyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}`)
-	rePEM       = regexp.MustCompile(`-----BEGIN (RSA |OPENSSH |EC )?PRIVATE KEY-----`)
+	reDBURI          = regexp.MustCompile(`(?i)\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|rediss|amqp|amqps|mssql|sqlserver)://[^\s/:]+:[^\s/@]+@`)
+	reAzureConn      = regexp.MustCompile(`(?i)AccountKey=[A-Za-z0-9+/=]{20,}`)
+	reJWT            = regexp.MustCompile(`eyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}`)
+	rePEM            = regexp.MustCompile(`-----BEGIN (RSA |OPENSSH |EC )?PRIVATE KEY-----`)
 )
 
 // Options controls optional detectors.
@@ -276,10 +276,7 @@ func isValidSigV4Query(q url.Values) bool {
 			return false
 		}
 	}
-	if q.Get("X-Amz-Algorithm") != "AWS4-HMAC-SHA256" {
-		return false
-	}
-	return true
+	return q.Get("X-Amz-Algorithm") == "AWS4-HMAC-SHA256"
 }
 
 func scanTokenShapes(blob, reason string) []Hit {

@@ -4,7 +4,7 @@
 
 Site: [https://denyout.com](https://denyout.com) · Canon GitHub (planned): [`nareyko/denyout`](https://github.com/nareyko/denyout)
 
-Agents that can read untrusted text, see sensitive data, and reach the network form a [lethal trifecta](https://arviser.com/guides/lethal-trifecta). DenyOut puts a local policy proxy on the path: **Protect this computer** defaults to an **Agent** allowlist (Rule of Two on egress — models/registries/git; Ask for new hosts); **Browse** restores allow-web + scanners. **Advanced / `denyout run`** default-denies except an allowlist. Audit stays out of the agent’s reach. See [CHANGELOG](CHANGELOG.md) 0.1.9.
+Agents that can read untrusted text, see sensitive data, and reach the network form a [lethal trifecta](https://arviser.com/guides/lethal-trifecta). DenyOut puts a local policy proxy on the path: **Protect computer** defaults to **Safe desktop** (web works; secret-looking links blocked). **My agents** wraps python/CLI tools under an allowlist with rare Ask. Whole-PC **Agents only** is intentional (confirm). Audit stays on-device. See [CHANGELOG](CHANGELOG.md).
 
 ```bash
 # Linux / macOS — silent; auto-detects Desktop (GUI) vs Server (headless)
@@ -14,28 +14,32 @@ curl -fsSL https://raw.githubusercontent.com/nareyko/denyout/main/install.sh | s
 #   curl … | sh -s -- --server
 #   DENYOUT_INSTALL_MODE=desktop|server sh install.sh
 
-# Desktop: tries whole-computer Protect once (admin), else Session (proxy env);
-# registers login autostart and starts the tray in the background.
-denyout desktop                 # tray (restores last scope)
+# Desktop: Safe desktop + tray (admin once; stays Off if admin fails — no Session fallback)
+denyout desktop                 # tray (restores Protect computer if left on)
+denyout profile create --name bot -- python app.py
+denyout run --profile bot
 # denyout desktop --web-ui      # optional localhost UI for tests only
 
 # Advanced / CI — wrap one process
 denyout run -- curl -I https://api.anthropic.com
+denyout run --sandbox=srt -- python app.py   # Stronger isolation (requires srt)
 
 # from this repo (dev)
 go run ./cmd/denyout version
 go run ./cmd/denyout check 'https://evil.example/x?api_key=DENYOUT_CANARY_LAB'
 ```
 
-**Scopes (tray):**
-- **Computer** — transparent redirect + system CA (admin password once).
-- **Session** — local HTTP proxy + `HTTP(S)_PROXY` for apps that honor it (no admin). Browsers may ignore proxy; use Computer for full coverage.
+**Tray:**
+- **Protect computer** — Safe desktop (transparent redirect + CA; admin once).
+- **My agents…** — named wrap profiles (Ask / learning / optional Stronger isolation).
+- **Agents only (whole PC)…** — intentional confirm; messengers may break.
+- **Off** — turns Protect computer off (does not stop running wrapped agents).
 
 Windows: download the zip from [Releases](https://github.com/nareyko/denyout/releases) and follow [`docs/install-windows.md`](docs/install-windows.md).
 
 ## Status
 
-**Protect this computer** is the primary desktop path (transparent HTTP/S + CA). Session mode is the no-admin fallback. Advanced wraps one process. Remaining for the Dec 1 bet: timed **M4** install on three OS; Windows WinDivert bridge packaging.
+**Protect computer (Safe desktop)** is the primary desktop path. **My agents** wraps AI/tools. Admin failure stays Off (no silent Session). Remaining for the Dec 1 bet: timed **M4** install on three OS; Windows WinDivert bridge packaging.
 
 **Language:** English only · **License:** Apache-2.0 · **Platforms:** Ubuntu, macOS, Windows.
 
@@ -74,8 +78,8 @@ Examples: [`examples/`](examples/). Schema: [`schemas/`](schemas/).
 
 Normative claims: [`docs/10-security-boundaries.md`](docs/10-security-boundaries.md).
 
-- **May claim:** with Protect this computer **On**, DenyOut protects **this user’s outbound web (HTTP/HTTPS)**; blocks secret-in-URL / canaries / hard SSRF patterns it can see; optional Ask mode for new hosts.
-- **Must not claim:** unbypassable, prompt-injection cure, phone coverage, or protection while Off / when hostguard failed (Needs admin). Session mode only covers apps that honor `HTTP(S)_PROXY`.
+- **May claim:** with Protect computer **On** (Safe desktop), DenyOut protects **this user’s outbound web (HTTP/HTTPS)** against secret-looking links / canaries / hard SSRF; Agents only / wraps limit destinations to an allowlist (Ask when enabled).
+- **Must not claim:** unbypassable, prompt-injection cure, phone coverage, or protection while Off / when hostguard failed. Without Stronger isolation (`srt`), some tools can bypass the proxy.
 - Residual: UDP, DoH, custom stacks; Windows needs WinDivert bridge for computer mode.
 
 ## One-line pitch

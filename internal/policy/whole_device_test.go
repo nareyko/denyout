@@ -29,6 +29,22 @@ func TestWholeDeviceAgentDeniesUnknownAllowsModels(t *testing.T) {
 		t.Fatalf("anthropic: want allow, got %+v", allowModel)
 	}
 
+	for _, u := range []string{
+		"https://api2.cursor.sh/",
+		"https://metrics.cursor.sh/",
+		"https://api.origin.cursor.com/",
+		"https://agentn.global.api5.cursor.sh/",
+		"https://downloads.cursor.com/",
+	} {
+		d, err := eng.EvaluateURL(u)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if d.Verdict != "allow" {
+			t.Fatalf("cursor allowlist %s: want allow, got %+v", u, d)
+		}
+	}
+
 	secret, err := eng.EvaluateURL("https://api.anthropic.com/?api_key=sk-ant-testvalue123456")
 	if err != nil {
 		t.Fatal(err)

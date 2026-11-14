@@ -39,11 +39,11 @@ var _ = iconPNG
 
 // Options for denyout desktop.
 type Options struct {
-	ConfigPath string
-	Version    string
-	ForceSetup bool
-	NoTray     bool
-	NoOpen     bool
+	ConfigPath    string
+	Version       string
+	ForceSetup    bool
+	NoTray        bool
+	NoOpen        bool
 	WebUI         bool   // optional localhost settings UI (advanced / tests only)
 	Listen        string // web UI listen when WebUI; default 127.0.0.1:0
 	ControlListen string // activity/control listen; default 127.0.0.1:0 (tests may pin)
@@ -63,43 +63,49 @@ type App struct {
 	proxyPort  int
 	wizardURL  string // only set when WebUI is enabled
 	controlURL string // Ask IPC for proxyd
+	asks       *askFlight
+	wraps      map[string]*wrapProc
 }
 
 // Run starts the desktop experience and blocks until quit.
-// Silent path: restore protection from state + tray (no setup questionnaire).
 func Run(ctx context.Context, opts Options) error {
-	a := &App{opts: opts, state: LoadState(), status: "Off"}
+	a := &App{opts: opts, state: LoadState(), status: "Off", wraps: map[string]*wrapProc{}, asks: newAskFlight()}
 	notify.SetEnabled(a.state.Notify)
 	if a.state.LastDenyHost != "" {
 		a.lastDeny = a.state.LastDenyHost
 	}
 
 	if _, err := a.startControlServer(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "denyout desktop: control/activity server: %v\n", err)
+		fmt.Fprintf(os.Stderr, "denyout desktop: control IPC server: %v\n", err)
 	}
 
-	// Optional legacy/web first-run only when --web-ui or explicit --setup with WebUI.
+	a.maybePromptCrashLeftovers()
+
 	needSetup := opts.ForceSetup || !a.state.SetupDone
 	if needSetup && opts.WebUI {
 		// web wizard handles setup
-	} else if needSetup && opts.ForceSetup && !opts.WebUI {
-		// --setup without web: mark done with defaults (silent); no zenity questionnaire
-		a.mu.Lock()
-		a.state.SetupDone = true
-		if !a.state.Notify {
-			a.state.Notify = true
+	} else if needSetup && !opts.WebUI {
+		if opts.ForceSetup {
+			a.mu.Lock()
+			a.state.SetupDone = true
+			a.state.PolicyProfile = PolicyProfileBrowse
+			a.state.AskMode = false
+			a.state.UXv2Migrated = true
+			if !a.state.Notify {
+				a.state.Notify = true
+			}
+			st := a.state
+			a.mu.Unlock()
+			_ = SaveState(st)
+			notify.SetEnabled(true)
+		} else {
+			a.runFirstRunWizard()
 		}
-		st := a.state
-		a.mu.Unlock()
-		_ = SaveState(st)
-		notify.SetEnabled(true)
-	} else if !a.state.SetupDone {
-		a.mu.Lock()
-		a.state.SetupDone = true
-		st := a.state
-		a.mu.Unlock()
-		_ = SaveState(st)
 	}
+
+	a.maybeMigrateUXv2()
+	a.maybeNotNowNudge()
+	a.maybeLearningNudge()
 
 	if opts.WebUI {
 		if opts.Listen == "" {
@@ -117,8 +123,8 @@ func Run(ctx context.Context, opts Options) error {
 		}
 	}
 
-	// Restore protection after login / restart (unless web-only setup tests with NoTray and no prior state).
-	if !opts.WebUI || a.state.ProtectionOn {
+	// Restore Computer after login; never silently fall back to Session.
+	if a.state.SetupDone && (!opts.WebUI || a.state.ProtectionOn) {
 		a.restoreProtection()
 	}
 
@@ -126,6 +132,7 @@ func Run(ctx context.Context, opts Options) error {
 		fmt.Fprintln(os.Stderr, "denyout desktop: tray disabled (--no-tray); press Ctrl+C to quit")
 		<-ctx.Done()
 		a.stopAll()
+		a.stopAllWrapsOpts("", true)
 		a.stopProtect()
 		return nil
 	}

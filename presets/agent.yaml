@@ -29,8 +29,7 @@ hosts:
   - codeload.github.com
   - alive.github.com
   - gitlab.com
-  # Cursor agent runtime (from desktop audit)
-  - api2.cursor.sh
-  - api2direct.cursor.sh
-  - api3.cursor.sh
-  # metrics.cursor.sh omitted — telemetry only; Ask/Always if needed
+  # Cursor IDE / agent runtime (wildcard: new regional API hosts keep appearing)
+  - "*.cursor.sh"
+  - "*.cursor.com"
+  # Telegram / messengers connect by raw IP → hard-denied under Agent; use Browse profile

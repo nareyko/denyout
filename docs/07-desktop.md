@@ -31,43 +31,49 @@
 ```bash
 # Unix (Linux / macOS) — preferred (silent)
 # Auto-detect: graphical session → Desktop; headless → Server (CLI).
-# Desktop: binary + login autostart + try whole-computer once (admin) →
-#   fallback Session (HTTP proxy env) → detach tray.
+# Desktop: binary + login autostart + Safe desktop preference → tray.
+# Admin runs once when Protect computer starts; failure stays Off (no Session fallback).
 # Force: --desktop / --server, or DENYOUT_INSTALL_MODE=desktop|server
 curl -fsSL https://denyout.com/install.sh | sh
 curl -fsSL https://denyout.com/install.sh | sh -s -- --desktop
 curl -fsSL https://denyout.com/install.sh | sh -s -- --server
 
-denyout desktop                 # tray; restores last scope
+denyout desktop                 # tray; restores Protect computer if left on
 denyout desktop --install       # silent register+start (used by install.sh)
+denyout profile create --name bot -- python app.py
+denyout run --profile bot
 # denyout desktop --web-ui      # optional / tests only
 denyout version
 denyout init                    # server / advanced path
-denyout run -- curl -I https://api.anthropic.com
+denyout run --sandbox=srt -- curl -I https://api.anthropic.com
 ```
 
-### Scopes
+### User-facing modes
 
-| Scope | Mechanism | Admin | Coverage |
+| Mode | Mechanism | Admin | Coverage |
 | --- | --- | --- | --- |
-| **Computer** | hostguard transparent redirect + system CA | Yes (once) | This user’s TCP 80/443 (OS-dependent) |
-| **Session** | local proxy + `HTTP(S)_PROXY` / `environment.d` | No | Apps that honor proxy env; browsers may ignore |
+| **Protect computer (Safe desktop)** | hostguard + browse policy | Yes (once) | This user’s TCP 80/443; web OK; scanners on |
+| **Agents only (whole PC)** | hostguard + agent allowlist | Yes | Strict allowlist; messengers may break — confirm required |
+| **My agents (wrap)** | per-profile proxy (+ optional `srt`) | No | Only the wrapped command |
+| **Off** | none | — | Does not stop running wraps |
 
-Tray: **Computer** / **Session** / **Off** (active mode marked ✓; re-click is a no-op), settings toggles, **Open activity…** (loopback Activity/Settings page), **Open diagnostics…**, **Copy last error**.
+Tray: **Protect computer** / **My agents…** / **Agents only (whole PC)…** / **Off**, Learning counter, Open activity…, Always-allow + Undo, Resume asks, Help & logs, Test, version, Quit (leave Protect-on for next login).
 
-- **Activity** (`http://127.0.0.1:…/activity`): mode, recent denials from `audit.jsonl`, notify/Ask, policy profile (Agent vs Browse), reason filter (`host_not_allowed` / `secret_in_url`), NSS/clipboard hints.
-- **Diagnostics** folder: `~/.local/state/denyout/` (`desktop.log`, `last-error.txt`, `audit.jsonl`, `README.txt`). Elevation failures (pkexec/UAC) are in `last-error.txt` / `desktop.log` — not in audit.
+- **Activity** (native OS dialog): recent denials; Always allow selected hostname (not raw IPs).
+- **Ask** (toast then dialog): Allow once / Always allow / Keep blocked (default + 2 min timeout). Queued globally; sound on Ask only. **IP literals** never Ask.
+- **Learning:** Once → pending; Pin / Discard from tray. After Pin, learning defaults off.
+- **Diagnostics:** `~/.local/state/denyout/` (logs rotate / use disk). Elevation failures in `last-error.txt`.
 
-### Policy profiles (0.1.9+)
+### Policy profiles
 
-| Profile | Default? | Behavior |
-| --- | --- | --- |
-| **Agent** | Yes (Computer / Session) | Enforce + `presets/agent.yaml` allowlist (models, registries, git/CDN, Cursor). Unknown hosts → deny or Ask. Implements **Rule of Two on egress**: private data + untrusted content may exist on the machine; external communication is limited to the allowlist (or HITL Ask). |
-| **Browse** | Advanced toggle | Legacy blocklist — normal web allowed; secrets/canaries/SSRF/deny-hosts still block. |
+| Profile | UI name | Default? | Behavior |
+| --- | --- | --- | --- |
+| **browse** | Safe desktop | Yes (Protect computer) | Blocklist — normal web allowed; secrets/canaries/SSRF still block. No host Ask. |
+| **agent** | Agents only | Opt-in confirm | Enforce + `presets/agent.yaml`. Unknown hosts → deny or Ask. |
 
-New installs: `AskMode=true`, `policy_profile=agent`. Upgrades with empty `policy_profile` migrate to `agent`. Examples: [`denyout.whole_device.yaml`](../examples/policies/denyout.whole_device.yaml) (agent), [`denyout.whole_device_browse.yaml`](../examples/policies/denyout.whole_device_browse.yaml) (browse).
+Upgrades still on Agents only get a one-time migration dialog offering Safe desktop. Examples: [`denyout.whole_device_browse.yaml`](../examples/policies/denyout.whole_device_browse.yaml), [`denyout.whole_device.yaml`](../examples/policies/denyout.whole_device.yaml).
 
-Manual QA: [`qa-agent-seatbelt.md`](qa-agent-seatbelt.md).
+Manual QA: [`qa-desktop-ux.md`](qa-desktop-ux.md), [`qa-agent-seatbelt.md`](qa-agent-seatbelt.md).
 
 Install elevates **at most once** (in the tray process). Turning protection off may ask once more to remove host rules.
 
@@ -158,14 +164,14 @@ Without OS sandbox integration (MVP: sandbox remains **optional**; desktop is st
 - Binaries using hard-coded DoH / custom stacks.  
 - Agents launched outside `denyout run`.
 
-### 6.1 Opt-in hardening
+### 6.1 Stronger isolation (`srt`)
 
 ```bash
 denyout run --sandbox=srt -- claude
-denyout run --sandbox=fence -- ...
+# or profile require_isolation / sandbox: srt
 ```
 
-When `--sandbox` set, DenyOut **SHOULD** wrap child with the external tool so that only localhost proxy is reachable (Anthropic `sandbox-runtime`, Fence, nono). Not required for M4. Deeper integration = phase 1.5.
+When `sandbox=srt` (or require isolation), DenyOut wraps the child with Anthropic `srt` and fails closed if `srt` is missing. Without it, wrap still works and prints one residual line (tools may bypass the proxy). UI label: **Stronger isolation (extra install)**. Fence/nono not in this wave.
 
 ## 7. CA UX policy
 
@@ -182,6 +188,8 @@ When `--sandbox` set, DenyOut **SHOULD** wrap child with the external tool so th
 
 | Path | Use |
 | --- | --- |
+| `~/.config/denyout/desktop.json` | Tray preferences |
+| `~/.config/denyout/profiles/*.yaml` | Named agent wrap profiles |
 | `~/.config/denyout/denyout.yaml` | User config |
 | `~/.config/denyout/ca/` | Persistent CA |
 | `~/.local/state/denyout/audit.jsonl` | Default audit |

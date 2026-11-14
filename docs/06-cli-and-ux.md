@@ -76,19 +76,31 @@ Standard.
 
 ### 3.7 `denyout desktop` (recommended GUI)
 
-Silent tray + restore last protection scope. No localhost wizard by default (`--web-ui` optional / tests).
+First-run wizard (Protect computer / Protect AI agents / Not now). Tray restores **Protect computer** if left on. No localhost wizard by default (`--web-ui` optional / tests).
 
 ```bash
 denyout desktop [--install] [--setup] [--no-tray] [--web-ui] [--no-open]
 ```
 
-- `--install` — autostart, try **Computer** once, fallback **Session**, detach tray (used by `install.sh`).
-- Scopes: **Computer** (hostguard + admin) vs **Session** (proxy env, no admin).
-- Tray: scope toggle (checkmark on active mode), notify/Ask settings, **Open activity…** (local denial history + settings), **Open diagnostics…**, Copy last error.
+- `--install` — Safe desktop preference + autostart + detach tray (used by `install.sh`). Admin failure stays Off.
+- Tray: Protect computer · My agents… · Agents only (whole PC)… · Off · Learning · Activity · Always-allow / Undo · Help & logs · version · Quit (leave-on).
 
 `install.sh` auto-detects Desktop vs Server; force with `--desktop` / `--server`. Windows zip includes `Start-DenyOut.cmd`.
 
-### 3.8 `denyout gui` (advanced)
+### 3.8 `denyout profile` / `denyout run --profile`
+
+Named wrap profiles in `~/.config/denyout/profiles/`:
+
+```bash
+denyout profile create --name bot -- python app.py
+denyout profile list
+denyout profile run bot
+denyout run --profile bot
+denyout run --sandbox=srt -- python app.py   # Stronger isolation (fail closed if srt missing)
+denyout profile pin bot                      # Pin pending Once hosts; learning off
+```
+
+### 3.9 `denyout gui` (advanced)
 
 Technical localhost panel (mode/preset/proxy details) — advanced / optional:
 
@@ -99,7 +111,7 @@ denyout gui [--config path] [--no-open]
 
 Same policy engine as CLI; prefer native `desktop` for non-experts.
 
-### 3.9 `denyout serve`
+### 3.10 `denyout serve`
 
 Long-running sidecar / compose / systemd proxy:
 
@@ -138,11 +150,11 @@ denyout: DENY host_not_allowed  https://evil.example/collect
            - host: evil.example
 ```
 
-Secret case:
+Secret case (desktop toast):
 
 ```text
-denyout: DENY secret_in_url  https://cdn.example/p.png?api_key=***
-         Secrets in URLs are blocked even on allowed hosts.
+Blocked a link that looked like it contained a secret.
+Host: cdn.example
 ```
 
 **MUST NOT** print the raw secret.

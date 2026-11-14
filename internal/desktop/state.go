@@ -6,13 +6,14 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Protection scope.
 const (
 	ScopeOff      = ""
 	ScopeComputer = "computer" // hostguard transparent + system CA (admin)
-	ScopeSession  = "session"  // local proxy + env (no admin)
+	ScopeSession  = "session"  // internal fallback only — not a user-facing mode
 )
 
 // State is persisted desktop preferences.
@@ -20,27 +21,36 @@ type State struct {
 	SetupDone         bool     `json:"setup_done"`
 	Notify            bool     `json:"notify"`
 	AskMode           bool     `json:"ask_mode"`
-	PolicyProfile     string   `json:"policy_profile,omitempty"`    // agent (default) | browse
-	Scope             string   `json:"scope,omitempty"`              // computer | session | empty
-	ProtectionOn      bool     `json:"protection_on"`               // restore on login
-	ComputerEnabled   bool     `json:"computer_enabled"`            // legacy / mirror of scope=computer+on
-	ComputerAvailable bool     `json:"computer_available"`          // false after elevation fail until retry
-	PreferredAgent    string   `json:"preferred_agent,omitempty"`   // advanced: claude|cursor|shell|custom
+	PolicyProfile     string   `json:"policy_profile,omitempty"` // browse (Safe desktop) | agent (Agents only)
+	ActiveProfileID   string   `json:"active_profile_id,omitempty"`
+	Scope             string   `json:"scope,omitempty"`
+	ProtectionOn      bool     `json:"protection_on"`
+	ComputerEnabled   bool     `json:"computer_enabled"`
+	ComputerAvailable bool     `json:"computer_available"`
+	Autostart         bool     `json:"autostart"`
+	AutostartAsked    bool     `json:"autostart_asked"`
+	UXv2Migrated      bool     `json:"ux_v2_migrated"`
+	NotNowReminded    bool     `json:"not_now_reminded"`
+	NotNowAt          string   `json:"not_now_at,omitempty"` // RFC3339
+	PreferredAgent    string   `json:"preferred_agent,omitempty"`
 	CustomCommand     string   `json:"custom_command,omitempty"`
 	AlwaysAllowHosts  []string `json:"always_allow_hosts,omitempty"`
 	LastDenyHost      string   `json:"last_deny_host,omitempty"`
 	LastDenySummary   string   `json:"last_deny_summary,omitempty"`
+	AskPausedUntil    string   `json:"ask_paused_until,omitempty"` // RFC3339
+	WrapPIDs          []int    `json:"wrap_pids,omitempty"`        // for crash leftover detection
 }
 
 var stateMu sync.Mutex
 
-// DefaultState returns first-run defaults.
+// DefaultState returns first-run defaults (Safe desktop UX).
 func DefaultState() State {
 	return State{
 		Notify:            true,
-		AskMode:           true, // HITL on new hosts (agent seatbelt)
-		PolicyProfile:     PolicyProfileAgent,
+		AskMode:           false, // Safe desktop: no host Ask
+		PolicyProfile:     PolicyProfileBrowse,
 		ComputerAvailable: true,
+		Autostart:         true,
 	}
 }
 
@@ -57,17 +67,14 @@ func StatePath() string {
 	return filepath.Join(cfg, "denyout", "desktop.json")
 }
 
+// ProfilesDir is ~/.config/denyout/profiles.
+func ProfilesDir() string {
+	return filepath.Join(filepath.Dir(StatePath()), "profiles")
+}
+
 // CADir is the persistent desktop CA directory.
 func CADir() string {
-	cfg := os.Getenv("XDG_CONFIG_HOME")
-	if cfg == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return filepath.Join("denyout-ca")
-		}
-		cfg = filepath.Join(home, ".config")
-	}
-	return filepath.Join(cfg, "denyout", "ca")
+	return filepath.Join(filepath.Dir(StatePath()), "ca")
 }
 
 // LoadState reads desktop state (defaults if missing).
@@ -78,28 +85,29 @@ func LoadState() State {
 		return st
 	}
 	_ = json.Unmarshal(b, &st)
-	// Migrate older state: computer_enabled without scope.
 	if st.Scope == "" && st.ComputerEnabled {
 		st.Scope = ScopeComputer
 		st.ProtectionOn = true
 	}
-	// Older files lacked computer_available — treat as available.
-	if !jsonHasComputerAvailable(b) {
+	if !jsonHasKey(b, "computer_available") {
 		st.ComputerAvailable = true
 	}
-	// Upgrade: empty policy_profile → agent (new default seatbelt).
+	if !jsonHasKey(b, "autostart") && !st.AutostartAsked {
+		st.Autostart = true
+	}
+	// Legacy empty profile → was agent; migration dialog handles switch to browse.
 	if strings.TrimSpace(st.PolicyProfile) == "" {
 		st.PolicyProfile = PolicyProfileAgent
 	}
 	return st
 }
 
-func jsonHasComputerAvailable(b []byte) bool {
+func jsonHasKey(b []byte, key string) bool {
 	var raw map[string]json.RawMessage
 	if json.Unmarshal(b, &raw) != nil {
 		return false
 	}
-	_, ok := raw["computer_available"]
+	_, ok := raw[key]
 	return ok
 }
 
@@ -116,4 +124,21 @@ func SaveState(st State) error {
 		return err
 	}
 	return os.WriteFile(path, append(b, '\n'), 0o600)
+}
+
+// AskPaused reports whether host-Ask dialogs are paused.
+func (st State) AskPaused() bool {
+	if st.AskPausedUntil == "" {
+		return false
+	}
+	t, err := time.Parse(time.RFC3339, st.AskPausedUntil)
+	if err != nil {
+		return false
+	}
+	return time.Now().Before(t)
+}
+
+// NeedsUXv2Migration is true for pre–Safe-desktop installs still on agent without migration ack.
+func (st State) NeedsUXv2Migration() bool {
+	return st.SetupDone && !st.UXv2Migrated && normalizePolicyProfile(st.PolicyProfile) == PolicyProfileAgent
 }
