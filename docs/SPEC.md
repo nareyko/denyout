@@ -27,7 +27,7 @@ If a later code change conflicts with this spec, either update the code or revis
 | D03 | [03-architecture.md](03-architecture.md) | **Normative** component boundaries |
 | D04 | [04-policy-engine.md](04-policy-engine.md) | **Normative** decision algorithm |
 | D05 | [05-secret-detection.md](05-secret-detection.md) | **Normative** scanner contracts |
-| D06 | [06-cli-and-ux.md](06-cli-and-ux.md) | **Normative** CLI surface; UX informative |
+| D06 | [06-cli-and-ux.md](06-cli-and-ux.md) | **Normative** CLI surface. UX informative |
 | D07 | [07-desktop.md](07-desktop.md) | **Normative** desktop deployment / binaries |
 | D07-UX | [07-desktop-ux.md](07-desktop-ux.md) | **Normative** install/tray/menu/screens inventory |
 | D07-UX-CAT | [07-desktop-ux-catalog.md](07-desktop-ux-catalog.md) | Catalog of all screens & user-visible messages |
@@ -71,18 +71,18 @@ If a later code change conflicts with this spec, either update the code or revis
 2. **Block secret-bearing URLs** and obvious exfil patterns even toward otherwise-allowed hosts when configured.
 3. **Audit** every decision out-of-band from the agent's writable filesystem where deployment allows.
 4. **Same policy language** for laptop CLI and server sidecar.
-5. **Honest boundaries**: document bypasses; never market as "unbypassable" without OS-level enforcement.
+5. **Honest boundaries**: document bypasses. Never market as "unbypassable" without OS-level enforcement.
 
 ### 4.2 MUST NOT claim (see D10)
 
-- Full OS sandbox / filesystem isolation (out of MVP core; may integrate later with SRT/Fence/nono).
+- Full OS sandbox / filesystem isolation (out of MVP core. May integrate later with SRT/Fence/nono).
 - Prompt-injection prevention inside the model.
 - Protection when the user runs the agent **outside** DenyOut without network backstops.
 - Stopping exfiltration to an **already-allowed** host via clever body encoding without intercept + scanners (best-effort only).
 
 ### 4.3 Primary UX
 
-**Desktop (P1):** silent install -> tray icon + compact menu -> left-click opens **Home**; clear blocks as **Keep blocked** / **Allow this site**; power in Settings tabs. Full surface inventory (install / tray / menu / every screen): [`07-desktop-ux.md`](07-desktop-ux.md).
+**Desktop (P1):** silent install -> tray icon + compact menu -> left-click opens **Home**. Clear blocks as **Keep blocked** / **Allow this site**. Power in Settings tabs. Full surface inventory (install / tray / menu / every screen): [`07-desktop-ux.md`](07-desktop-ux.md).
 
 **CLI / wrap:**
 
@@ -90,7 +90,7 @@ If a later code change conflicts with this spec, either update the code or revis
 denyout run [--policy PATH] [--mode MODE] -- <command> [args...]
 ```
 
-Zero-thinking wrap path: install -> `denyout run -- <agent>` -> first denials as notifications + log; expand allowlist only as needed.
+Zero-thinking wrap path: install -> `denyout run -- <agent>` -> first denials as notifications + log. Expand allowlist only as needed.
 
 ## 5. High-level decision flow (normative sketch)
 
@@ -142,14 +142,14 @@ Exact order is specified in [04-policy-engine.md](04-policy-engine.md) (includin
 
 - Spec versions: semver. Breaking policy semantics bump **minor** while pre-1.0, **major** after 1.0.
 - Config `apiVersion: denyout/v1` freezes keys in [11-config-reference.md](11-config-reference.md).
-- Audit log `schema_version` integers; additive fields OK; renames need new version.
+- Audit log `schema_version` integers. Additive fields OK. Renames need new version.
 
 ## 8. Open questions (tracked)
 
 See end of [12-mvp-and-roadmap.md](12-mvp-and-roadmap.md). Critical ones:
 
 1. Exact v1 vs later cut during build (private HQ `decisions.md` §1 - in process). 
-2. GUI: `denyout gui` localhost web UI locked for Dec 1 (see [`design-decisions.md`](design-decisions.md)); deeper screens later. 
+2. GUI: `denyout gui` localhost web UI locked for Dec 1 (see [`design-decisions.md`](design-decisions.md)). Deeper screens later. 
 3. Language **Go**, license **Apache-2.0**, TLS default **intercept** - [`design-decisions.md`](design-decisions.md).
 
 ## 9. Change control

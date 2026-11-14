@@ -87,7 +87,7 @@ denyout desktop [--install] [--setup] [--no-tray] [--web-ui] [--no-open]
 - `--install` - Safe desktop preference + autostart + detach tray (used by `install.sh`). Admin failure stays Off.
 - Tray (compact): Status - Protect computer - My agents... - Off - Open DenyOut... - Quit. Left-click opens Activity. Agents only / lists / tips live in the window - see [`07-desktop-ux.md`](07-desktop-ux.md).
 
-`install.sh` auto-detects Desktop vs Server; force with `--desktop` / `--server`. Windows zip includes `Start-DenyOut.cmd`.
+`install.sh` auto-detects Desktop vs Server. Force with `--desktop` / `--server`. Windows zip includes `Start-DenyOut.cmd`.
 
 ### 3.8 `denyout profile` / `denyout run --profile`
 
@@ -111,7 +111,7 @@ denyout gui [--config path] [--no-open]
 # or: denyout desktop --web-ui
 ```
 
-Same policy engine as CLI; prefer native `desktop` for non-experts.
+Same policy engine as CLI. Prefer native `desktop` for non-experts.
 
 ### 3.10 `denyout serve`
 
@@ -197,17 +197,17 @@ Common failures documented in `--help` troubleshooting:
 | Symptom | Likely cause | Fix |
 | --- | --- | --- |
 | TLS errors | Client ignores CA | `--tls-mode=passthrough` or set framework CA env |
-| Model calls fail | Missing host in preset | `audit` mode discover; add host |
+| Model calls fail | Missing host in preset | `audit` mode discover. Add host |
 | Package install fails | registry blocked | preset `models+pkg` |
 | Everything denied | `strict` preset | switch preset |
 
 ## 10. Localization
 
-MVP: English CLI messages. Russian docs may live on Arviser; product UI EN-first.
+MVP: English CLI messages. Russian docs may live on Arviser. Product UI EN-first.
 
 ## 11. Accessibility / scripting
 
-- All commands scriptable; no required GUI. 
+- All commands scriptable. No required GUI. 
 - `--json` flag on `check` and denials to stdout for CI (phase 1).
 
 ```bash

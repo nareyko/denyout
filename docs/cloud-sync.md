@@ -40,7 +40,7 @@ Example blob:
 
 **Settings -> Advanced -> Account:** email one-time code sign-in / sign out / **Sync now** / **Delete cloud data**. 
 Trust line: works fully without an account. Protect is never gated on login. 
-**Delete cloud data** removes the server account + synced blob, then signs out locally; Protect settings on disk stay.
+**Delete cloud data** removes the server account + synced blob, then signs out locally. Protect settings on disk stay.
 
 ## Sync now
 

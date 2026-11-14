@@ -13,7 +13,7 @@ Internal success metrics (M1-M6) and Bet Tree sheets live in private HQ (`denyou
 | Item | Notes |
 | --- | --- |
 | CLI `run`, `check`, `policy validate`, `version`, `init` | D06 |
-| **Simple install on Ubuntu, macOS, Windows** | install script / package managers; `denyout version` on all three |
+| **Simple install on Ubuntu, macOS, Windows** | install script / package managers. `Denyout version` on all three |
 | HTTP/HTTPS proxy with CONNECT | |
 | TLS intercept with session CA | Windows CA UX may be the hard part of M4 |
 | Modes: enforce, audit | ask optional stretch |
@@ -22,8 +22,8 @@ Internal success metrics (M1-M6) and Bet Tree sheets live in private HQ (`denyou
 | SSRF unsafe IP defaults | |
 | JSONL audit + stderr denials | |
 | SQLite lab fixture DB + `denyout test run` | M1 corpus |
-| Notifications on Linux/macOS (best-effort); Windows best-effort | |
-| Docs site on denyout.com (install, trust, modes, why-it-blocks, known issues) | English only; private `denyout-web` repo |
+| Notifications on Linux/macOS (best-effort). Windows best-effort | |
+| Docs site on denyout.com (install, trust, modes, why-it-blocks, known issues) | English only. Private `denyout-web` repo |
 | Examples + acceptance tests for R-20 canaries | |
 
 ### Out of MVP
@@ -82,7 +82,7 @@ Internal success metrics (M1-M6) and Bet Tree sheets live in private HQ (`denyou
 
 ### Phase 3 - Productize
 
-- Optional hosted policy sync (still local enforce) - **scaffold shipped**: desktop Account + sync client; interim API in private HQ `services/denyout-api`; production site/API stay in the **private denyout.com web repo**. 
+- Optional hosted policy sync (still local enforce) - **scaffold shipped**: desktop Account + sync client. Interim API in private HQ `services/denyout-api`. Production site/API stay in the **private denyout.com web repo**. 
 - Public app update manifest client + Settings check (no account). 
 - Browser helper for R-20 in human UIs. 
 - Commercial support / Arviser bundling.
@@ -95,7 +95,7 @@ Internal success metrics (M1-M6) and Bet Tree sheets live in private HQ (`denyou
 | Q2 | License | **Apache-2.0** (decided 2026-11-13) | Done |
 | Q3 | Trademark "DenyOut" | file or not | TBD |
 | Q4 | Relationship to Arviser legal entity | same / spin | TBD |
-| Q5 | Default TLS mode | **intercept**; passthrough = degraded + warning | Done |
+| Q5 | Default TLS mode | **intercept**. Passthrough = degraded + warning | Done |
 | Q6 | Ship `ask` in 0.1? | yes/no | Prefer yes if TTY |
 | Q7 | Wildcard policy for Azure OpenAI | how wide | Careful |
 

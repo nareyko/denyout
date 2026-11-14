@@ -11,11 +11,11 @@ Index: [`SPEC.md`](SPEC.md) (D07-UX).
 | Shell | Binary | What the user gets |
 | --- | --- | --- |
 | **Primary** | `denyout-desktop` | System tray + Wails window (Home / History / My agents / Settings / Problems) |
-| **Fallback** | `denyout desktop` | Same compact tray; native OS dialogs instead of the Wails window |
+| **Fallback** | `denyout desktop` | Same compact tray. Native OS dialogs instead of the Wails window |
 
 This document is the **inventory of what the user sees**: install, tray icon, tray menu, every window screen/modal, and out-of-window toasts/dialogs.
 
-**Product posture:** everyday Safe / Protect computer first; window opened rarely; power behind Filters / Select / Advanced.
+**Product posture:** everyday Safe / Protect computer first. Window opened rarely. Power behind Filters / Select / Advanced.
 
 ---
 
@@ -36,9 +36,9 @@ Install is **terminal-first**. There is no browser installer and no multi-page G
 
 | Surface | When | What the user sees |
 | --- | --- | --- |
-| **System tray icon** | Immediately / next login | **DenyOut**; tooltip `DenyOut - <mode>` (§2) |
+| **System tray icon** | Immediately / next login | **DenyOut**. Tooltip `DenyOut - <mode>` (§2) |
 | **Admin / elevation** | If Protect needs privileges | OS elevation dialog |
-| **Your setup** | Once | Mode + 3 bullets; **Open DenyOut** (primary) - **Got it** (§4.4 / §5.5) |
+| **Your setup** | Once | Mode + 3 bullets. **Open DenyOut** (primary) - **Got it** (§4.4 / §5.5) |
 | **Wails window** | Only if user chooses Open DenyOut (or later left-click) | Does not auto-open every login |
 
 Silent install **does not** show the first-run three-way choice (§1.3).
@@ -55,7 +55,7 @@ Desktop vs Server choice on TTY when `--prompt` / forced ask.
 
 **Title:** DenyOut - How should DenyOut protect this computer? 
 Controls: Protect computer - Protect AI agents - Not now. 
-Then optional autostart; then **Your setup** once. Protect AI agents + Wails -> My agents / New agent flow.
+Then optional autostart. Then **Your setup** once. Protect AI agents + Wails -> My agents / New agent flow.
 
 ---
 
@@ -72,11 +72,11 @@ Then optional autostart; then **Your setup** once. Protect AI agents + Wails -> 
 | **Left-click** | Open window on **Home** (fallback: native denial list) |
 | **Right-click** | Compact menu (§3) |
 
-Linux caveat: some trays open the menu on left-click; **Open DenyOut...** remains available.
+Linux caveat: some trays open the menu on left-click. **Open DenyOut...** remains available.
 
 ---
 
-## 3. Tray menu (right-click; compact)
+## 3. Tray menu (right-click. Compact)
 
 ```text
 Protected | Off | Agents only -> disabled status line
@@ -125,7 +125,7 @@ Mode changes, Ask pause/resume, etc.
 ### 4.4 Your setup (native)
 
 **Title:** DenyOut - Your setup 
-Body: protected/off paragraph + three bullets (Keep/Allow; Open DenyOut Home; Problems if Protect failed) + privacy. 
+Body: protected/off paragraph + three bullets (Keep/Allow. Open DenyOut Home. Problems if Protect failed) + privacy. 
 **Buttons:** **Open DenyOut** (primary -> `OpenUI("home")`) - **Got it** (dismiss only).
 
 ---
@@ -138,8 +138,8 @@ Close **X** = hide to tray. Quit only via tray.
 
 | Region | Contents |
 | --- | --- |
-| Left nav | **DenyOut**; **Home**; **History**; **Settings**; **Problems** (+ badge); **My agents** demoted ("For AI tools"); Jump via **Ctrl+K** only |
-| Top bar | Mode pill (**Protected** / Off / ...); status text; if unhealthy: **Needs attention - open Problems** + **Open Problems** button; **Refresh** |
+| Left nav | **DenyOut**. **Home**. **History**. **Settings**. **Problems** (+ badge). **My agents** demoted ("For AI tools"). Jump via **Ctrl+K** only |
+| Top bar | Mode pill (**Protected** / Off / ...). Status text. If unhealthy: **Needs attention - open Problems** + **Open Problems** button. **Refresh** |
 | Deep-links | `home`, `activity`/`history`, `profiles` / `profiles-new`, `settings`, `settings-advanced`, `problems` |
 
 ### 5.0.1 Onboarding sequence (one layer at a time)
@@ -177,7 +177,7 @@ Normative detail: [`ux-iters/home.md`](ux-iters/home.md) (v2). Research: [`ux-it
 
 **Must not on Home:** tables, Filters, charts, reason codes, health/IPC, Jump, allow-lists, Agents only.
 
-Optional quiet lines: `Blocked today: N`; when a newer app build was detected - **Newer DenyOut available** - Open release - Settings (never asks to sign in). Footer text links at most: Settings - For AI tools.
+Optional quiet lines: `Blocked today: N`. When a newer app build was detected - **Newer DenyOut available** - Open release - Settings (never asks to sign in). Footer text links at most: Settings - For AI tools.
 
 ---
 
@@ -186,9 +186,9 @@ Optional quiet lines: `Blocked today: N`; when a newer app build was detected - 
 **Tip** (only when onboarding sequence allows screen tips).
 
 **Toolbar (default):** **Filters** (collapsed) - **Select...** - **Refresh** 
-No persistent row checkboxes. **Select...** / **Done selecting** toggles selection mode; then checkboxes + **Always allow selected (N)**.
+No persistent row checkboxes. **Select...** / **Done selecting** toggles selection mode. Then checkboxes + **Always allow selected (N)**.
 
-**Filters (expanded):** search - reason (human label only, e.g. `Secret in link`; code in `title` tooltip) - Remembered Keep only - **Group by host**.
+**Filters (expanded):** search - reason (human label only, e.g. `Secret in link`. Code in `title` tooltip) - Remembered Keep only - **Group by host**.
 
 **Table:** Time - Site - Why (human) - secondary Always allow.
 
@@ -206,7 +206,7 @@ User-facing name is **My agents** everywhere (internal route may remain `profile
 
 **Toolbar:** **New agent** - **Refresh** 
 **Learning** card only when pending Once hosts. 
-**Modal:** simpler copy; isolation under **Advanced options**. 
+**Modal:** simpler copy. Isolation under **Advanced options**. 
 On **New agent** save: optional **Add recommended hosts?** (Cursor / Claude starter packs). Edit -> **Allow packs** (Add pack... / **Undo pack**). 
 Empty: No AI agents yet - fine for everyday browsing.
 
@@ -218,11 +218,11 @@ Tray **My agents...** opens this list. **New agent** / Jump / first-run agents p
 
 **Find a setting...** search filters visible cards and may switch Basic/Advanced. 
 **Tabs:** Basic - Advanced. 
-Everyday On/Off may mirror Home on Basic; Home remains the emotional center.
+Everyday On/Off may mirror Home on Basic. Home remains the emotional center.
 
 ### Basic
 
-Tip: everyday protection; Agents only under Advanced. 
+Tip: everyday protection. Agents only under Advanced. 
 **Protection:** **Turn on Protect computer** - **Turn off** - Now: Protected/Off. **Switch to Protect computer** only when Agents only is on. 
 **Notifications** - **Autostart**. 
 **Threat lists:** Block known phishing - Block known malware - nested **Including stronger threat list** (confirm on first enable) - update interval - **Refresh now** - feed status - read-only **Product exceptions (N)**. 
@@ -232,21 +232,21 @@ Tip: everyday protection; Agents only under Advanced.
 
 Tip: lists, diagnostics, whole-PC Agents only. 
 
-**Account** (optional) - trust line: *Sign in to sync settings across computers. DenyOut works fully without an account.* Email one-time code - Sign in - Sign out - **Sync settings when signed in** - **Sync now** - **Delete cloud data** (cloud account only; local Protect unchanged). API base under a collapsed advanced detail (local/stub). **Protect never requires an account.** Detail: [`cloud-sync.md`](cloud-sync.md).
+**Account** (optional) - trust line: *Sign in to sync settings across computers. DenyOut works fully without an account.* Email one-time code - Sign in - Sign out - **Sync settings when signed in** - **Sync now** - **Delete cloud data** (cloud account only. Local Protect unchanged). API base under a collapsed advanced detail (local/stub). **Protect never requires an account.** Detail: [`cloud-sync.md`](cloud-sync.md).
 
 **Sites I've allowed or silenced** - Allowed + Silenced (Keep blocked) + filter + Undo last allow. 
 
-**Optional lists (not core)** - OISD small / OISD big / StevenBlack (default off; ad/tracker warning on enable). Not network-wide adblocking. 
+**Optional lists (not core)** - OISD small / OISD big / StevenBlack (default off. Ad/tracker warning on enable). Not network-wide adblocking. 
 
 **Agents only (whole PC)** - "Almost nobody needs this" + confirm. 
 
-**Asks** (Resume asks) - **Diagnostics** (version - logs - audit - Test protection - **Check for updates** / Open update - public manifest, no sign-in; fail-open) - Privacy.
+**Asks** (Resume asks) - **Diagnostics** (version - logs - audit - Test protection - **Check for updates** / Open update - public manifest, no sign-in. Fail-open) - Privacy.
 
 ---
 
 ## 5.4 Screen: Problems - additional (when broken)
 
-Fix-first summary - **Retry Protect computer** - **Copy last error** - Open diagnostics - optional **Update available** card (Open release; no sign-in) - Last blocked -> History - Health under **Details**. 
+Fix-first summary - **Retry Protect computer** - **Copy last error** - Open diagnostics - optional **Update available** card (Open release. No sign-in) - Last blocked -> History - Health under **Details**. 
 Surfaces on Home only via needs-help state + nav badge - not as a peer home.
 
 ---
@@ -275,11 +275,11 @@ Normative detail: [`ux-iters/notifications-rework-plan.md`](ux-iters/notificatio
 | Agents only (whole PC) | Same decision dialog | Pre-act Ask |
 | Off | - | - |
 
-Threat-list hits use reason `threat_list`. User **Allow this site** / timed allow beats threat lists; starter **packs** do not. Product unbreak (Book D) skips threat lists only - scanners still apply. Detail: [`ux-iters/threat-lists-plan.md`](ux-iters/threat-lists-plan.md).
+Threat-list hits use reason `threat_list`. User **Allow this site** / timed allow beats threat lists. Starter **packs** do not. Product unbreak (Book D) skips threat lists only - scanners still apply. Detail: [`ux-iters/threat-lists-plan.md`](ux-iters/threat-lists-plan.md).
 
 **OS toasts (whitelist only):** Keep-repeat - Allow Undo - Protect pause ended - protection failure. 
 **Notifications levels:** Quiet / Normal / Detailed (dialogs always when Protect on). 
-**Protect Off:** pause presets (15m / 1h / tomorrow / forever); Home/tray truthful; no Off nags.
+**Protect Off:** pause presets (15m / 1h / tomorrow / forever). Home/tray truthful. No Off nags.
 
 No false-deny of normal API auth on Safe (0.2.1).
 

@@ -42,7 +42,7 @@ func Install(opts Options) error {
 		return fmt.Errorf("start tray: %w", err)
 	}
 
-	fmt.Fprintln(os.Stderr, "denyout install: tray started - approve admin once if prompted (stays Off on failure; no Session fallback)")
+	fmt.Fprintln(os.Stderr, "denyout install: tray started - approve admin once if prompted (stays Off on failure, no Session fallback)")
 	fmt.Fprintf(os.Stderr, "denyout install: done (scope=%s profile=%s protection_on=%v)\n", st.Scope, st.PolicyProfile, st.ProtectionOn)
 	return nil
 }

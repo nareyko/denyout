@@ -130,9 +130,9 @@ func YourSetupText(mode string) string {
 func nativeFirstRunChoice() string {
 	title := "DenyOut"
 	text := "How should DenyOut protect this computer?\n\n" +
-		"- Protect computer - Safe desktop: internet works as usual; blocks suspicious links.\n" +
-		"- Protect AI agents - wrap a program (python, Cursor agent, ...); rest of PC unchanged.\n" +
-		"- Not now - leave off; open the tray later."
+		"- Protect computer - Safe desktop: internet works as usual. Blocks suspicious links.\n" +
+		"- Protect AI agents - wrap a program (python, Cursor agent, ...). Rest of PC unchanged.\n" +
+		"- Not now - leave off. Open the tray later."
 	switch runtime.GOOS {
 	case "linux":
 		if zenity, err := exec.LookPath("zenity"); err == nil {
@@ -238,7 +238,7 @@ func (a *App) maybeMigrateUXv2() {
 		switchToSafe = nativeConfirm(
 			"DenyOut update",
 			"Earlier DenyOut versions defaulted to Agents only on the whole computer (messengers and many sites can break).\n\n"+
-				"Switch to Safe desktop? (Recommended - web works; agents use wrap profiles.)\n\n"+
+				"Switch to Safe desktop? (Recommended - web works. Agents use wrap profiles.)\n\n"+
 				"Choose Keep Agents only only if you still want whole-PC allowlist mode.",
 			"Switch to Safe desktop",
 			"Keep Agents only",

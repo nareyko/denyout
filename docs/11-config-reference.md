@@ -2,7 +2,7 @@
 
 ## 1. Format
 
-- YAML preferred; JSON accepted. 
+- YAML preferred. JSON accepted. 
 - `apiVersion: denyout/v1` required for non-empty files after 0.1. 
 - Schema file: [`schemas/denyout-config.v1.json`](../schemas/denyout-config.v1.json).
 
@@ -88,7 +88,7 @@ server:
 | `apiVersion` | string | - | `denyout/v1` |
 | `kind` | string | `Config` | |
 | `mode` | enum | `enforce` | |
-| `preset` | enum | `models` | Applied before `allow` merge; `none` = no preset; `agent` = desktop seatbelt allowlist (0.1.9+) |
+| `preset` | enum | `models` | Applied before `allow` merge. `None` = no preset. `Agent` = desktop seatbelt allowlist (0.1.9+) |
 | `tls.mode` | enum | `intercept` | |
 | `tls.session_ca` | bool | true | |
 | `listen.host` | string | `127.0.0.1` | |
@@ -128,7 +128,7 @@ server:
 
 Exactly one matcher key per PathRule.
 
-## 4. Preset contents (informative; pin in code)
+## 4. Preset contents (informative. Pin in code)
 
 ### `models` (MVP)
 
@@ -149,7 +149,7 @@ Adds: `registry.npmjs.org`, `pypi.org`, `files.pythonhosted.org`, `proxy.golang.
 
 ### `strict`
 
-No preset hosts; only explicit `allow`.
+No preset hosts. Only explicit `allow`.
 
 ### `agent` (0.1.9+ desktop default)
 

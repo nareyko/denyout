@@ -4,10 +4,10 @@
 
 | Layer | What |
 | --- | --- |
-| Unit | Policy engine decisions; scanners; host matching; IP unsafe |
+| Unit | Policy engine decisions. Scanners. Host matching. IP unsafe |
 | Integration | Proxy CONNECT + intercept with local upstream |
 | E2E | `denyout run -- curl ...` scripts |
-| Bypass | Documented residual; server NetworkPolicy tests in kind |
+| Bypass | Documented residual. Server NetworkPolicy tests in kind |
 | Supply chain | `govulncheck` / dep audit before release |
 
 ## 2. Normative acceptance tests (MVP)
@@ -23,7 +23,7 @@ Each test has id, setup, action, expected.
 ### AT-02 Deny unknown host
 
 - Action: GET `https://example.com/` 
-- Expect: deny `host_not_allowed`; no upstream TCP to example.com (verify with packet counter or fake resolver).
+- Expect: deny `host_not_allowed`. No upstream TCP to example.com (verify with packet counter or fake resolver).
 
 ### AT-03 Secret in query
 
@@ -42,19 +42,19 @@ Each test has id, setup, action, expected.
 
 ### AT-06 Audit mode would_deny
 
-- Mode audit; GET `https://example.com/` 
+- Mode audit. GET `https://example.com/` 
 - Expect: forward + event with `would_deny` / reasons include `host_not_allowed`. 
 - Exception: AT-05 still hard deny.
 
 ### AT-07 Redaction
 
-- Trigger AT-03; read audit JSONL. 
+- Trigger AT-03. Read audit JSONL. 
 - Expect: raw key material absent; `***` present.
 
 ### AT-08 Config fail closed
 
 - Invalid regex in config. 
-- Expect: `denyout run` exit code 2; child not started.
+- Expect: `denyout run` exit code 2. Child not started.
 
 ### AT-09 check CLI
 
@@ -62,7 +62,7 @@ Each test has id, setup, action, expected.
 
 ### AT-10 Session teardown
 
-- Start run, kill child; proxy port closed; lockfile removed.
+- Start run, kill child. Proxy port closed. Lockfile removed.
 
 ## 3. Server acceptance (phase 1.1)
 
@@ -96,7 +96,7 @@ Metric: model-only traffic false-deny ≤ **1/10** scripted runs need an allowli
 
 ## 6. Performance smoke
 
-- 100 sequential GETs to allowlisted host through proxy; p95 overhead < 50ms local (informal until measured).
+- 100 sequential GETs to allowlisted host through proxy. P95 overhead < 50ms local (informal until measured).
 
 ## 7. Security regression
 

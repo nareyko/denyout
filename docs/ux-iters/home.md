@@ -11,7 +11,7 @@
 > Open DenyOut -> in **5 seconds** answer: *Am I protected? What should I do? Did anything scary happen?* 
 > If they need more, they leave Home on purpose - History, Settings, Problems, My agents are **not peers of Home**.
 
-Tray stays compact; window opens rarely; Home is the default open target.
+Tray stays compact. Window opens rarely. Home is the default open target.
 
 ---
 
@@ -83,7 +83,7 @@ ADDITIONAL (secondary doors)
 | S1 | Agents-only active -> treat as **not** everyday protected: headline steers to turn on Protect computer (or Switch) without teaching the mode |
 | S2 | Optional **one quiet line** under story: `Blocked today: N` (no charts, no tops, no %) |
 | S3 | At most **two** footer doors on Home: Settings - For AI tools (My agents) - text links, not equal nav weight |
-| S4 | Visual urgency: needs-help card uses alert styling; protected stays calm |
+| S4 | Visual urgency: needs-help card uses alert styling. Protected stays calm |
 
 ### 3.3 Must not (on Home)
 
@@ -126,12 +126,12 @@ These exist to deepen, not to compete with Home.
 
 | Screen | May contain | Must not steal from Home |
 | --- | --- | --- |
-| **History** | Table, Filters, drawer, bulk allow, technical details | Default open; status On/Off as hero |
+| **History** | Table, Filters, drawer, bulk allow, technical details | Default open. Status On/Off as hero |
 | **Settings** | Notify, autostart, allowed/silenced, Agents only | Everyday On/Off as the *main* story (mirror OK on Basic) |
 | **Problems** | Fix-first summary, diagnostics under Details | Shown as home hero unless `problems_alert` |
 | **My agents** | Agents list, Learning when pending | Equal nav weight; "you must set up an agent" |
 
-Chrome: Home - History - Settings - Problems; My agents demoted. Status pill/top bar may echo Home, not replace it.
+Chrome: Home - History - Settings - Problems. My agents demoted. Status pill/top bar may echo Home, not replace it.
 
 ---
 
@@ -149,4 +149,4 @@ If any answer requires another screen first, Home has failed.
 
 ## 7. Out of scope for Home requirements
 
-HITL toast policy/timeouts; Electron; systray Linux epic; Pi-hole-style analytics; commit/PR.
+HITL toast policy/timeouts. Electron. Systray Linux epic. Pi-hole-style analytics. Commit/PR.

@@ -6,4 +6,4 @@ Understand one block and decide Allow this site without reading reason codes fir
 
 ## Requirements
 
-**Must:** Host + human why first; Allow this site primary; Always allow host secondary; codes under Technical details.
+**Must:** Host + human why first. Allow this site primary. Always allow host secondary. Codes under Technical details.

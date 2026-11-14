@@ -22,7 +22,7 @@ DenyOut's bet: **make the safe outcome the default outcome** when someone wraps 
 | --- | --- |
 | Category | Agent egress control / default-deny outbound proxy |
 | Not | Prompt firewall, full EDR, LLM gateway for prompts, password manager |
-| Promise | Agents don't talk to the world unless policy allows it; secret-looking URLs die loudly |
+| Promise | Agents don't talk to the world unless policy allows it. Secret-looking URLs die loudly |
 | Tone | Straight, slightly stern, honest about limits - matches the name |
 | Brand domain | https://denyout.com |
 
@@ -55,7 +55,7 @@ DenyOut's bet: **make the safe outcome the default outcome** when someone wraps 
 ### P2 - Indie hacker / small SaaS
 
 - Runs an agent as a systemd service or single Docker Compose stack on a VPS.
-- Can paste a compose snippet; cannot staff a security team.
+- Can paste a compose snippet. Cannot staff a security team.
 
 **Job to be done:** Sleep at night knowing the bot can't POST to random domains.
 
@@ -77,11 +77,11 @@ DenyOut's bet: **make the safe outcome the default outcome** when someone wraps 
 
 | ID | Use case | Success look |
 | --- | --- | --- |
-| U1 | Wrap coding agent on laptop | Model API works; random URL fetch denied; notify shown |
-| U2 | Block R-20 style image URL with canary | Request never reaches attacker; audit has reason `secret_url` |
+| U1 | Wrap coding agent on laptop | Model API works. Random URL fetch denied. Notify shown |
+| U2 | Block R-20 style image URL with canary | Request never reaches attacker. Audit has reason `secret_url` |
 | U3 | Discover needed allowlist | `audit` mode for a day -> export allowlist candidates |
-| U4 | Sidecar in front of agent service | NetworkPolicy + DenyOut; curl to evil fails |
-| U5 | Incident kill switch | Flip mode or empty allowlist remotely / via file; new calls deny |
+| U4 | Sidecar in front of agent service | NetworkPolicy + DenyOut. Curl to evil fails |
+| U5 | Incident kill switch | Flip mode or empty allowlist remotely / via file. New calls deny |
 | U6 | Demo for executives | One terminal: poisoned markdown -> blocked |
 
 ## 6. Product principles
@@ -92,7 +92,7 @@ DenyOut's bet: **make the safe outcome the default outcome** when someone wraps 
 4. **Friction on first deny, not on first run.** First run works for common model APIs out of the box.
 5. **Audit lives outside the agent's reach** whenever the deployment can ensure it.
 6. **Secrets never required in the agent env for third-party APIs** (phase 2: credential injection). MVP may still use env keys for model providers - document the residual risk.
-7. **Local-first OSS core.** No account required for Protect or app update checks; optional account only for settings sync. Telemetry off by default.
+7. **Local-first OSS core.** No account required for Protect or app update checks. Optional account only for settings sync. Telemetry off by default.
 
 ## 7. Brand & naming
 
@@ -117,7 +117,7 @@ DenyOut's bet: **make the safe outcome the default outcome** when someone wraps 
 
 - High contrast, monospace-friendly docs.
 - Avoid purple-glow "AI security" clichés.
-- Denial events: clear red/amber in CLI; no alarmist emoji spam.
+- Denial events: clear red/amber in CLI. No alarmist emoji spam.
 
 ## 8. Success metrics (product)
 
@@ -126,7 +126,7 @@ DenyOut's bet: **make the safe outcome the default outcome** when someone wraps 
 | Time to first protected run | < 5 minutes on macOS/Linux |
 | False-deny rate on "model chat only" preset | < 5% of sessions need allowlist edit in first hour |
 | R-20 canary catch rate in lab | 100% for documented URL patterns |
-| Bypass without OS backstop | Documented; server guide **MUST** require NetworkPolicy |
+| Bypass without OS backstop | Documented. Server guide **MUST** require NetworkPolicy |
 
 ## 9. Relationship to Arviser
 
@@ -136,7 +136,7 @@ DenyOut may be:
 - Packaged as recommended control in AI Security Review reports.
 - Optionally co-branded later (`denyout` by Arviser) without requiring Arviser account for OSS use.
 
-This repo stays **product-owned**; Arviser site content is a separate concern.
+This repo stays **product-owned**. Arviser site content is a separate concern.
 
 ## 10. Non-goals for vision (see also D10, D12)
 

@@ -35,8 +35,8 @@ Examples: [`examples/k8s/`](../examples/k8s/).
 
 ### 2.2 NetworkPolicy sketch
 
-- Agent: allow egress TCP to DenyOut port on localhost / pod; allow DNS to cluster DNS; deny the rest. 
-- DenyOut: allow egress HTTPS to needed CIDRs or unrestricted as org policy dictates; still enforce app-level allowlist.
+- Agent: allow egress TCP to DenyOut port on localhost / pod. Allow DNS to cluster DNS. Deny the rest. 
+- DenyOut: allow egress HTTPS to needed CIDRs or unrestricted as org policy dictates. Still enforce app-level allowlist.
 
 ## 3. `denyout serve`
 
@@ -50,7 +50,7 @@ denyout serve --config /etc/denyout/denyout.yaml --listen 127.0.0.1:8080
 | --- | --- |
 | `--config`, `-c` | **Required** policy file |
 | `--listen` | Bind address (default from config `listen`, else `127.0.0.1:8080`) |
-| `--metrics-listen` | Optional `127.0.0.1:9090` (`/metrics`; also `/healthz` if health unset) |
+| `--metrics-listen` | Optional `127.0.0.1:9090` (`/metrics`. Also `/healthz` if health unset) |
 | `--health-listen` | Optional `/healthz` `/readyz` `/livez` |
 | `--tls-mode` | `intercept` (default) or `passthrough` |
 | `--ca-dir` | Where to write session CA cert for agent trust (intercept) |
@@ -79,7 +79,7 @@ services:
  - ./denyout.yaml:/config/denyout.yaml:ro
 ```
 
-Compose **without** extra firewall is weaker (agent could ignore proxy). Document clearly; provide `examples/compose/nftables` notes for VPS.
+Compose **without** extra firewall is weaker (agent could ignore proxy). Document clearly. Provide `examples/compose/nftables` notes for VPS.
 
 ## 5. systemd (VM)
 
@@ -93,7 +93,7 @@ Compose **without** extra firewall is weaker (agent could ignore proxy). Documen
 | --- | --- |
 | MVP | Single policy per proxy instance |
 | 1.1 | `agent_id` from header `X-DenyOut-Agent` set by mesh (spoofable if agent can set it - only trust if injected by sidecar iptables / envoy) |
-| 2 | mTLS from workload to DenyOut; map SPIFFE / K8s SA to policy bundle |
+| 2 | mTLS from workload to DenyOut. Map SPIFFE / K8s SA to policy bundle |
 | 3 | Central control plane issues short-lived proxy tokens (cf. Permit-style) |
 
 MVP **MUST NOT** pretend header-based agent_id is authentic without network isolation.
@@ -106,7 +106,7 @@ Align with seekrit/C1 pattern:
 - Proxy injects real secret only toward allowlisted hosts. 
 - Scrub echoes on response.
 
-Out of MVP; interfaces reserved in D03.
+Out of MVP. Interfaces reserved in D03.
 
 ## 8. Kill switch
 
@@ -136,4 +136,4 @@ Body scan caps protect memory.
 
 - Image digests pinned. 
 - Policy `apiVersion` compatible. 
-- CA rotation: restart pod with new session CA; agents may need reconnect.
+- CA rotation: restart pod with new session CA. Agents may need reconnect.

@@ -45,7 +45,7 @@ DenyOut **must not** claim that it:
 | Secret in body to allowed host, passthrough | Not stopped | Not stopped | Not stopped |
 | Secret in URL, intercept | Stopped | Stopped | Stopped |
 | User allowlists attacker / Ask Always | Allowed (user action) | Same | Same |
-| Open-redirect hop1->evil hop2 | Absolute Location re-eval strips hop2 (0.1.9+); relative/open-fetch proxies on allowlisted hosts remain residual | Same | Same |
+| Open-redirect hop1->evil hop2 | Absolute Location re-eval strips hop2 (0.1.9+). Relative/open-fetch proxies on allowlisted hosts remain residual | Same | Same |
 | Agent kills DenyOut / turns Off | Possible | Possible | Hard if RBAC + separate container |
 | Windows without WinDivert bridge | Must show unsupported / Needs setup - never fake On | N/A | N/A |
 
@@ -57,7 +57,7 @@ Marketing one-liners **MUST** match §1-§2 (no "unbypassable").
 
 ## 6. Vulnerability reporting
 
-GitHub Security Advisories on [`nareyko/denyout`](https://github.com/nareyko/denyout); mailbox `security@denyout.com` (forwarding live). 
+GitHub Security Advisories on [`nareyko/denyout`](https://github.com/nareyko/denyout). Mailbox `security@denyout.com` (forwarding live). 
 Fix policy: fail-closed bugs prioritized over UX bugs.
 
 ## 7. Ship-check (M5)

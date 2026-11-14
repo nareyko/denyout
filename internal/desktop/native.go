@@ -401,11 +401,11 @@ func (a *App) helpAndProblems() {
 	}
 	text := fmt.Sprintf(
 		"DenyOut %s\n\n"+
-			"Protect computer - everyday browsing; clear threats -> Keep blocked / Allow this site.\n"+
+			"Protect computer - everyday browsing. Clear threats then Keep blocked or Allow this site.\n"+
 			"My agents - wrap a program (Ask before new hosts).\n"+
-			"Agents only - whole-PC allowlist (Settings -> Advanced; almost nobody needs this).\n\n"+
-			"Left-click tray / Open DenyOut... -> Home.\n"+
-			"History = what was blocked. Settings -> Advanced = allowed / silenced sites.\n"+
+			"Agents only - whole-PC allowlist (Settings, Advanced - almost nobody needs this).\n\n"+
+			"Left-click tray or Open DenyOut... for Home.\n"+
+			"History = what was blocked. Settings, Advanced = allowed / silenced sites.\n"+
 			"Problems = when Protect failed.\n\n"+
 			"Privacy: decisions stay on this computer.",
 		ver,

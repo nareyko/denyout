@@ -4,7 +4,7 @@
 
 Site: [https://denyout.com](https://denyout.com) - Canon GitHub (planned): [`nareyko/denyout`](https://github.com/nareyko/denyout)
 
-Agents that can read untrusted text, see sensitive data, and reach the network form a [lethal trifecta](https://arviser.com/guides/lethal-trifecta). DenyOut puts a local policy proxy on the path: **Protect computer** defaults to **Safe desktop** (web works; secret-looking links blocked). **My agents** wraps python/CLI tools under an allowlist with rare Ask. Whole-PC **Agents only** is intentional (confirm). Audit stays on-device. See [CHANGELOG](CHANGELOG.md).
+Agents that can read untrusted text, see sensitive data, and reach the network form a [lethal trifecta](https://arviser.com/guides/lethal-trifecta). DenyOut puts a local policy proxy on the path: **Protect computer** defaults to **Safe desktop** (web works. Secret-looking links blocked). **My agents** wraps python/CLI tools under an allowlist with rare Ask. Whole-PC **Agents only** is intentional (confirm). Audit stays on-device. See [CHANGELOG](CHANGELOG.md).
 
 ```bash
 # Linux / macOS - silent; auto-detects Desktop (GUI) vs Server (headless)
@@ -37,11 +37,11 @@ Windows: download the zip from [Releases](https://github.com/nareyko/denyout/rel
 
 ## Status
 
-**Protect computer (Safe desktop)** is the primary desktop path. **My agents** wraps AI/tools. Admin failure stays Off (no silent Session). Remaining for the Dec 1 bet: timed **M4** install on three OS; Windows WinDivert bridge packaging.
+**Protect computer (Safe desktop)** is the primary desktop path. **My agents** wraps AI/tools. Admin failure stays Off (no silent Session). Remaining for the Dec 1 bet: timed **M4** install on three OS. Windows WinDivert bridge packaging.
 
 **Language:** English only - **License:** Apache-2.0 - **Platforms:** Ubuntu, macOS, Windows.
 
-**Install:** GitHub Releases + SHA256SUMS; Linux/macOS [`install.sh`](install.sh) -> `~/.local/bin` (`denyout` + `denyout-desktop` when published); Windows zip + [`docs/install-windows.md`](docs/install-windows.md). See [`docs/07-desktop.md`](docs/07-desktop.md).
+**Install:** GitHub Releases + SHA256SUMS. Linux/macOS [`install.sh`](install.sh) -> `~/.local/bin` (`denyout` + `denyout-desktop` when published). Windows zip + [`docs/install-windows.md`](docs/install-windows.md). See [`docs/07-desktop.md`](docs/07-desktop.md).
 
 Internal Bet Tree / monetization / full decision log live in a **private HQ** sibling (`denyout-hq`), not in this repo.
 
@@ -74,9 +74,9 @@ Examples: [`examples/`](examples/). Schema: [`schemas/`](schemas/).
 
 Normative claims: [`docs/10-security-boundaries.md`](docs/10-security-boundaries.md).
 
-- **May claim:** with Protect computer **On** (Safe desktop), DenyOut protects **this user's outbound web (HTTP/HTTPS)** against secret-looking links / canaries / hard SSRF; Agents only / wraps limit destinations to an allowlist (Ask when enabled).
+- **May claim:** with Protect computer **On** (Safe desktop), DenyOut protects **this user's outbound web (HTTP/HTTPS)** against secret-looking links / canaries / hard SSRF. Agents only / wraps limit destinations to an allowlist (Ask when enabled).
 - **Must not claim:** unbypassable, prompt-injection cure, phone coverage, or protection while Off / when hostguard failed. Without Stronger isolation (`srt`), some tools can bypass the proxy.
-- Residual: UDP, DoH, custom stacks; Windows needs WinDivert bridge for computer mode.
+- Residual: UDP, DoH, custom stacks. Windows needs WinDivert bridge for computer mode.
 
 ## One-line pitch
 
@@ -85,7 +85,7 @@ Normative claims: [`docs/10-security-boundaries.md`](docs/10-security-boundaries
 ## Author
 
 **Vadim Nareyko** - founder of [Arviser](https://arviser.com). 
-DenyOut (https://denyout.com) is a separate product brand; Arviser may recommend it as an egress control (e.g. R-20).
+DenyOut (https://denyout.com) is a separate product brand. Arviser may recommend it as an egress control (e.g. R-20).
 
 ## License
 

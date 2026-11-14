@@ -191,7 +191,7 @@ func Run(ctx context.Context, opts Options) error {
 	}
 
 	if opts.NoTray {
-		fmt.Fprintln(os.Stderr, "denyout desktop: tray disabled (--no-tray); press Ctrl+C to quit")
+		fmt.Fprintln(os.Stderr, "denyout desktop: tray disabled (--no-tray). Press Ctrl+C to quit")
 		<-ctx.Done()
 		a.stopAll()
 		a.stopAllWrapsOpts("", true)

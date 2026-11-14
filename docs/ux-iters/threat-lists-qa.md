@@ -14,14 +14,14 @@ go build -o /tmp/denyout-cli-wave ./cmd/denyout
 ```
 
 **Last run (LF, 2026-11-14):** `go test ./internal/...` PASS - frontend build PASS - Wails + CLI build PASS. 
-TL1-TL8 unit re-verified verbose PASS. M1-M8 remain code PASS; live Protect dogfood still **PENDING** user (not blocking LF).
+TL1-TL8 unit re-verified verbose PASS. M1-M8 remain code PASS. Live Protect dogfood still **PENDING** user (not blocking LF).
 
 ## Automated matrix (TL*)
 
 | ID | Assert | Evidence | Result |
 | --- | --- | --- | --- |
 | TL1 | User Allow beats threat list | `TestUserAlwaysBeatsThreatList`, `TestUserOnceBeatsThreatList` | **PASS** |
-| TL2 | Unbreak beats threat; scanner still denies | `TestUnbreakBeatsThreatList`, `TestUnbreakDoesNotBypassScanner` | **PASS** |
+| TL2 | Unbreak beats threat. Scanner still denies | `TestUnbreakBeatsThreatList`, `TestUnbreakDoesNotBypassScanner` | **PASS** |
 | TL3 | Parse domains + hosts + ABP | `TestParseDomainsHostsABP` | **PASS** |
 | TL4 | Bad fetch keeps cache | `TestBadFetchKeepsPreviousCache` | **PASS** |
 | TL5 | Undersized fetch rejected | `TestUndersizedFetchRejected` | **PASS** |
@@ -29,16 +29,16 @@ TL1-TL8 unit re-verified verbose PASS. M1-M8 remain code PASS; live Protect dogf
 | TL7 | Pack merge idempotent + Undo | `TestApplyPackIdempotentAndUndo`, `TestApplyPackDoesNotClaimPreexisting` | **PASS** |
 | TL8 | Agent default-deny unknown | `TestWholeDeviceAgentDeniesUnknownAllowsModels` (unchanged) | **PASS** |
 
-Related: pack allow does **not** beat threat (`TestPackAllowDoesNotBeatThreatList`); URLhaus inactive until first OK (`TestURLHausInactiveUntilFirstOK`).
+Related: pack allow does **not** beat threat (`TestPackAllowDoesNotBeatThreatList`). URLhaus inactive until first OK (`TestURLHausInactiveUntilFirstOK`).
 
 ## Manual matrix (M*)
 
 | ID | Scenario | Result (2026-11-14) |
 | --- | --- | --- |
-| M1 | Phishing ON -> listed domain -> decision dialog | **PASS** code (`threat_list` in clear post-block; HITL path). Live Protect dogfood **PENDING** user |
+| M1 | Phishing ON -> listed domain -> decision dialog | **PASS** code (`threat_list` in clear post-block. HITL path). Live Protect dogfood **PENDING** user |
 | M2 | Allow site -> same domain passes | **PASS** code (Book B Always skips Book C) |
 | M3 | URLhaus ON/OFF | **PASS** code (`UISetBlockMalware` + `Contains` Active) |
-| M4 | Stronger OFF->ON + warning + count | **PASS** code/UI (nested checkbox + confirm; Settings feed row) |
+| M4 | Stronger OFF->ON + warning + count | **PASS** code/UI (nested checkbox + confirm. Settings feed row) |
 | M5 | Refresh now + offline cache | **PASS** unit (cache keep) + `UIRefreshThreatLists` |
 | M6 | Cursor pack -> hosts on profile | **PASS** unit + My agents UI / wizard ask |
 | M7 | Browse normal sites with defaults ON | **PASS** code (blocklist + threat only on listed hosts) |

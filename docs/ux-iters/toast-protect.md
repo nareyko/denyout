@@ -10,4 +10,4 @@ Know Protect state from **Home / tray** (and Problems on failure), without statu
 ## Requirements (historical - partly void)
 
 **Was Must:** success ≈ "You're protected..." OS toast - **void** (UI only). 
-**Still Must:** admin fail ≈ password window story + Open DenyOut -> Problems / retry Protect; no "Help & logs".
+**Still Must:** admin fail ≈ password window story + Open DenyOut -> Problems / retry Protect. No "Help & logs".

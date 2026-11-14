@@ -52,7 +52,7 @@
 | Field | Meaning |
 | --- | --- |
 | `policy_profile` | `agent` \| `browse` (desktop seatbelt profile) |
-| `process` | Best-effort client label (e.g. `proxyd`, `desktop-session`); empty OK |
+| `process` | Best-effort client label (e.g. `proxyd`, `desktop-session`). Empty OK |
 
 Activity UI can filter denials by reason (`host_not_allowed` vs `secret_in_url`).
 
@@ -82,9 +82,9 @@ Prometheus-style:
 
 ## 5. Retention
 
-Default desktop: rotate `audit.jsonl` at ~32 MiB; keep the last 3 rotated `*.bak` files. 
+Default desktop: rotate `audit.jsonl` at ~32 MiB. Keep the last 3 rotated `*.bak` files. 
 CLI: `denyout audit tail [-n N] [--denials] [--path FILE]`. 
-Server: rely on platform logging stack; local file optional.
+Server: rely on platform logging stack. Local file optional.
 
 ## 6. Operational runbooks (outline)
 
@@ -98,11 +98,11 @@ Server: rely on platform logging stack; local file optional.
 
 1. Filter `verdict=deny` + `secret_*` / `canary_*`. 
 2. Capture `session_id`, agent version, policy_hash. 
-3. Preserve audit file; rotate credentials that appeared in canary tests only if real secrets used (lab should use fakes).
+3. Preserve audit file. Rotate credentials that appeared in canary tests only if real secrets used (lab should use fakes).
 
 ### 6.3 Proxy down in server
 
-Readiness fails -> kube stops sending traffic; with NetworkPolicy agent cannot bypass -> fail closed. Alert on CrashLoop.
+Readiness fails -> kube stops sending traffic. With NetworkPolicy agent cannot bypass -> fail closed. Alert on CrashLoop.
 
 ## 7. Policy change audit
 

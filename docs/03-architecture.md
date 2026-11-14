@@ -49,7 +49,7 @@
 
 **MUST:**
 
-- Provide `run`, `check`, `version`, `policy validate`, `audit tail` (MVP subset OK; see D06).
+- Provide `run`, `check`, `version`, `policy validate`, `audit tail` (MVP subset OK. See D06).
 - Load config from flag, env, or default search path.
 - Bind proxy to **localhost** (or abstract UDS on Linux) by default.
 - Spawn child with proxy-related env vars set.
@@ -69,8 +69,8 @@
 - Apply policy **before** bytes are forwarded to an unapproved destination.
 - Support at least two inspection depths:
  - **L1 passthrough:** decide on destination host/SNI/IP (and CONNECT target).
- - **L2 intercept:** terminate TLS with DenyOut CA; inspect method/path/query/headers/body.
-- Default MVP desktop preset: L2 for HTTP cleartext + L1 or L2 for HTTPS configurable; **recommend L2** when blocking secret-in-URL is a goal.
+ - **L2 intercept:** terminate TLS with DenyOut CA. Inspect method/path/query/headers/body.
+- Default MVP desktop preset: L2 for HTTP cleartext + L1 or L2 for HTTPS configurable. **Recommend L2** when blocking secret-in-URL is a goal.
 - Enforce SSRF IP rules after DNS resolution (see D04) - **resolve then check**, never check hostname only.
 
 **SHOULD:**
@@ -131,7 +131,7 @@ Pod
 ```
 
 Agent points to `http://127.0.0.1:8080` or link-local sidecar IP. 
-Cluster NetworkPolicy: agent egress only to sidecar; sidecar egress as needed.
+Cluster NetworkPolicy: agent egress only to sidecar. Sidecar egress as needed.
 
 ### 4.3 Server: host / gateway model (later)
 
@@ -142,7 +142,7 @@ Shared DenyOut per node or central egress gateway with mTLS from workloads - pha
 | Binding | Default | Notes |
 | --- | --- | --- |
 | HTTP proxy | `127.0.0.1:0` (ephemeral) written to env | Desktop |
-| HTTP proxy server | `0.0.0.0:8080` or localhost only | Sidecar; prefer localhost + shared emptyDir network namespace |
+| HTTP proxy server | `0.0.0.0:8080` or localhost only | Sidecar. Prefer localhost + shared emptyDir network namespace |
 | Admin / metrics | localhost only | Disabled by default in desktop |
 | UDS | `$XDG_RUNTIME_DIR/denyout.sock` | Optional Linux hardening |
 
@@ -163,11 +163,11 @@ On first desktop use (or per session - configurable):
 1. Client CONNECT `host:443`. 
 2. Policy L1 on host - deny early if host forbidden. 
 3. If L2 required (secret scanning / path rules): MITM, present cert for `host` signed by DenyOut CA. 
-4. Inspect request; policy L2; then dial upstream with normal WebPKI (system roots), unless enterprise custom roots configured.
+4. Inspect request. Policy L2. Then dial upstream with normal WebPKI (system roots), unless enterprise custom roots configured.
 
 ### 6.3 Certificate pinning / broken clients
 
-Some agents use custom HTTP stacks that ignore env CA. Document failures; offer `denyout run --tls-mode=passthrough` with reduced guarantees.
+Some agents use custom HTTP stacks that ignore env CA. Document failures. Offer `denyout run --tls-mode=passthrough` with reduced guarantees.
 
 ## 7. Config load order
 
@@ -178,7 +178,7 @@ Some agents use custom HTTP stacks that ignore env CA. Document failures; offer 
 5. `--policy` / `--config` flag. 
 6. Env `DENYOUT_*` overrides for a small safe subset (mode, log level) - **MUST NOT** allow env to set `allow_hosts: ['*']` without explicit `DENYOUT_ALLOW_INSECURE_OVERRIDE=1`.
 
-Merge semantics: deep-merge maps; lists for allow hosts **replace** by default at the highest layer (document clearly). Optional `extra_allow_hosts` additive key.
+Merge semantics: deep-merge maps. Lists for allow hosts **replace** by default at the highest layer (document clearly). Optional `extra_allow_hosts` additive key.
 
 ## 8. Presets
 
@@ -210,10 +210,10 @@ Interfaces SHOULD be defined in code as stable Go/Rust traits even if only one i
 | --- | --- | --- |
 | **Go** | Single static binary, easy cross-compile, good HTTP ecosystem | MITM libs less mature than mitmproxy |
 | **Rust** | Strong safety, performance | Slower MVP |
-| **Python + mitmproxy addon** | Fastest secret URL MVP | Packaging/heavier runtime; harder "one binary" |
-| **Hybrid** | mitmproxy for L2 lab; Go for production | Two stacks |
+| **Python + mitmproxy addon** | Fastest secret URL MVP | Packaging/heavier runtime. Harder "one binary" |
+| **Hybrid** | mitmproxy for L2 lab. Go for production | Two stacks |
 
-**Spec suggestion:** MVP prototype in Python/mitmproxy or Go; production target **single static binary (Go)**. Final choice recorded in D12 open questions.
+**Spec suggestion:** MVP prototype in Python/mitmproxy or Go. Production target **single static binary (Go)**. Final choice recorded in D12 open questions.
 
 ## 11. Repository layout (planned implementation)
 

@@ -315,7 +315,7 @@ func (a *App) chooseProtectPause() string {
 		def = last
 	}
 	title := "DenyOut - Pause protection"
-	text := "How long should Protect stay off?\n(Default: " + def + "; forever is available but not the default.)"
+	text := "How long should Protect stay off?\n(Default: " + def + ". Forever is available but not the default.)"
 	if runtime.GOOS == "linux" {
 		if zenity, err := exec.LookPath("zenity"); err == nil {
 			cmd := exec.Command(zenity, "--list",

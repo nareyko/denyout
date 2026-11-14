@@ -31,8 +31,15 @@ node "$PH" typography --check --strict --ext=.tsx,.ts,.html \
 echo "== prose-hygiene patterns (docs blockers) =="
 node "$PH" check --fail-on=blocker --ext=.md docs README.md SECURITY.md
 
+echo "== semicolon scan (docs + README; report) =="
+# Info-level: rewrite prose ';' when touching these files (see HQ copy-hygiene.mdc).
+set +e
+SEMI=$(node "$PH" check --ext=.md docs README.md SECURITY.md CHANGELOG.md 2>&1 | grep -c 'semicolon-density' || true)
+set -e
+echo "semicolon-density hits: ${SEMI:-0} (fix stacked ';' in English to periods)"
+
 if command -v uvx >/dev/null 2>&1; then
-  echo "== lexaudit (docs; detection) =="
+  echo "== lexaudit (docs, detection) =="
   uvx lexaudit audit --path docs --locale en --check || true
 else
   echo "uvx not found; skip lexaudit"

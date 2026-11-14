@@ -15,8 +15,8 @@ Engineering tasks for the DenyOut MVP. Product deadlines and internal bets are t
 
 ## B. Policy + scanners
 
-- [x] Load/validate `denyout/v1` (see `schemas/denyout-config.v1.json`; embedded copy under `internal/policy/schema/`)
-- [x] Modes `enforce` / `audit` (+ blocklist/ask without UI); evaluation order per [`04-policy-engine.md`](04-policy-engine.md)
+- [x] Load/validate `denyout/v1` (see `schemas/denyout-config.v1.json`. Embedded copy under `internal/policy/schema/`)
+- [x] Modes `enforce` / `audit` (+ blocklist/ask without UI). Evaluation order per [`04-policy-engine.md`](04-policy-engine.md)
 - [x] Preset `presets/models.yaml` (versioned)
 - [x] Scanners: canaries, named query params, token prefixes, JWT-ish (high entropy off)
 - [x] Redaction in `denyout check` / audit
@@ -24,16 +24,16 @@ Engineering tasks for the DenyOut MVP. Product deadlines and internal bets are t
 
 ## C. Proxy + CLI
 
-- [x] Localhost HTTP proxy; CONNECT; intercept CA for child env
+- [x] Localhost HTTP proxy. CONNECT. Intercept CA for child env
 - [x] `--tls-mode=passthrough` with warning
 - [x] SSRF / unsafe IP hard denies
 - [x] `denyout run -- <cmd>`
 - [x] `denyout check`, `policy validate`, `init`
-- [x] Optional `--sandbox=` stub (documented; not required)
+- [x] Optional `--sandbox=` stub (documented. Not required)
 
 ## D. Lab tests
 
-- [x] SQLite schema + seed (`internal/lab`; primary `r20-01-canary-query`)
+- [x] SQLite schema + seed (`internal/lab`. Primary `r20-01-canary-query`)
 - [x] SQLite fixture DB + ≥20 R-20 / secret-URL cases (`r20_url` suite, 22 cases)
 - [x] `denyout test` / acceptance AT-01...AT-09 (`internal/accept`, CI)
 - [x] Examples under `examples/canaries/` (pre-existing)
@@ -42,10 +42,10 @@ Engineering tasks for the DenyOut MVP. Product deadlines and internal bets are t
 ## E. Audit + UX
 
 - [x] JSONL audit schema v1 ([`09-audit-and-ops.md`](09-audit-and-ops.md))
-- [x] Desktop UX: `denyout desktop` Protect this computer (hostguard) + tray/notify/settings; Advanced process wrap; `denyout gui` technical panel
-- [x] `denyout hostctl` + `internal/hostguard` (linux nft / darwin pf / windows WinDivert bridge); whole_device policy + Ask mode
-- [x] Denial copy never prints raw secrets; OS notifications on deny (default)
-- [x] Install entries: `install.sh` optional desktop launch; Windows `Start-DenyOut.cmd` in release zip
+- [x] Desktop UX: `denyout desktop` Protect this computer (hostguard) + tray/notify/settings. Advanced process wrap. `Denyout gui` technical panel
+- [x] `denyout hostctl` + `internal/hostguard` (linux nft / darwin pf / windows WinDivert bridge). Whole_device policy + Ask mode
+- [x] Denial copy never prints raw secrets. OS notifications on deny (default)
+- [x] Install entries: `install.sh` optional desktop launch. Windows `Start-DenyOut.cmd` in release zip
 
 ## F. Install + release
 
@@ -54,13 +54,13 @@ Locked recipes: [`07-desktop.md`](07-desktop.md) §3.
 - [x] `install.sh` (Linux/macOS -> `~/.local/bin`, fetch Release + SHA256)
 - [x] Windows zip + short EN `docs/install-windows.md` (winget optional stretch)
 - [x] Cross-build linux / darwin / windows (`.goreleaser.yaml` + `release` workflow on `v*` tags)
-- [ ] GitHub Release + SHA256SUMS (M6 must) - tag `v*` to publish; SBOM/cosign SHOULD if time
-- [ ] Timed M4 install smoke on each OS; failed OS -> preview/unsupported in notes
+- [ ] GitHub Release + SHA256SUMS (M6 must) - tag `v*` to publish. SBOM/cosign SHOULD if time
+- [ ] Timed M4 install smoke on each OS. Failed OS -> preview/unsupported in notes
 - [ ] Homebrew formula **after** first Release (not M4 blocker)
 
 ## G. Server (after desktop skeleton)
 
-- [x] `denyout serve` (`--listen`, `--health-listen`, `--metrics-listen`, `--ca-dir`; `DENYOUT_KILL=1`)
+- [x] `denyout serve` (`--listen`, `--health-listen`, `--metrics-listen`, `--ca-dir`. `DENYOUT_KILL=1`)
 - [x] Examples in `examples/k8s/` + `examples/compose/` + NetworkPolicy docs ([`08-server.md`](08-server.md))
 
 ## Non-goals for MVP code

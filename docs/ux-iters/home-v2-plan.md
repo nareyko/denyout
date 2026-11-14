@@ -1,6 +1,6 @@
 # Plan: Home v2 UX alignment
 
-Normative: [`home.md`](home.md). Goal: Home is the only primary surface; other screens stay additional. Implement -> test -> visual QA.
+Normative: [`home.md`](home.md). Goal: Home is the only primary surface. Other screens stay additional. Implement -> test -> visual QA.
 
 ## Gaps vs current UI
 
@@ -33,7 +33,7 @@ Normative: [`home.md`](home.md). Goal: Home is the only primary surface; other s
 ### C - Additional screens (light polish only)
 
 1. History empty already calm - leave.
-2. Top bar on Home: keep Protected pill; no new chrome clutter.
+2. Top bar on Home: keep Protected pill. No new chrome clutter.
 3. Do not re-promote My agents / Jump.
 
 ### D - Docs + preview
@@ -61,5 +61,5 @@ HITL timing, tray expansion, Pi-hole charts, commit/PR.
 | D preview/docs | Done |
 | E verify | Done - `npm run build`, `go test ./internal/desktop`, visual preview states |
 | F compact layout pass | Done - narrower nav, quieter topbar, tighter Home/cards/History/drawer, mobile nav fix |
-| G layout bugfix | Done - History empty without drawer; Problems healthy CTAs; denser card type |
-| H re-audit polish | Done - Profiles empty card; shorter Settings find; History Refresh kept (list reload) |
+| G layout bugfix | Done - History empty without drawer. Problems healthy CTAs. Denser card type |
+| H re-audit polish | Done - Profiles empty card. Shorter Settings find. History Refresh kept (list reload) |

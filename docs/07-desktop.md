@@ -22,7 +22,7 @@ cd cmd/denyout-desktop/frontend && npm ci && npm run build && cd ../../..
 CGO_ENABLED=1 go build -tags 'wails,production,webkit2_41' -ldflags "-X main.version=dev" -o denyout-desktop ./cmd/denyout-desktop
 ```
 
-Plain `go build` **must** include the `production` tag (otherwise Wails links a stub). Close the window **hides to tray**; Quit only from the tray menu - see [`07-desktop-ux.md`](07-desktop-ux.md) §§2-5.
+Plain `go build` **must** include the `production` tag (otherwise Wails links a stub). Close the window **hides to tray**. Quit only from the tray menu - see [`07-desktop-ux.md`](07-desktop-ux.md) §§2-5.
 
 ## 2. Modes (summary)
 
@@ -30,9 +30,9 @@ Full menu and screen inventory: [`07-desktop-ux.md`](07-desktop-ux.md) §§2-5.
 
 | Mode | User expectation |
 | --- | --- |
-| Safe desktop | Web OK; clear threats -> **Keep blocked** / **Allow this site** + URL |
-| My agents (wrap) | Per-program proxy; Pre-act Ask on new hosts |
-| Agents only (whole PC) | Settings -> Advanced (strong warn); allowlist; messengers may break |
+| Safe desktop | Web OK. Clear threats -> **Keep blocked** / **Allow this site** + URL |
+| My agents (wrap) | Per-program proxy. Pre-act Ask on new hosts |
+| Agents only (whole PC) | Settings -> Advanced (strong warn). Allowlist. Messengers may break |
 | Off | No Protect computer mediation |
 
 ## 3. Install channels (Dec 1 must)

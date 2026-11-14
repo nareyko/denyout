@@ -64,7 +64,7 @@ func (a *App) wizardNewAgent(start bool) {
 			"Skip",
 		)
 	} else {
-		notify.Info("DenyOut", "Stronger isolation needs srt (sandbox-runtime). Wrap will run without it; some tools can bypass the proxy.")
+		notify.Info("DenyOut", "Stronger isolation needs srt (sandbox-runtime). Wrap will run without it. Some tools can bypass the proxy.")
 	}
 	p := NewAgentProfile(name, splitCommand(cmdLine))
 	p.WorkDir = strings.TrimSpace(workdir)

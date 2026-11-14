@@ -73,9 +73,9 @@ App name: **DenyOut**.
 | --- | --- |
 | Brand | **DenyOut** |
 | Nav | **Home** - **History** - **Settings** - **Problems** - **My agents** (demoted) - Jump via Ctrl+K only |
-| Problems badge | Red dot; title `Needs attention` |
+| Problems badge | Red dot. Title `Needs attention` |
 | Mode pill | `Protected` (Safe on) / `Agents only` / `Off` / ... |
-| Status (healthy) | `Protected` when Safe on; else live status |
+| Status (healthy) | `Protected` when Safe on. Else live status |
 | Status (unhealthy) | **Needs attention - open Problems** |
 | Button | **Open Problems** (when unhealthy) |
 | Button | **Refresh** |
@@ -130,7 +130,7 @@ Dropped - Home covers first open.
 
 ---
 
-## 4.5 Screen: Home (default) - **primary**; see [`ux-iters/home.md`](ux-iters/home.md)
+## 4.5 Screen: Home (default) - **primary**. See [`ux-iters/home.md`](ux-iters/home.md)
 
 | Region | Labels / copy |
 | --- | --- |
@@ -146,7 +146,7 @@ Dropped - Home covers first open.
 
 ---
 
-## 5. Screen: History (nav label; route `activity`)
+## 5. Screen: History (nav label. Route `activity`)
 
 | Region | Labels / copy |
 | --- | --- |
