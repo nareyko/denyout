@@ -11,13 +11,14 @@ import (
 
 // Options for denyout run.
 type Options struct {
-	ConfigPath string
-	TLSMode    proxy.TLSMode
-	Version    string
-	Command    []string
-	Sandbox    string // stub only
-	Notify     bool   // OS notifications on deny
-	OnDeny     proxy.DenyHook
+	ConfigPath     string
+	TLSMode        proxy.TLSMode
+	Version        string
+	Command        []string
+	Sandbox        string // srt when Stronger isolation
+	Notify         bool   // OS notifications on deny
+	OnDeny         proxy.DenyHook
+	RequireSandbox bool // fail closed if Sandbox cannot be applied
 }
 
 // Exec starts proxy, wraps child, returns child exit code.
@@ -45,13 +46,33 @@ func Exec(opts Options) (int, error) {
 	st := sess.Status()
 	fmt.Fprintf(os.Stderr, "denyout: mode=%s preset=%s tls=%s proxy=%s session=%s\n",
 		st.Mode, st.Preset, st.TLSMode, st.ProxyURL, st.SessionID)
-	fmt.Fprintln(os.Stderr, "denyout: note — without OS sandbox / Protect this computer, some tools can bypass the proxy (see docs/10-security-boundaries.md)")
 
-	cmd := exec.Command(opts.Command[0], opts.Command[1:]...)
+	sandbox := opts.Sandbox
+	if opts.RequireSandbox && sandbox == "" {
+		sandbox = "srt"
+	}
+	argv, envExtra, clean, err := WrapSandbox(sandbox, opts.Command, st.ProxyURL)
+	if clean != nil {
+		defer clean()
+	}
+	if err != nil {
+		if opts.RequireSandbox || sandbox != "" {
+			return 2, err
+		}
+	}
+	if sandbox == "" {
+		fmt.Fprintln(os.Stderr, "denyout: note — without OS sandbox / Protect this computer, some tools can bypass the proxy (see docs/10-security-boundaries.md)")
+	} else {
+		fmt.Fprintf(os.Stderr, "denyout: stronger isolation via %s\n", sandbox)
+	}
+
+	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.Env = childEnv(os.Environ(), st.ProxyURL, st.SessionID, sess.ca)
+	env := childEnv(os.Environ(), st.ProxyURL, st.SessionID, sess.ca)
+	env = append(env, envExtra...)
+	cmd.Env = env
 	setProcGroup(cmd)
 
 	if err := cmd.Start(); err != nil {

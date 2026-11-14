@@ -86,7 +86,7 @@ allow:
 | `*.example.com` | One or more labels under `example.com` (**MUST NOT** match `example.com` itself unless `include_apex: true`) |
 | `*`, `*.*` | **Forbidden** in enforce without `insecure_allow_all: true` |
 
-IP literals allowed only if `allow_ip_literals: true` (default false).
+IP literals are **hard-denied** when `allow_ip_literals` is false (default): evaluation stops immediately; Ask / Always-allow cannot bypass. Desktop shows a rate-limited toast instead of an Ask dialog. Use **Browse** profile for apps that connect by raw IP (e.g. some messengers).
 
 ### 4.2 Path matching (L2)
 

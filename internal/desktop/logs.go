@@ -45,7 +45,8 @@ const logsReadme = `DenyOut diagnostics — which file to send
 3) audit.jsonl     ← traffic decisions (allow/deny). NOT an admin error log.
    Rotates when large (~32 MiB). Use: denyout audit tail --denials
 
-Tray → "Open activity…" for denial history + settings.
+Tray → "Open activity…" for native denial history (Always allow selected host).
+Tray → "Always-allow list…" to remove persisted hosts.
 Tray → "Open diagnostics…" opens this folder (last-error / desktop.log).
 
 If last-error.txt says "No errors recorded yet", Protect is OK or the

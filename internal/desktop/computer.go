@@ -135,7 +135,6 @@ func (a *App) startComputer() error {
 	return nil
 }
 
-
 // stopComputerOpts stops computer-mode proxyd.
 // If elevateRemove is false, only kills proxyd — next ElevateApply replaces nft/pf
 // in one admin prompt (avoid Remove+Apply = two passwords).
@@ -184,6 +183,11 @@ func (a *App) stopAll() {
 	a.stopComputerOpts(true, false) // keep rules; caller may re-Apply once
 	a.stopSessionKeep(true)
 	a.setStatus("Off")
+}
+
+// stopAllKeepRestore stops live protectors but leaves ProtectionOn for next login (Quit leave-on).
+func (a *App) stopAllKeepRestore() {
+	a.stopAll()
 }
 
 func (a *App) stopProtection() {
@@ -257,18 +261,24 @@ func (a *App) enableComputerFromTray() error {
 	if err := a.startComputer(); err != nil {
 		fmt.Fprintf(os.Stderr, "denyout desktop: %v\n", err)
 		a.setStatus("Needs admin")
-		notify.Info("DenyOut", "Admin failed — tray → Copy last error / Open diagnostics. Session mode on.")
-		_ = a.startSession()
+		a.mu.Lock()
+		a.state.ComputerAvailable = false
+		a.state.ProtectionOn = false
+		a.state.Scope = ScopeOff
+		stFail := a.state
+		a.mu.Unlock()
+		_ = SaveState(stFail)
+		notify.Info("DenyOut", "Admin failed — protection stays Off. Tray → Protect computer to retry, or Help & logs.")
 		return err
 	}
-	AppendDesktopLog("INFO computer mode on")
+	AppendDesktopLog("INFO computer mode on profile=%s", normalizePolicyProfile(a.state.PolicyProfile))
 	if !certutilAvailable() {
 		AppendDesktopLog("INFO hint: install libnss3-tools (certutil) for Chrome/Chromium trust")
 	}
 	if !clipboardAvailable() {
 		AppendDesktopLog("INFO hint: install wl-clipboard for Copy last error")
 	}
-	notify.Info("DenyOut", "Protect whole computer is on.")
+	notify.Info("DenyOut", "Protect computer is on ("+policyProfileLabel(a.state.PolicyProfile)+").")
 	return nil
 }
 
@@ -289,11 +299,11 @@ func (a *App) enableSessionFromTray() error {
 
 func (a *App) stopProtectionFromTray() {
 	if a.currentMode() == ModeOff {
-		notify.Info("DenyOut", "Protection is already off.")
+		notify.Info("DenyOut", "Protection is already off. (Running agents are separate — use My agents → Stop.)")
 		return
 	}
 	a.stopProtection()
-	notify.Info("DenyOut", "Protection is off.")
+	notify.Info("DenyOut", "Protect computer is off. Running agents (if any) keep going — Stop them from My agents.")
 }
 
 func (a *App) restartActiveProtector() {
@@ -312,10 +322,17 @@ func (a *App) restartActiveProtector() {
 	switch scope {
 	case ScopeComputer:
 		if err := a.startComputer(); err != nil {
-			_ = a.startSession()
+			fmt.Fprintf(os.Stderr, "denyout desktop: restart computer failed: %v — staying Off\n", err)
+			a.setStatus("Needs admin")
+			notify.Info("DenyOut", "Could not restart Protect computer — staying Off. Retry from the tray.")
 		}
-	default:
+	case ScopeSession:
+		// Session is not a user-facing restore target after UX v2.
 		_ = a.startSession()
+	default:
+		if err := a.startComputer(); err != nil {
+			a.setStatus("Needs admin")
+		}
 	}
 }
 
@@ -327,29 +344,36 @@ func (a *App) restoreProtection() {
 	if !on {
 		return
 	}
+	// Migrate legacy session preference → Off (no morning Session surprise).
+	if scope == ScopeSession {
+		AppendDesktopLog("INFO restore: ignoring legacy session scope (no silent Session)")
+		a.mu.Lock()
+		a.state.Scope = ScopeOff
+		a.state.ProtectionOn = false
+		a.state.ComputerEnabled = false
+		st := a.state
+		a.mu.Unlock()
+		_ = SaveState(st)
+		notify.Info("DenyOut", "Previous Session mode was cleared. Use Protect computer (Safe desktop) when ready.")
+		return
+	}
 	if scope == "" {
 		scope = ScopeComputer
 	}
-	AppendDesktopLog("INFO restore scope=%s", scope)
-	switch scope {
-	case ScopeComputer:
-		if err := a.startComputer(); err != nil {
-			fmt.Fprintf(os.Stderr, "denyout desktop: restore computer failed: %v — session mode\n", err)
-			RecordError("restore.computer", err.Error())
-			a.mu.Lock()
-			a.state.ComputerAvailable = false
-			st := a.state
-			a.mu.Unlock()
-			_ = SaveState(st)
-			notify.Info("DenyOut", "Admin failed — Open diagnostics / Copy last error. Using Session mode.")
-			if err := a.startSession(); err != nil {
-				RecordError("restore.session", err.Error())
-			}
-		}
-	case ScopeSession:
-		if err := a.startSession(); err != nil {
-			fmt.Fprintf(os.Stderr, "denyout desktop: restore session failed: %v\n", err)
-			RecordError("restore.session", err.Error())
-		}
+	AppendDesktopLog("INFO restore scope=%s profile=%s", scope, normalizePolicyProfile(a.state.PolicyProfile))
+	if scope != ScopeComputer {
+		return
+	}
+	if err := a.startComputer(); err != nil {
+		fmt.Fprintf(os.Stderr, "denyout desktop: restore computer failed: %v — staying Off\n", err)
+		RecordError("restore.computer", err.Error())
+		a.mu.Lock()
+		a.state.ComputerAvailable = false
+		a.state.ProtectionOn = false
+		a.state.Scope = ScopeOff
+		st := a.state
+		a.mu.Unlock()
+		_ = SaveState(st)
+		notify.Info("DenyOut", "Admin failed — protection stays Off. Tray → Protect computer to retry.")
 	}
 }

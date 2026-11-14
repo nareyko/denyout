@@ -117,6 +117,46 @@ func TestHostMatchProperty(t *testing.T) {
 	}
 }
 
+func TestIPLiteralsHardDeny(t *testing.T) {
+	cfg, err := policy.DefaultWholeDeviceAsk(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.AllowIPLiterals {
+		t.Fatal("ask whole-device should default allow_ip_literals=false")
+	}
+	eng := policy.NewEngine(cfg)
+	d := eng.Evaluate(policy.RequestView{
+		DestHost: "149.154.167.41",
+		DestPort: 443,
+		RawURL:   "https://149.154.167.41/",
+	})
+	if d.Verdict != "deny" || len(d.Reasons) == 0 || d.Reasons[0] != policy.ReasonHostNotAllowed {
+		t.Fatalf("literal deny: %+v", d)
+	}
+	eng.AllowHost("149.154.167.41", "user_always")
+	d2 := eng.Evaluate(policy.RequestView{
+		DestHost: "149.154.167.41",
+		DestPort: 443,
+		RawURL:   "https://149.154.167.41/",
+	})
+	if d2.Verdict != "deny" {
+		t.Fatalf("AllowHost must not bypass allow_ip_literals=false: %+v", d2)
+	}
+
+	cfg.AllowIPLiterals = true
+	eng2 := policy.NewEngine(cfg)
+	eng2.AllowHost("1.1.1.1", "user_always")
+	d3 := eng2.Evaluate(policy.RequestView{
+		DestHost: "1.1.1.1",
+		DestPort: 443,
+		RawURL:   "https://1.1.1.1/",
+	})
+	if d3.Verdict != "allow" {
+		t.Fatalf("literal allow when flag true: %+v", d3)
+	}
+}
+
 func TestAuditWouldDeny(t *testing.T) {
 	cfg, err := policy.LoadBytes([]byte(`
 apiVersion: denyout/v1

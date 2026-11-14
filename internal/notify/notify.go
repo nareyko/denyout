@@ -58,6 +58,13 @@ func Deny(host string, reasons []string) {
 	}
 	title := "DenyOut blocked a request"
 	body := fmt.Sprintf("Blocked connection to %s.\n%s", host, HumanReasons(reasons))
+	for _, r := range reasons {
+		if r == "secret_in_url" || r == "secret_in_header" || r == "secret_in_body" {
+			title = "DenyOut blocked a link"
+			body = "Blocked a link that looked like it contained a secret.\nHost: " + host
+			break
+		}
+	}
 	if err := beeep.Notify(title, body, ""); err != nil {
 		fmt.Fprintf(os.Stderr, "denyout: notification: %v\n", err)
 	}
@@ -73,8 +80,8 @@ func HumanReasons(reasons []string) string {
 		switch r {
 		case "host_not_allowed":
 			parts = append(parts, "That site is not on your allowed list.")
-		case "secret_in_url":
-			parts = append(parts, "The link looked like it contained a secret.")
+		case "secret_in_url", "secret_in_header", "secret_in_body":
+			parts = append(parts, "Blocked a link that looked like it contained a secret.")
 		case "canary_detected":
 			parts = append(parts, "A canary/test secret was found in the request.")
 		case "unsafe_ip":

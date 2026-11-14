@@ -25,8 +25,8 @@ type AskHandler func(host string, action AskAction)
 
 // AskOptions controls Ask UX.
 type AskOptions struct {
-	Host    string
-	OpenURL string // localhost allow page; opened as primary click target
+	Host     string
+	OpenURL  string // localhost allow page; opened as primary click target
 	OnAction AskHandler
 }
 

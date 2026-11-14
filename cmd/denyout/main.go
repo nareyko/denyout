@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -56,6 +57,8 @@ func runMain(args []string) int {
 		return cmdInit(args[1:])
 	case "run":
 		return cmdRun(args[1:])
+	case "profile":
+		return cmdProfile(args[1:])
 	case "test":
 		return cmdTest(args[1:])
 	case "gui":
@@ -89,6 +92,7 @@ Commands:
   policy validate <f>  Validate a denyout/v1 YAML config
   test [--db path]     Run lab SQLite fixtures (denyout test)
   run [flags] -- <cmd> Wrap command with local policy proxy
+  profile              Manage named agent wrap profiles
   desktop              Tray + Protect this computer (recommended)
   hostctl              Privileged helper for transparent redirect + CA (elevated)
   gui                  Advanced localhost UI (technical)
@@ -252,6 +256,8 @@ func cmdRun(args []string) int {
 	cfgPath := ""
 	tlsMode := string(proxy.TLSIntercept)
 	sandbox := ""
+	profileID := ""
+	requireSandbox := false
 	doNotify := true
 	if os.Getenv("DENYOUT_NOTIFY") == "0" {
 		doNotify = false
@@ -275,7 +281,7 @@ func cmdRun(args []string) int {
 		a := flagArgs[i]
 		switch {
 		case a == "--help" || a == "-h":
-			fmt.Println("Usage: denyout run [--config path] [--tls-mode intercept|passthrough] [--sandbox=name] [--notify|--no-notify] -- <command>...")
+			fmt.Println("Usage: denyout run [--config path] [--profile id] [--tls-mode intercept|passthrough] [--sandbox=srt] [--notify|--no-notify] -- <command>...")
 			return 0
 		case a == "--config" || a == "-c":
 			i++
@@ -284,6 +290,15 @@ func cmdRun(args []string) int {
 				return 2
 			}
 			cfgPath = flagArgs[i]
+		case strings.HasPrefix(a, "--profile="):
+			profileID = strings.TrimPrefix(a, "--profile=")
+		case a == "--profile":
+			i++
+			if i >= len(flagArgs) {
+				fmt.Fprintln(os.Stderr, "denyout run: --profile requires an id")
+				return 2
+			}
+			profileID = flagArgs[i]
 		case strings.HasPrefix(a, "--tls-mode="):
 			tlsMode = strings.TrimPrefix(a, "--tls-mode=")
 		case a == "--tls-mode":
@@ -312,8 +327,35 @@ func cmdRun(args []string) int {
 		}
 	}
 
+	if profileID != "" {
+		p, err := desktop.LoadProfile(profileID)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "denyout run: profile: %v\n", err)
+			return 2
+		}
+		cfgFile, err := p.WriteTempConfig()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "denyout run: profile config: %v\n", err)
+			return 2
+		}
+		cfgPath = cfgFile
+		if len(cmdArgs) == 0 {
+			cmdArgs = append([]string{}, p.Command...)
+		}
+		if sandbox == "" {
+			sandbox = p.Sandbox
+		}
+		requireSandbox = p.RequireIsolation
+		if p.WorkDir != "" {
+			if err := os.Chdir(p.WorkDir); err != nil {
+				fmt.Fprintf(os.Stderr, "denyout run: workdir: %v\n", err)
+				return 2
+			}
+		}
+	}
+
 	if len(cmdArgs) == 0 {
-		fmt.Fprintln(os.Stderr, "denyout run: missing -- <command>")
+		fmt.Fprintln(os.Stderr, "denyout run: missing -- <command> (or --profile with a command)")
 		return 2
 	}
 
@@ -324,12 +366,13 @@ func cmdRun(args []string) int {
 	}
 
 	code, err := run.Exec(run.Options{
-		ConfigPath: cfgPath,
-		TLSMode:    mode,
-		Version:    version,
-		Command:    cmdArgs,
-		Sandbox:    sandbox,
-		Notify:     doNotify || os.Getenv("DENYOUT_DESKTOP_NOTIFY") == "1",
+		ConfigPath:     cfgPath,
+		TLSMode:        mode,
+		Version:        version,
+		Command:        cmdArgs,
+		Sandbox:        sandbox,
+		RequireSandbox: requireSandbox,
+		Notify:         doNotify || os.Getenv("DENYOUT_DESKTOP_NOTIFY") == "1",
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "denyout run: %v\n", err)
@@ -338,6 +381,150 @@ func cmdRun(args []string) int {
 		}
 	}
 	return code
+}
+
+func cmdProfile(args []string) int {
+	if len(args) == 0 || args[0] == "--help" || args[0] == "-h" {
+		fmt.Println(`Usage: denyout profile <command>
+
+  list                         List saved agent profiles
+  create --name N -- <cmd>…    Create a profile (Agent+Cursor + learning)
+  show <id>                    Print profile YAML path / summary
+  delete <id>                  Delete a profile
+  run <id>                     Run profile (same as denyout run --profile <id>)
+  pin <id>                     Pin all pending Once hosts (learning)
+  discard <id>                 Discard pending Once hosts
+
+Profiles live in ~/.config/denyout/profiles/`)
+		return 0
+	}
+	switch args[0] {
+	case "list":
+		list, err := desktop.ListProfiles()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "denyout profile list: %v\n", err)
+			return 2
+		}
+		if len(list) == 0 {
+			fmt.Println("(no profiles)")
+			return 0
+		}
+		for _, p := range list {
+			fmt.Printf("%s\t%s\t%s\tpending=%d\n", p.ID, p.Name, p.CommandLine(), len(p.PendingOnce))
+		}
+		return 0
+	case "create":
+		name := ""
+		var cmdArgs []string
+		rest := args[1:]
+		dash := -1
+		for i, a := range rest {
+			if a == "--" {
+				dash = i
+				break
+			}
+		}
+		flagArgs := rest
+		if dash >= 0 {
+			flagArgs = rest[:dash]
+			cmdArgs = rest[dash+1:]
+		}
+		for i := 0; i < len(flagArgs); i++ {
+			a := flagArgs[i]
+			switch {
+			case a == "--name":
+				i++
+				if i < len(flagArgs) {
+					name = flagArgs[i]
+				}
+			case strings.HasPrefix(a, "--name="):
+				name = strings.TrimPrefix(a, "--name=")
+			default:
+				fmt.Fprintf(os.Stderr, "denyout profile create: unknown flag %q\n", a)
+				return 2
+			}
+		}
+		if name == "" || len(cmdArgs) == 0 {
+			fmt.Fprintln(os.Stderr, "denyout profile create: need --name and -- <command>")
+			return 2
+		}
+		p := desktop.NewAgentProfile(name, cmdArgs)
+		if err := desktop.SaveProfile(p); err != nil {
+			fmt.Fprintf(os.Stderr, "denyout profile create: %v\n", err)
+			return 2
+		}
+		fmt.Printf("created %s (%s)\n", p.ID, desktop.ProfilePathForCLI(p.ID))
+		return 0
+	case "show":
+		if len(args) < 2 {
+			fmt.Fprintln(os.Stderr, "denyout profile show: need id")
+			return 2
+		}
+		p, err := desktop.LoadProfile(args[1])
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "denyout profile show: %v\n", err)
+			return 2
+		}
+		fmt.Printf("id=%s name=%q preset=%s ask=%v sandbox=%q pending=%v allow=%v\npath=%s\n",
+			p.ID, p.Name, p.Preset, p.AskMode, p.Sandbox, p.PendingOnce, p.ExtraAllow, desktop.ProfilePathForCLI(p.ID))
+		return 0
+	case "delete":
+		if len(args) < 2 {
+			fmt.Fprintln(os.Stderr, "denyout profile delete: need id")
+			return 2
+		}
+		if err := desktop.DeleteProfile(args[1]); err != nil {
+			fmt.Fprintf(os.Stderr, "denyout profile delete: %v\n", err)
+			return 2
+		}
+		fmt.Println("deleted", args[1])
+		return 0
+	case "run":
+		if len(args) < 2 {
+			fmt.Fprintln(os.Stderr, "denyout profile run: need id")
+			return 2
+		}
+		return cmdRun([]string{"--profile", args[1]})
+	case "pin":
+		if len(args) < 2 {
+			fmt.Fprintln(os.Stderr, "denyout profile pin: need id")
+			return 2
+		}
+		p, err := desktop.LoadProfile(args[1])
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "denyout profile pin: %v\n", err)
+			return 2
+		}
+		n := len(p.PendingOnce)
+		p.PinPending(nil)
+		p.Learning.Enabled = false
+		if err := desktop.SaveProfile(p); err != nil {
+			fmt.Fprintf(os.Stderr, "denyout profile pin: %v\n", err)
+			return 2
+		}
+		fmt.Printf("pinned %d host(s); learning off\n", n)
+		return 0
+	case "discard":
+		if len(args) < 2 {
+			fmt.Fprintln(os.Stderr, "denyout profile discard: need id")
+			return 2
+		}
+		p, err := desktop.LoadProfile(args[1])
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "denyout profile discard: %v\n", err)
+			return 2
+		}
+		p.DiscardPending()
+		if err := desktop.SaveProfile(p); err != nil {
+			fmt.Fprintf(os.Stderr, "denyout profile discard: %v\n", err)
+			return 2
+		}
+		fmt.Println("discarded pending")
+		return 0
+	default:
+		fmt.Fprintf(os.Stderr, "denyout profile: unknown %q\n", args[0])
+		return 2
+	}
 }
 
 func cmdHostctl(args []string) int {
@@ -532,9 +719,18 @@ func cmdHostctlProxyd(args []string) int {
 					break
 				}
 			}
+			// Raw IP literals: hard-deny toast only (no Ask). Control rate-limits.
+			if net.ParseIP(host) != nil {
+				if controlURL != "" {
+					go postControlDenyEvent(controlURL, host, reasons, true)
+					return
+				}
+				notify.Deny(host, reasons)
+				return
+			}
 			if ask && hostNotAllowed {
 				if controlURL != "" {
-					// Update tray last-deny without toast; Ask dialog follows.
+					// Update tray last-deny without toast; Ask dialog follows (coalesced).
 					go postControlDenyEvent(controlURL, host, reasons, false)
 					action := askViaControl(controlURL, host)
 					switch action {

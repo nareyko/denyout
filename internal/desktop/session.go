@@ -89,9 +89,16 @@ func (a *App) onSessionDeny(host string, reasons []string) {
 			break
 		}
 	}
+	if isIPLiteral(host) {
+		if a.asks == nil {
+			a.asks = newAskFlight()
+		}
+		a.asks.notifyIPBlocked(host)
+		return
+	}
 	if ask && hostNotAllowed {
 		go func() {
-			switch nativeAllowDialog(host) {
+			switch a.coalescedAsk(host, "host_not_allowed") {
 			case "once":
 				if sess != nil {
 					sess.AllowHost(host, "user_once")

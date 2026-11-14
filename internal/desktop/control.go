@@ -12,16 +12,23 @@ import (
 	"github.com/nareyko/denyout/internal/notify"
 )
 
-// startControlServer listens on 127.0.0.1 for proxyd Ask IPC and the Activity page.
+// startControlServer listens on 127.0.0.1 for proxyd Ask IPC (no browser UI).
 // GET/POST /ask?host=… → native dialog → {"action":"once|always|deny"}
 // POST /always {"host":"…"} persists Always allow.
-// GET /activity + /api/desktop/* for local Activity/Settings UI.
+// POST /deny-event updates last-deny + optional toast.
+// GET /ready for readiness (tests).
 func (a *App) startControlServer(ctx context.Context) (string, error) {
+	if a.asks == nil {
+		a.asks = newAskFlight()
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ask", a.handleControlAsk)
 	mux.HandleFunc("/always", a.handleControlAlways)
 	mux.HandleFunc("/deny-event", a.handleControlDenyEvent)
-	a.registerActivityRoutes(mux)
+	mux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprint(w, `{"ok":true}`)
+	})
 
 	listen := "127.0.0.1:0"
 	if a.opts.ControlListen != "" {
@@ -43,18 +50,26 @@ func (a *App) startControlServer(ctx context.Context) (string, error) {
 	a.mu.Lock()
 	a.controlURL = url
 	a.mu.Unlock()
-	AppendDesktopLog("INFO activity page %s/activity", url)
+	AppendDesktopLog("INFO control IPC %s", url)
 	return url, nil
 }
 
 func (a *App) handleControlAsk(w http.ResponseWriter, r *http.Request) {
 	host := strings.TrimSpace(r.URL.Query().Get("host"))
+	reason := strings.TrimSpace(r.URL.Query().Get("reason"))
+	if reason == "" {
+		reason = "host_not_allowed"
+	}
 	if host == "" && r.Method == http.MethodPost {
 		var body struct {
-			Host string `json:"host"`
+			Host   string `json:"host"`
+			Reason string `json:"reason"`
 		}
 		_ = json.NewDecoder(r.Body).Decode(&body)
 		host = strings.TrimSpace(body.Host)
+		if body.Reason != "" {
+			reason = strings.TrimSpace(body.Reason)
+		}
 	}
 	if host == "" {
 		http.Error(w, `{"error":"host required"}`, 400)
@@ -67,15 +82,12 @@ func (a *App) handleControlAsk(w http.ResponseWriter, r *http.Request) {
 	a.mu.Unlock()
 	_ = SaveState(st)
 
-	action := nativeAllowDialog(host)
-	if action == "" {
-		action = "deny"
-	}
+	action := a.coalescedAsk(host, reason)
 	switch action {
-	case "once", "always":
-		if action == "always" {
-			_ = a.persistAlwaysHost(host)
-		}
+	case "once":
+		_ = a.allowHostOnce(host)
+	case "always":
+		_ = a.persistAlwaysHost(host)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]string{"action": action, "host": host})
@@ -127,8 +139,29 @@ func (a *App) handleControlDenyEvent(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 		}
-		if doNotify && !(ask && hostNotAllowed) {
-			notify.Deny(body.Host, body.Reasons)
+		if isIPLiteral(body.Host) {
+			if doNotify {
+				if a.asks == nil {
+					a.asks = newAskFlight()
+				}
+				a.asks.notifyIPBlocked(body.Host)
+			}
+		} else if doNotify && !(ask && hostNotAllowed) {
+			secretish := false
+			for _, rsn := range body.Reasons {
+				if strings.HasPrefix(rsn, "secret_") || rsn == "canary_detected" {
+					secretish = true
+					break
+				}
+			}
+			if secretish {
+				if a.asks == nil {
+					a.asks = newAskFlight()
+				}
+				a.asks.notifySecretCoalesced(body.Host, body.Reasons)
+			} else {
+				notify.Deny(body.Host, body.Reasons)
+			}
 		}
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -139,6 +172,9 @@ func (a *App) persistAlwaysHost(host string) error {
 	host = strings.TrimSpace(host)
 	if host == "" {
 		return fmt.Errorf("empty host")
+	}
+	if isIPLiteral(host) {
+		return fmt.Errorf("IP literals cannot be always-allowed while allow_ip_literals is false")
 	}
 	a.mu.Lock()
 	found := false
@@ -161,4 +197,23 @@ func (a *App) persistAlwaysHost(host string) error {
 		sess.AllowHost(host, "user_always")
 	}
 	return nil
+}
+
+func (a *App) removeAlwaysHost(host string) {
+	host = strings.TrimSpace(host)
+	a.mu.Lock()
+	out := a.state.AlwaysAllowHosts[:0]
+	for _, h := range a.state.AlwaysAllowHosts {
+		if !strings.EqualFold(h, host) {
+			out = append(out, h)
+		}
+	}
+	a.state.AlwaysAllowHosts = out
+	st := a.state
+	wasOn := a.proxyd != nil || a.session != nil
+	a.mu.Unlock()
+	_ = SaveState(st)
+	if wasOn {
+		a.restartActiveProtector()
+	}
 }

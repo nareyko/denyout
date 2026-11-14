@@ -126,6 +126,7 @@ func (e *Engine) Evaluate(rv RequestView) Decision {
 }
 
 // AllowHost adds a host to the in-memory allowlist (Ask once / Always without full restart).
+// IP literals are ignored while allow_ip_literals is false (cannot bypass hard-deny).
 func (e *Engine) AllowHost(host, reason string) {
 	host = normalizeHost(host)
 	if host == "" {
@@ -133,6 +134,9 @@ func (e *Engine) AllowHost(host, reason string) {
 	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	if net.ParseIP(host) != nil && !e.Cfg.AllowIPLiterals {
+		return
+	}
 	for _, r := range e.Cfg.Allow {
 		if strings.EqualFold(r.Host, host) {
 			return
@@ -171,7 +175,12 @@ func (e *Engine) resolveIPs(cfg *Config, host string, ips []net.IP, reasons *[]s
 	if ip := net.ParseIP(host); ip != nil {
 		ips = []net.IP{ip}
 		if !cfg.AllowIPLiterals {
-			*reasons = append(*reasons, ReasonHostNotAllowed)
+			// Hard-deny: literals never proceed (Ask/AllowHost cannot bypass).
+			// Prefer unsafe_ip when the literal is SSRF-sensitive (metadata/private/…).
+			if d := denyUnsafeIPs(ips, cfg.AllowPrivate, nil); d != nil {
+				return nil, d
+			}
+			return nil, &Decision{Verdict: "deny", Reasons: []string{ReasonHostNotAllowed}}
 		}
 	}
 	return ips, nil

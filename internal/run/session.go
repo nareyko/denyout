@@ -92,9 +92,7 @@ func StartSession(opts SessionOptions) (*Session, error) {
 	if opts.TLSMode == proxy.TLSPassthrough {
 		fmt.Fprintln(os.Stderr, "denyout: WARNING: tls-mode=passthrough — secret-in-URL / canary scanning on HTTPS is limited to CONNECT host only; not full R-20 protection")
 	}
-	if opts.Sandbox != "" {
-		fmt.Fprintf(os.Stderr, "denyout: --sandbox=%s is documented stub only in this build; proceeding without OS sandbox\n", opts.Sandbox)
-	}
+	// Sandbox wrapping happens in Exec / WrapSandbox (child argv), not in StartSession.
 
 	sessionID := uuid.NewString()
 	sum := sha256.Sum256(raw)

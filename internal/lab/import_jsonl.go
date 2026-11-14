@@ -11,14 +11,14 @@ import (
 
 // JSONLCase is one external corpus fixture line.
 type JSONLCase struct {
-	ID             string   `json:"id"`
-	Suite          string   `json:"suite"`
-	URL            string   `json:"url"`
-	Mode           string   `json:"mode"`
-	Preset         string   `json:"preset"`
-	ExpectVerdict  string   `json:"expect_verdict"`
-	ExpectReasons  []string `json:"expect_reasons"`
-	Note           string   `json:"note"`
+	ID            string   `json:"id"`
+	Suite         string   `json:"suite"`
+	URL           string   `json:"url"`
+	Mode          string   `json:"mode"`
+	Preset        string   `json:"preset"`
+	ExpectVerdict string   `json:"expect_verdict"`
+	ExpectReasons []string `json:"expect_reasons"`
+	Note          string   `json:"note"`
 }
 
 // SeedJSONL upserts cases from a JSONL file. Returns number of rows processed.
