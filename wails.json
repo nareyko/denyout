@@ -1,0 +1,22 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "denyout-desktop",
+  "outputfilename": "denyout-desktop",
+  "frontend:dir": "cmd/denyout-desktop/frontend",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "DenyOut",
+    "email": ""
+  },
+  "info": {
+    "companyName": "DenyOut",
+    "productName": "DenyOut",
+    "productVersion": "0.0.0",
+    "copyright": "",
+    "comments": "DenyOut desktop shell"
+  },
+  "debounceMS": 500
+}

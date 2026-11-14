@@ -1,0 +1,12 @@
+# Preset: models — versioned LLM API allowlist for DenyOut MVP.
+# Changelog: 2026-11-13 — initial hosts for skeleton / check stub.
+version: 1
+hosts:
+  - api.anthropic.com
+  - api.openai.com
+  - api.groq.com
+  - api.mistral.ai
+  - generativelanguage.googleapis.com
+  - api.cohere.ai
+  - api.together.xyz
+  - api.fireworks.ai

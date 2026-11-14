@@ -1,0 +1,55 @@
+# Binaries / build
+/bin/
+/dist/
+/target/
+*.exe
+/denyout
+/denyout-desktop
+!docs/
+!examples/
+*.sqlite
+*.sqlite-journal
+
+# External corpora (Prowl CC BY-NC local cache; large JSONL/parquet)
+/examples/fixtures/corpus/**
+!/examples/fixtures/corpus/README.md
+/.venv-corpus/
+
+# IDE / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Local secrets / CA material — never commit
+*.pem
+*.key
+/.denyout/
+/.config-denyout-local/
+
+# Audit logs
+*.jsonl
+/audit/
+
+# Env
+.env
+.env.*
+
+# Wails / frontend
+cmd/denyout-desktop/frontend/node_modules/
+/build/bin/
+*.syso
+
+cmd/denyout-desktop/frontend/*.tsbuildinfo
+
+# Authoring / agent tooling (not part of this product tree)
+.cursor/
+prompts/
+AGENTS.md
+CLAUDE.md
+.claude/
+
+# Local doc builds / audit caches
+/site-reference/
+/site/
+/tmp/

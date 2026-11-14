@@ -1,0 +1,111 @@
+# Illustrative snippet — not a full Helm chart.
+# Pair with networkpolicy.yaml so the agent cannot bypass DenyOut.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: denyout-config
+data:
+  denyout.yaml: |
+    apiVersion: denyout/v1
+    kind: Config
+    mode: enforce
+    preset: models
+    tls:
+      mode: intercept
+      session_ca: true
+    listen:
+      host: 127.0.0.1
+      port: 8080
+    scanners:
+      canaries:
+        - "DENYOUT_CANARY_"
+    audit:
+      stdout: true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sample-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sample-agent
+  template:
+    metadata:
+      labels:
+        app: sample-agent
+    spec:
+      containers:
+        - name: agent
+          image: example/agent:latest
+          env:
+            - name: HTTP_PROXY
+              value: http://127.0.0.1:8080
+            - name: HTTPS_PROXY
+              value: http://127.0.0.1:8080
+            - name: NO_PROXY
+              value: localhost,127.0.0.1
+            - name: SSL_CERT_FILE
+              value: /ca/ca.crt
+            - name: REQUESTS_CA_BUNDLE
+              value: /ca/ca.crt
+            - name: NODE_EXTRA_CA_CERTS
+              value: /ca/ca.crt
+          volumeMounts:
+            - name: ca
+              mountPath: /ca
+              readOnly: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+        - name: denyout
+          image: denyout/denyout:0.1.0 # planned
+          args:
+            - serve
+            - -c
+            - /config/denyout.yaml
+            - --listen
+            - 127.0.0.1:8080
+            - --health-listen
+            - 127.0.0.1:8081
+            - --ca-dir
+            - /ca
+          ports:
+            - containerPort: 8080
+              name: proxy
+          volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+            - name: ca
+              mountPath: /ca
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+            initialDelaySeconds: 1
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+      volumes:
+        - name: config
+          configMap:
+            name: denyout-config
+        - name: ca
+          emptyDir: {}

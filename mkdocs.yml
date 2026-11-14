@@ -1,0 +1,74 @@
+site_name: DenyOut docs
+site_url: https://denyout.com/reference/
+site_description: DenyOut product specification and design docs
+repo_url: https://github.com/nareyko/denyout
+repo_name: nareyko/denyout
+docs_dir: docs
+site_dir: site-reference
+theme:
+  name: material
+  palette:
+    primary: black
+    accent: indigo
+  features:
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+    - search.suggest
+markdown_extensions:
+  - tables
+  - toc:
+      permalink: true
+  - admonition
+  - pymdownx.superfences
+  - pymdownx.details
+nav:
+  - Home: index.md
+  - SPEC: SPEC.md
+  - 01-vision.md: 01-vision.md
+  - 02-threat-model.md: 02-threat-model.md
+  - 03-architecture.md: 03-architecture.md
+  - 04-policy-engine.md: 04-policy-engine.md
+  - 05-secret-detection.md: 05-secret-detection.md
+  - 06-cli-and-ux.md: 06-cli-and-ux.md
+  - 07-desktop-ux-catalog.md: 07-desktop-ux-catalog.md
+  - 07-desktop-ux-refactor-tracker.md: 07-desktop-ux-refactor-tracker.md
+  - 07-desktop-ux-simplicity.md: 07-desktop-ux-simplicity.md
+  - 07-desktop-ux.md: 07-desktop-ux.md
+  - 07-desktop.md: 07-desktop.md
+  - 08-server.md: 08-server.md
+  - 09-audit-and-ops.md: 09-audit-and-ops.md
+  - 10-security-boundaries.md: 10-security-boundaries.md
+  - 11-config-reference.md: 11-config-reference.md
+  - 12-mvp-and-roadmap.md: 12-mvp-and-roadmap.md
+  - 13-competitors.md: 13-competitors.md
+  - 14-testing.md: 14-testing.md
+  - IMPLEMENTATION.md: IMPLEMENTATION.md
+  - cloud-sync.md: cloud-sync.md
+  - design-decisions.md: design-decisions.md
+  - hostguard-windows.md: hostguard-windows.md
+  - install-windows.md: install-windows.md
+  - known-issues.md: known-issues.md
+  - qa-agent-seatbelt.md: qa-agent-seatbelt.md
+  - qa-desktop-ux.md: qa-desktop-ux.md
+  - UX iters:
+      - ask-messages: ux-iters/ask-messages.md
+      - chrome-nav: ux-iters/chrome-nav.md
+      - dashboard-research: ux-iters/dashboard-research.md
+      - history-drawer: ux-iters/history-drawer.md
+      - history: ux-iters/history.md
+      - home-v2-plan: ux-iters/home-v2-plan.md
+      - home: ux-iters/home.md
+      - my-agents: ux-iters/my-agents.md
+      - notifications-rework-plan: ux-iters/notifications-rework-plan.md
+      - onboarding-tips: ux-iters/onboarding-tips.md
+      - problems: ux-iters/problems.md
+      - settings-allows: ux-iters/settings-allows.md
+      - settings-basic: ux-iters/settings-basic.md
+      - threat-lists-plan: ux-iters/threat-lists-plan.md
+      - threat-lists-qa: ux-iters/threat-lists-qa.md
+      - toast-postblock: ux-iters/toast-postblock.md
+      - toast-protect: ux-iters/toast-protect.md
+      - tray-labels: ux-iters/tray-labels.md
+      - your-setup: ux-iters/your-setup.md
+  - Updates: updates/README.md

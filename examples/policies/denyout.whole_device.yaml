@@ -1,0 +1,53 @@
+apiVersion: denyout/v1
+kind: Config
+
+metadata:
+  name: whole-device
+  description: "Protect this computer — agent seatbelt (default-deny allowlist); Ask on new hosts recommended"
+
+# enforce + agent: unknown hosts denied (or Ask); scanners still block secrets/canaries/SSRF.
+mode: enforce
+preset: agent
+
+tls:
+  mode: intercept
+  session_ca: true
+
+listen:
+  host: 127.0.0.1
+  port: 0
+
+allow_private: false
+allow_ip_literals: false
+deny_on_dns_failure: true
+
+allowed_ports: [443, 80]
+
+allow: []
+
+# No host deny-list: agent enforce already default-denies unknown hosts.
+deny: []
+
+scanners:
+  hard_secrets_in_audit_mode: true
+  body_scan_max_bytes: 65536
+  min_value_len: 6
+  named_query:
+    enabled: true
+  high_entropy:
+    enabled: false
+  canaries:
+    - "DENYOUT_CANARY_"
+    - "ARVISER_CANARY_"
+
+limits:
+  per_host_rpm: 600
+  global_rpm: 3000
+
+audit:
+  jsonl_path: "~/.local/state/denyout/audit.jsonl"
+  stdout: false
+
+ui:
+  notify: true
+  show_bypass_warning: true

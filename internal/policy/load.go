@@ -1,0 +1,330 @@
+package policy
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
+
+	"github.com/santhosh-tekuri/jsonschema/v5"
+	"gopkg.in/yaml.v3"
+)
+
+// schemaFS is set by load_schema.go via go:embed of schemas/denyout-config.v1.json.
+// LoadFile validates YAML against that schema (fail closed).
+
+// LoadFile reads and validates a denyout/v1 YAML config.
+func LoadFile(path string) (*Config, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return LoadBytes(raw)
+}
+
+// LoadBytes validates and parses config YAML bytes.
+func LoadBytes(raw []byte) (*Config, error) {
+	if err := validateSchema(raw); err != nil {
+		return nil, fmt.Errorf("schema: %w", err)
+	}
+
+	var cfg Config
+	dec := yaml.NewDecoder(bytes.NewReader(raw))
+	dec.KnownFields(false)
+	if err := dec.Decode(&cfg); err != nil {
+		return nil, fmt.Errorf("yaml: %w", err)
+	}
+	if cfg.APIVersion != "denyout/v1" {
+		return nil, fmt.Errorf("apiVersion must be denyout/v1")
+	}
+	if cfg.Kind != "Config" {
+		return nil, fmt.Errorf("kind must be Config")
+	}
+	if cfg.Mode == "" {
+		cfg.Mode = "enforce"
+	}
+	if err := validateCustomRegex(&cfg); err != nil {
+		return nil, err
+	}
+	if err := mergePreset(&cfg); err != nil {
+		return nil, err
+	}
+	return &cfg, nil
+}
+
+func validateCustomRegex(cfg *Config) error {
+	for _, cr := range cfg.Scanners.CustomRegex {
+		if cr.Pattern == "" {
+			return fmt.Errorf("custom_regex %q: empty pattern", cr.ID)
+		}
+		if _, err := regexp.Compile(cr.Pattern); err != nil {
+			return fmt.Errorf("custom_regex %q: invalid pattern: %w", cr.ID, err)
+		}
+	}
+	return nil
+}
+
+func validateSchema(yamlRaw []byte) error {
+	var doc any
+	if err := yaml.Unmarshal(yamlRaw, &doc); err != nil {
+		return fmt.Errorf("yaml parse: %w", err)
+	}
+	jsonBytes, err := json.Marshal(doc)
+	if err != nil {
+		return err
+	}
+	var jsonDoc any
+	if err := json.Unmarshal(jsonBytes, &jsonDoc); err != nil {
+		return err
+	}
+
+	compiler := jsonschema.NewCompiler()
+	compiler.Draft = jsonschema.Draft2020
+	if err := compiler.AddResource("https://denyout.com/schemas/denyout-config.v1.json", strings.NewReader(schemaJSON)); err != nil {
+		return err
+	}
+	sch, err := compiler.Compile("https://denyout.com/schemas/denyout-config.v1.json")
+	if err != nil {
+		return fmt.Errorf("compile schema: %w", err)
+	}
+	if err := sch.Validate(jsonDoc); err != nil {
+		return err
+	}
+	return nil
+}
+
+// DefaultEnforceModels returns a built-in enforce+models config for `denyout check` without --config.
+func DefaultEnforceModels() (*Config, error) {
+	path, err := findExamplePolicy("denyout.enforce.models.yaml")
+	if err == nil {
+		return LoadFile(path)
+	}
+	// Fallback embedded-minimal when examples are not on disk (tests may set via LoadBytes).
+	minimal := []byte(`
+apiVersion: denyout/v1
+kind: Config
+mode: enforce
+preset: models
+scanners:
+  min_value_len: 6
+  named_query:
+    enabled: true
+  canaries:
+    - "DENYOUT_CANARY_"
+    - "ARVISER_CANARY_"
+`)
+	return LoadBytes(minimal)
+}
+
+// DefaultWholeDevice returns agent seatbelt: enforce + agent allowlist + scanners (Protect this computer).
+func DefaultWholeDevice() (*Config, error) {
+	path, err := findExamplePolicy("denyout.whole_device.yaml")
+	if err == nil {
+		return LoadFile(path)
+	}
+	minimal := []byte(`
+apiVersion: denyout/v1
+kind: Config
+mode: enforce
+preset: agent
+allow_private: false
+allow_ip_literals: false
+allowed_ports: [443, 80]
+deny: []
+scanners:
+  min_value_len: 6
+  named_query:
+    enabled: true
+  canaries:
+    - "DENYOUT_CANARY_"
+    - "ARVISER_CANARY_"
+`)
+	return LoadBytes(minimal)
+}
+
+// DefaultWholeDeviceBrowse returns legacy blocklist (allow web; secrets/SSRF still deny).
+func DefaultWholeDeviceBrowse() (*Config, error) {
+	path, err := findExamplePolicy("denyout.whole_device_browse.yaml")
+	if err == nil {
+		return LoadFile(path)
+	}
+	minimal := []byte(`
+apiVersion: denyout/v1
+kind: Config
+mode: blocklist
+preset: none
+allow_private: false
+allow_ip_literals: false
+allowed_ports: [443, 80]
+deny:
+  - host: pastebin.com
+scanners:
+  min_value_len: 6
+  named_query:
+    enabled: true
+  canaries:
+    - "DENYOUT_CANARY_"
+    - "ARVISER_CANARY_"
+`)
+	return LoadBytes(minimal)
+}
+
+// DefaultWholeDeviceAsk returns deny-unknown hosts until Allow once/Always (Ask mode) on agent allowlist.
+func DefaultWholeDeviceAsk(extraAllow []Rule) (*Config, error) {
+	path, err := findExamplePolicy("denyout.whole_device_ask.yaml")
+	var cfg *Config
+	if err == nil {
+		cfg, err = LoadFile(path)
+	} else {
+		minimal := []byte(`
+apiVersion: denyout/v1
+kind: Config
+mode: enforce
+preset: agent
+allow_private: false
+allow_ip_literals: false
+allowed_ports: [443, 80]
+allow: []
+deny: []
+scanners:
+  min_value_len: 6
+  named_query:
+    enabled: true
+  canaries:
+    - "DENYOUT_CANARY_"
+    - "ARVISER_CANARY_"
+`)
+		cfg, err = LoadBytes(minimal)
+	}
+	if err != nil {
+		return nil, err
+	}
+	cfg.Allow = append(cfg.Allow, extraAllow...)
+	return cfg, nil
+}
+
+func findExamplePolicy(name string) (string, error) {
+	candidates := []string{
+		filepath.Join("examples", "policies", name),
+		filepath.Join("..", "examples", "policies", name),
+		filepath.Join("..", "..", "examples", "policies", name),
+	}
+	if wd, err := os.Getwd(); err == nil {
+		candidates = append(candidates, filepath.Join(wd, "examples", "policies", name))
+		dir := wd
+		for i := 0; i < 4; i++ {
+			candidates = append(candidates, filepath.Join(dir, "examples", "policies", name))
+			dir = filepath.Dir(dir)
+		}
+	}
+	for _, c := range candidates {
+		if st, err := os.Stat(c); err == nil && !st.IsDir() {
+			return c, nil
+		}
+	}
+	return "", fmt.Errorf("example policy %s not found", name)
+}
+
+func mergePreset(cfg *Config) error {
+	if cfg.Preset == "" || cfg.Preset == "none" {
+		return nil
+	}
+	hosts, err := loadPresetHosts(cfg.Preset)
+	if err != nil {
+		return err
+	}
+	existing := map[string]struct{}{}
+	for _, r := range cfg.Allow {
+		existing[strings.ToLower(r.Host)] = struct{}{}
+	}
+	for _, h := range hosts {
+		key := strings.ToLower(h)
+		if _, ok := existing[key]; ok {
+			continue
+		}
+		cfg.Allow = append(cfg.Allow, Rule{Host: h, Reason: "preset:" + cfg.Preset})
+		existing[key] = struct{}{}
+	}
+	return nil
+}
+
+func loadPresetHosts(name string) ([]string, error) {
+	switch name {
+	case "models", "models+pkg", "strict", "dev", "agent":
+	default:
+		return nil, fmt.Errorf("unknown preset %q", name)
+	}
+	file := "models.yaml"
+	fallback := defaultModelsHosts
+	if name == "agent" {
+		file = "agent.yaml"
+		fallback = defaultAgentHosts
+	}
+	path, err := findPresetFile(file)
+	if err != nil {
+		return fallback(), nil
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var doc struct {
+		Hosts []string `yaml:"hosts"`
+	}
+	if err := yaml.Unmarshal(raw, &doc); err != nil {
+		return nil, err
+	}
+	if len(doc.Hosts) == 0 {
+		return fallback(), nil
+	}
+	return doc.Hosts, nil
+}
+
+func findPresetFile(name string) (string, error) {
+	candidates := []string{
+		filepath.Join("presets", name),
+	}
+	if wd, err := os.Getwd(); err == nil {
+		dir := wd
+		for i := 0; i < 4; i++ {
+			candidates = append(candidates, filepath.Join(dir, "presets", name))
+			dir = filepath.Dir(dir)
+		}
+	}
+	for _, c := range candidates {
+		if st, err := os.Stat(c); err == nil && !st.IsDir() {
+			return c, nil
+		}
+	}
+	return "", fmt.Errorf("preset file not found")
+}
+
+func defaultModelsHosts() []string {
+	return []string{
+		"api.anthropic.com",
+		"api.openai.com",
+		"api.groq.com",
+		"api.mistral.ai",
+		"generativelanguage.googleapis.com",
+		"api.cohere.ai",
+		"api.together.xyz",
+		"api.fireworks.ai",
+	}
+}
+
+func defaultAgentHosts() []string {
+	h := defaultModelsHosts()
+	extra := []string{
+		"proxy.golang.org", "sum.golang.org", "index.golang.org",
+		"registry.npmjs.org", "pypi.org", "files.pythonhosted.org",
+		"crates.io", "static.crates.io",
+		"github.com", "api.github.com", "raw.githubusercontent.com",
+		"objects.githubusercontent.com", "release-assets.githubusercontent.com",
+		"codeload.github.com", "alive.github.com", "gitlab.com",
+		"api2.cursor.sh", "api2direct.cursor.sh", "api3.cursor.sh",
+	}
+	return append(h, extra...)
+}

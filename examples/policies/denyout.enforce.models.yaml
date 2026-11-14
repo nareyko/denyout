@@ -1,0 +1,64 @@
+apiVersion: denyout/v1
+kind: Config
+
+metadata:
+  name: enforce-models
+  description: "Laptop default — LLM APIs only, intercept TLS, secret URL block"
+
+mode: enforce
+preset: models
+
+tls:
+  mode: intercept
+  session_ca: true
+
+listen:
+  host: 127.0.0.1
+  port: 0
+
+allow_private: false
+allow_ip_literals: false
+deny_on_dns_failure: true
+
+allowed_ports: [443, 80]
+
+# preset already adds model hosts; add extras here if needed
+allow: []
+
+deny:
+  - host: pastebin.com
+    reason: "common paste exfil"
+  - host: "*.ngrok-free.app"
+    reason: "ephemeral tunnels"
+
+scanners:
+  hard_secrets_in_audit_mode: true
+  body_scan_max_bytes: 65536
+  min_value_len: 6
+  named_query:
+    enabled: true
+  high_entropy:
+    enabled: false
+  canaries:
+    - "DENYOUT_CANARY_"
+    - "ARVISER_CANARY_"
+  credential_destinations:
+    - api.openai.com
+    - api.anthropic.com
+    - api.groq.com
+    - api.mistral.ai
+    - generativelanguage.googleapis.com
+
+limits:
+  per_host_rpm: 120
+  global_rpm: 600
+
+audit:
+  jsonl_path: "~/.local/state/denyout/audit.jsonl"
+  stdout: false
+  include_headers: false
+
+ui:
+  notify: true
+  show_bypass_warning: true
+  ask_timeout_seconds: 30

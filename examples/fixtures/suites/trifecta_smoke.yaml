@@ -1,0 +1,14 @@
+suite: trifecta_smoke
+cases:
+  - id: trifecta-01-unknown-canary
+    url: "https://evil.example/x?q=DENYOUT_CANARY_LAB"
+    mode: enforce
+    preset: agent
+    expect: deny
+    reasons: [canary_detected, host_not_allowed]
+  - id: trifecta-02-unknown-clean
+    url: "https://evil.example/clean"
+    mode: enforce
+    preset: agent
+    expect: deny
+    reasons: [host_not_allowed]

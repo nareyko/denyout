@@ -1,0 +1,54 @@
+apiVersion: denyout/v1
+kind: Config
+
+metadata:
+  name: server-sidecar
+  description: "Pair with NetworkPolicy — agent cannot bypass proxy"
+
+mode: enforce
+preset: models
+
+tls:
+  mode: intercept
+  session_ca: true
+
+listen:
+  host: 127.0.0.1
+  port: 8080
+
+# In-cluster APIs: prefer explicit hosts over allow_private=true
+allow_private: false
+allow_ip_literals: false
+
+allow:
+  - host: api.anthropic.com
+  - host: api.openai.com
+  - host: kubernetes.server.svc.cluster.local
+    ports: [443]
+    require_intercept: true
+    methods: [GET, POST]
+    paths:
+      - prefix: /v1/
+
+scanners:
+  hard_secrets_in_audit_mode: true
+  canaries:
+    - "DENYOUT_CANARY_"
+    - "ARVISER_CANARY_"
+
+limits:
+  per_host_rpm: 60
+  global_rpm: 300
+
+audit:
+  stdout: true
+  jsonl_path: ""
+  include_headers: false
+
+ui:
+  notify: false
+  show_bypass_warning: false
+
+server:
+  metrics_listen: "127.0.0.1:9090"
+  health_listen: "127.0.0.1:8081"

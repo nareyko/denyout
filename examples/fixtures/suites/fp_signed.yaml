@@ -1,0 +1,30 @@
+# Human-readable mirror of lab suite fp_signed (seeded by denyout test).
+suite: fp_signed
+cases:
+  - id: fp-signed-01-gh-release
+    url: "https://release-assets.githubusercontent.com/github-production-release-asset/1/abc?sp=r&sv=2018-11-09&sr=b&sig=XxRLfake&jwt=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.signaturepartgoeshere000"
+    mode: enforce
+    preset: agent
+    expect: allow
+  - id: fp-signed-02-alive-session
+    url: "https://alive.github.com/socket?p=1&session=abc123sessionval&shared=true"
+    mode: enforce
+    preset: agent
+    expect: allow
+  - id: fp-signed-03-sigv4
+    url: "https://mybucket.s3.amazonaws.com/o?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIOSFODNN7DENYOUT%2F20260101%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260101T000000Z&X-Amz-Expires=300&X-Amz-SignedHeaders=host&X-Amz-Signature=abcdef0123456789abcdef0123456789abcdef01"
+    mode: blocklist
+    preset: none
+    expect: allow
+  - id: fp-signed-04-gh-sk
+    url: "https://release-assets.githubusercontent.com/github-production-release-asset/1/abc?sp=r&sv=2018-11-09&sig=Xx&jwt=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.signaturepartgoeshere000&api_key=sk-denyouttest000000000000000"
+    mode: enforce
+    preset: agent
+    expect: deny
+    reasons: [secret_in_url]
+  - id: fp-signed-05-canary
+    url: "https://release-assets.githubusercontent.com/x?sig=Xx&q=DENYOUT_CANARY_LAB"
+    mode: enforce
+    preset: agent
+    expect: deny
+    reasons: [canary_detected]

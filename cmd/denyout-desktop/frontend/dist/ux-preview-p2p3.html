@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>DenyOut P2/P3 — UX preview</title>
+    <link rel="stylesheet" href="/src/styles/app.css" />
+    <style>
+      body { margin: 0; }
+      .preview { display: grid; grid-template-columns: 200px 1fr; height: 100vh; }
+      .pane { padding: 1rem; overflow: auto; background: var(--bg); }
+      .label { font-size: 11px; text-transform: uppercase; color: #5c6b7a; margin: 1rem 0 0.4rem; }
+    </style>
+  </head>
+  <body>
+    <div class="preview app">
+      <nav class="nav">
+        <div class="brand">DenyOut</div>
+        <button class="active">Home</button>
+        <button>History</button>
+        <button>Settings</button>
+        <button>Problems</button>
+        <button class="nav-secondary">My agents</button>
+      </nav>
+      <div class="pane">
+        <div class="label">Settings Advanced — unified allows</div>
+        <section class="card">
+          <h2>Sites I’ve allowed or silenced</h2>
+          <p class="muted">Allowed sites skip blocks. Silenced entries stay quiet after you chose Keep blocked.</p>
+          <h3 class="settings-subhead">Allowed</h3>
+          <p class="muted">None yet. Use History → Allow this site on a block.</p>
+          <h3 class="settings-subhead">Silenced (Keep blocked)</h3>
+          <p class="muted">None.</p>
+        </section>
+        <section class="card warn-box" style="margin-top: 0.85rem">
+          <h2>Agents only (whole PC)</h2>
+          <p>Almost nobody needs this. Prefer My agents for AI tools.</p>
+        </section>
+        <div class="label">Problems — fix first</div>
+        <section class="card home-hero-alert">
+          <h2>Something went wrong turning protection on.</h2>
+          <p class="muted">Try Protect again, or copy the error for support.</p>
+          <div class="row-actions">
+            <button class="btn primary">Retry Protect computer</button>
+            <button class="btn">Copy last error</button>
+          </div>
+        </section>
+        <details class="card tech-details" style="margin-top: 0.85rem">
+          <summary>Details</summary>
+          <div class="health" style="margin-top: 0.65rem">Control IPC: <span class="bad">down</span></div>
+        </details>
+      </div>
+    </div>
+  </body>
+</html>

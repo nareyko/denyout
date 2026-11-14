@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+ <meta charset="utf-8" />
+ <meta name="viewport" content="width=device-width, initial-scale=1" />
+ <title>DenyOut - Allow site?</title>
+ <link rel="icon" href="logo.svg" type="image/svg+xml" />
+ <style>
+ :root {
+ --bg: #f7f5f1; --ink: #1a1f24; --muted: #5c6670; --accent: #1f7a4c;
+ --line: #d9dde2; --sans: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+ --display: "Fraunces", Georgia, serif;
+ }
+ body {
+ margin: 0; min-height: 100vh; font-family: var(--sans); color: var(--ink);
+ background:
+ radial-gradient(ellipse 70% 45% at 0% 0%, #dceee3 0%, transparent 55%),
+ var(--bg);
+ display: flex; align-items: center; justify-content: center; padding: 1.5rem;
+ }
+ .box {
+ max-width: 26rem; width: 100%; background: #fff; border: 1px solid var(--line);
+ border-radius: 10px; padding: 1.4rem 1.35rem 1.5rem;
+ }
+ .brand { font-family: var(--display); font-size: 1.75rem; margin: 0 0 0.35rem; font-weight: 600; }
+ .host { font-weight: 600; word-break: break-all; margin: 0.75rem 0 1rem; }
+ p { color: var(--muted); line-height: 1.4; margin: 0 0 0.75rem; }
+ button {
+ font-family: var(--sans); font-size: 1rem; width: 100%; border-radius: 8px;
+ padding: 0.75rem 1rem; margin-top: 0.45rem; cursor: pointer;
+ }
+ .primary { background: var(--accent); color: #fff; border: none; font-weight: 600; }
+ .secondary { background: transparent; border: 1px solid var(--line); }
+ .ok { color: var(--accent); font-weight: 600; }
+ .err { color: #8a4b12; }
+ </style>
+</head>
+<body>
+ <div class="box">
+ <h1 class="brand">DenyOut</h1>
+ <p>Ask mode blocked a new site. Choose what to do:</p>
+ <p class="host" id="host">...</p>
+ <button class="primary" id="once">Allow once</button>
+ <button class="secondary" id="always">Always allow</button>
+ <button class="secondary" id="deny">Keep blocked</button>
+ <p id="msg"></p>
+ </div>
+ <script>
+ const params = new URLSearchParams(location.search);
+ const host = (params.get("host") || "").trim();
+ document.getElementById("host").textContent = host || "(unknown host)";
+ const msg = document.getElementById("msg");
+
+ async function allow(body) {
+ msg.textContent = "";
+ msg.className = "";
+ try {
+ const r = await fetch("/api/allow", {
+ method: "POST",
+ headers: { "Content-Type": "application/json" },
+ body: JSON.stringify(body),
+ });
+ const j = await r.json().catch(() => ({}));
+ if (!r.ok) throw new Error(j.error || r.statusText);
+ msg.className = "ok";
+ msg.textContent = body.deny ? "Kept blocked." : (body.always ? "Always allowed." : "Allowed once.");
+ setTimeout(() => window.close(), 900);
+ } catch (e) {
+ msg.className = "err";
+ msg.textContent = e.message;
+ }
+ }
+
+ document.getElementById("once").onclick = () => allow({ host, once: true });
+ document.getElementById("always").onclick = () => allow({ host, always: true });
+ document.getElementById("deny").onclick = () => allow({ host, deny: true });
+ </script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+id: claude-starter
+version: 1
+name: Claude starter
+description: Recommended hosts for Claude / Anthropic-oriented agents.
+hosts:
+  - api.anthropic.com
+  - "*.anthropic.com"
+  - github.com
+  - api.github.com
+  - raw.githubusercontent.com
+  - objects.githubusercontent.com
