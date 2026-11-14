@@ -207,6 +207,8 @@ func applySecretScanners(cfg *Config, rv RequestView, reasons []string) ([]strin
 	if len(rv.BodyPrefix) > 0 {
 		hits = append(hits, secrets.ScanBytes(rv.BodyPrefix, cfg.Scanners.Canaries)...)
 	}
+	hostAllowed := HostAllowed(cfg, rv.DestHost) || cfg.InsecureAllowAll
+	hits = append(hits, secrets.ScanHeaders(rv.Headers, cfg.Scanners.Canaries, hostAllowed)...)
 	var detectors []string
 	for _, h := range hits {
 		reasons = append(reasons, h.Reason)

@@ -1,0 +1,46 @@
+# Human-readable mirror of lab suite agent_egress.
+suite: agent_egress
+cases:
+  - id: agent-01-anthropic
+    url: "https://api.anthropic.com/"
+    mode: enforce
+    preset: agent
+    expect: allow
+  - id: agent-02-openai
+    url: "https://api.openai.com/"
+    mode: enforce
+    preset: agent
+    expect: allow
+  - id: agent-03-proxy-golang
+    url: "https://proxy.golang.org/"
+    mode: enforce
+    preset: agent
+    expect: allow
+  - id: agent-04-github
+    url: "https://github.com/nareyko/denyout"
+    mode: enforce
+    preset: agent
+    expect: allow
+  - id: agent-05-raw-gh
+    url: "https://raw.githubusercontent.com/nareyko/denyout/main/README.md"
+    mode: enforce
+    preset: agent
+    expect: allow
+  - id: agent-06-evil
+    url: "https://evil.example/"
+    mode: enforce
+    preset: agent
+    expect: deny
+    reasons: [host_not_allowed]
+  - id: agent-07-example
+    url: "https://example.com/"
+    mode: enforce
+    preset: agent
+    expect: deny
+    reasons: [host_not_allowed]
+  - id: agent-08-pastebin
+    url: "https://pastebin.com/"
+    mode: enforce
+    preset: agent
+    expect: deny
+    reasons: [host_not_allowed]

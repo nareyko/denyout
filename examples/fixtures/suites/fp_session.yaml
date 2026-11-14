@@ -1,0 +1,24 @@
+suite: fp_session
+cases:
+  - id: fp-session-01-plain
+    url: "https://api.anthropic.com/x?session=abc_plain_session_id"
+    mode: enforce
+    preset: agent
+    expect: allow
+  - id: fp-session-02-sk
+    url: "https://api.anthropic.com/x?session=sk-denyouttest000000000000000"
+    mode: enforce
+    preset: agent
+    expect: deny
+    reasons: [secret_in_url]
+  - id: fp-session-03-ghp
+    url: "https://api.anthropic.com/x?session=ghp_denyouttest000000000000000000"
+    mode: enforce
+    preset: agent
+    expect: deny
+    reasons: [secret_in_url]
+  - id: fp-session-04-ad
+    url: "https://api.openai.com/go/jmap?session=plain_session_id_001&rnd=123456"
+    mode: enforce
+    preset: agent
+    expect: allow

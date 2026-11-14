@@ -3,10 +3,10 @@ kind: Config
 
 metadata:
   name: whole-device-ask
-  description: "Protect this computer with Ask mode — deny unknown hosts until Allow once/Always"
+  description: "Agent seatbelt with Ask — deny unknown hosts until Allow once/Always"
 
 mode: enforce
-preset: none
+preset: agent
 
 tls:
   mode: intercept
@@ -25,11 +25,8 @@ allowed_ports: [443, 80]
 # Populated at runtime from desktop allowlist (Allow once / Always).
 allow: []
 
-deny:
-  - host: pastebin.com
-    reason: "common paste exfil"
-  - host: "*.ngrok-free.app"
-    reason: "ephemeral tunnels"
+# No host deny-list: agent enforce already default-denies unknown hosts.
+deny: []
 
 scanners:
   hard_secrets_in_audit_mode: true

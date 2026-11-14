@@ -4,7 +4,7 @@
 
 Site: [https://denyout.com](https://denyout.com) · Canon GitHub (planned): [`nareyko/denyout`](https://github.com/nareyko/denyout)
 
-Agents that can read untrusted text, see sensitive data, and reach the network form a [lethal trifecta](https://arviser.com/guides/lethal-trifecta). DenyOut puts a local policy proxy on the path: **Protect this computer** allows normal web while blocking secret-bearing URLs and unsafe destinations; **Advanced / `denyout run`** default-denies except an allowlist (e.g. model APIs). Audit stays out of the agent’s reach.
+Agents that can read untrusted text, see sensitive data, and reach the network form a [lethal trifecta](https://arviser.com/guides/lethal-trifecta). DenyOut puts a local policy proxy on the path: **Protect this computer** defaults to an **Agent** allowlist (Rule of Two on egress — models/registries/git; Ask for new hosts); **Browse** restores allow-web + scanners. **Advanced / `denyout run`** default-denies except an allowlist. Audit stays out of the agent’s reach. See [CHANGELOG](CHANGELOG.md) 0.1.9.
 
 ```bash
 # Linux / macOS — silent; auto-detects Desktop (GUI) vs Server (headless)

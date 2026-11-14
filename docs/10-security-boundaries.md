@@ -6,10 +6,10 @@ This document is **normative for marketing, README badges, and sales talk tracks
 
 DenyOut **may** claim that, when used as documented:
 
-1. With **Protect this computer** On, it protects **this user’s outbound web (HTTP/HTTPS)** via transparent redirect into DenyOut for the duration of the session.  
+1. With **Protect this computer** On (Agent profile), it **default-denies** this user’s outbound HTTP/HTTPS except the agent allowlist (or Ask), via transparent redirect into DenyOut — Rule of Two on the egress leg. Browse profile restores allow-web + scanners.  
 2. It **blocks** configured secret-in-URL / canary patterns and hard SSRF/unsafe destinations visible at the configured inspection depth.  
-3. In **Ask** mode (optional), it **denies unknown hosts** until the user allows once/always.  
-4. For `denyout run` / Advanced wrap, it **default-denies** destinations not on the allowlist (models preset) for that process tree.  
+3. In **Ask** mode (default on for new installs), it **denies unknown hosts** until the user allows once/always.  
+4. For `denyout run` / Advanced wrap, it **default-denies** destinations not on the allowlist (models/agent preset) for that process tree.  
 5. On server, with NetworkPolicy, workloads that cannot bypass the sidecar are constrained accordingly.  
 6. It **emits** an audit event for each decision.  
 7. It **reduces** blast radius for R-20-style exfiltration on traffic that actually traverses DenyOut.
@@ -45,6 +45,7 @@ DenyOut **must not** claim that it:
 | Secret in body to allowed host, passthrough | Not stopped | Not stopped | Not stopped |
 | Secret in URL, intercept | Stopped | Stopped | Stopped |
 | User allowlists attacker / Ask Always | Allowed (user action) | Same | Same |
+| Open-redirect hop1→evil hop2 | Absolute Location re-eval strips hop2 (0.1.9+); relative/open-fetch proxies on allowlisted hosts remain residual | Same | Same |
 | Agent kills DenyOut / turns Off | Possible | Possible | Hard if RBAC + separate container |
 | Windows without WinDivert bridge | Must show unsupported / Needs setup — never fake On | N/A | N/A |
 

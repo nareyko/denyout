@@ -7,14 +7,14 @@ import (
 
 // CaseSpec is one lab fixture row.
 type CaseSpec struct {
-	ID             string
-	Suite          string
-	URL            string
-	Mode           string
-	Preset         string
-	ExpectVerdict  string
-	ExpectReasons  []string // any-of match when non-empty
-	Note           string
+	ID            string
+	Suite         string
+	URL           string
+	Mode          string
+	Preset        string
+	ExpectVerdict string
+	ExpectReasons []string // any-of match when non-empty
+	Note          string
 }
 
 // DefaultCases returns the normative lab set (≥20 r20_url denies for M1).
@@ -65,10 +65,68 @@ func DefaultCases() []CaseSpec {
 		{ID: "audit-would-deny", Suite: "allow_models", URL: "https://example.com/", Mode: "audit", Preset: "none", ExpectVerdict: "allow", ExpectReasons: []string{"host_not_allowed"}, Note: "AT-06 would_deny via reasons"},
 	}
 
-	out := make([]CaseSpec, 0, len(r20)+len(ssrf)+len(allow))
+	fpSigned := []CaseSpec{
+		{ID: "fp-signed-01-gh-release", Suite: "fp_signed", URL: "https://release-assets.githubusercontent.com/github-production-release-asset/1/abc?sp=r&sv=2018-11-09&sr=b&sig=XxRLfake&jwt=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.signaturepartgoeshere000", Mode: "enforce", Preset: "agent", ExpectVerdict: "allow", Note: "GitHub signed release asset"},
+		{ID: "fp-signed-02-alive-session", Suite: "fp_signed", URL: "https://alive.github.com/socket?p=1&session=abc123sessionval&shared=true", Mode: "enforce", Preset: "agent", ExpectVerdict: "allow", Note: "alive.github session carve-out"},
+		{ID: "fp-signed-03-sigv4", Suite: "fp_signed", URL: "https://mybucket.s3.amazonaws.com/o?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIOSFODNN7DENYOUT%2F20260101%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260101T000000Z&X-Amz-Expires=300&X-Amz-SignedHeaders=host&X-Amz-Signature=abcdef0123456789abcdef0123456789abcdef01", Mode: "blocklist", Preset: "none", ExpectVerdict: "allow", Note: "SigV4 carve-out: no secret_in_url (blocklist so host policy does not mask)"},
+		{ID: "fp-signed-04-gh-sk", Suite: "fp_signed", URL: "https://release-assets.githubusercontent.com/github-production-release-asset/1/abc?sp=r&sv=2018-11-09&sig=Xx&jwt=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.signaturepartgoeshere000&api_key=sk-denyouttest000000000000000", Mode: "enforce", Preset: "agent", ExpectVerdict: "deny", ExpectReasons: []string{"secret_in_url"}, Note: "real secret still denied on carve-out host"},
+		{ID: "fp-signed-05-canary", Suite: "fp_signed", URL: "https://release-assets.githubusercontent.com/x?sig=Xx&q=DENYOUT_CANARY_LAB", Mode: "enforce", Preset: "agent", ExpectVerdict: "deny", ExpectReasons: []string{"canary_detected"}, Note: "canary still denied on carve-out host"},
+	}
+
+	fpSession := []CaseSpec{
+		{ID: "fp-session-01-plain", Suite: "fp_session", URL: "https://api.anthropic.com/x?session=abc_plain_session_id", Mode: "enforce", Preset: "agent", ExpectVerdict: "allow", Note: "plain session without token shape"},
+		{ID: "fp-session-02-sk", Suite: "fp_session", URL: "https://api.anthropic.com/x?session=sk-denyouttest000000000000000", Mode: "enforce", Preset: "agent", ExpectVerdict: "deny", ExpectReasons: []string{"secret_in_url"}, Note: "session value with sk- shape"},
+		{ID: "fp-session-03-ghp", Suite: "fp_session", URL: "https://api.anthropic.com/x?session=ghp_denyouttest000000000000000000", Mode: "enforce", Preset: "agent", ExpectVerdict: "deny", ExpectReasons: []string{"secret_in_url"}, Note: "session value with ghp_ shape"},
+		{ID: "fp-session-04-ad", Suite: "fp_session", URL: "https://api.openai.com/go/jmap?session=plain_session_id_001&rnd=123456", Mode: "enforce", Preset: "agent", ExpectVerdict: "allow", Note: "ad-like session query"},
+	}
+
+	agentEgress := []CaseSpec{
+		{ID: "agent-01-anthropic", Suite: "agent_egress", URL: "https://api.anthropic.com/", Mode: "enforce", Preset: "agent", ExpectVerdict: "allow", Note: "model host"},
+		{ID: "agent-02-openai", Suite: "agent_egress", URL: "https://api.openai.com/", Mode: "enforce", Preset: "agent", ExpectVerdict: "allow", Note: "model host"},
+		{ID: "agent-03-proxy-golang", Suite: "agent_egress", URL: "https://proxy.golang.org/", Mode: "enforce", Preset: "agent", ExpectVerdict: "allow", Note: "Go module proxy"},
+		{ID: "agent-04-github", Suite: "agent_egress", URL: "https://github.com/nareyko/denyout", Mode: "enforce", Preset: "agent", ExpectVerdict: "allow", Note: "git host"},
+		{ID: "agent-05-raw-gh", Suite: "agent_egress", URL: "https://raw.githubusercontent.com/nareyko/denyout/main/README.md", Mode: "enforce", Preset: "agent", ExpectVerdict: "allow", Note: "raw github"},
+		{ID: "agent-06-evil", Suite: "agent_egress", URL: "https://evil.example/", Mode: "enforce", Preset: "agent", ExpectVerdict: "deny", ExpectReasons: []string{"host_not_allowed"}, Note: "unknown host"},
+		{ID: "agent-07-example", Suite: "agent_egress", URL: "https://example.com/", Mode: "enforce", Preset: "agent", ExpectVerdict: "deny", ExpectReasons: []string{"host_not_allowed"}, Note: "example.com not allowlisted"},
+		{ID: "agent-08-pastebin", Suite: "agent_egress", URL: "https://pastebin.com/", Mode: "enforce", Preset: "agent", ExpectVerdict: "deny", ExpectReasons: []string{"host_not_allowed"}, Note: "unknown host (no redundant deny-list under agent)"},
+	}
+
+	exfilTrue := []CaseSpec{
+		{ID: "exfil-01-sk-anthropic", Suite: "exfil_true", URL: "https://api.anthropic.com/v1?api_key=sk-denyouttest000000000000000", Mode: "enforce", Preset: "agent", ExpectVerdict: "deny", ExpectReasons: []string{"secret_in_url"}, Note: "secret on allowlisted"},
+		{ID: "exfil-02-canary", Suite: "exfil_true", URL: "https://api.openai.com/?q=DENYOUT_CANARY_LAB", Mode: "enforce", Preset: "agent", ExpectVerdict: "deny", ExpectReasons: []string{"canary_detected"}, Note: "canary on allowlisted"},
+		{ID: "exfil-03-userinfo", Suite: "exfil_true", URL: "https://user:secretpass@github.com/x", Mode: "enforce", Preset: "agent", ExpectVerdict: "deny", ExpectReasons: []string{"secret_in_url"}, Note: "userinfo on allowlisted"},
+		{ID: "exfil-04-ghp", Suite: "exfil_true", URL: "https://api.github.com/?token=ghp_denyouttest000000000000000000", Mode: "enforce", Preset: "agent", ExpectVerdict: "deny", ExpectReasons: []string{"secret_in_url"}, Note: "PAT on allowlisted"},
+	}
+
+	browseCompat := []CaseSpec{
+		{ID: "browse-01-example", Suite: "browse_compat", URL: "https://example.com/", Mode: "blocklist", Preset: "none", ExpectVerdict: "allow", Note: "legacy Computer allows web"},
+		{ID: "browse-02-secret", Suite: "browse_compat", URL: "https://example.com/x?api_key=sk-denyouttest000000000000000", Mode: "blocklist", Preset: "none", ExpectVerdict: "deny", ExpectReasons: []string{"secret_in_url"}, Note: "secrets still deny in browse"},
+		{ID: "browse-03-pastebin", Suite: "browse_compat", URL: "https://pastebin.com/", Mode: "blocklist", Preset: "none", ExpectVerdict: "deny", ExpectReasons: []string{"host_denied"}, Note: "explicit deny host"},
+		{ID: "browse-04-anthropic", Suite: "browse_compat", URL: "https://api.anthropic.com/", Mode: "blocklist", Preset: "none", ExpectVerdict: "allow", Note: "model host still allow"},
+	}
+
+	redirectPolicy := []CaseSpec{
+		{ID: "redir-01-hop2-evil", Suite: "redirect_policy", URL: "https://evil.example/exfil", Mode: "enforce", Preset: "agent", ExpectVerdict: "deny", ExpectReasons: []string{"host_not_allowed"}, Note: "hop1 allowlisted → hop2 evil (re-eval dest)"},
+		{ID: "redir-02-hop2-ok", Suite: "redirect_policy", URL: "https://api.openai.com/", Mode: "enforce", Preset: "agent", ExpectVerdict: "allow", Note: "hop1→hop2 both allowlisted"},
+		{ID: "redir-03-hop2-example", Suite: "redirect_policy", URL: "https://example.com/", Mode: "enforce", Preset: "agent", ExpectVerdict: "deny", ExpectReasons: []string{"host_not_allowed"}, Note: "open-redirect class"},
+	}
+
+	trifecta := []CaseSpec{
+		{ID: "trifecta-01-unknown-canary", Suite: "trifecta_smoke", URL: "https://evil.example/x?q=DENYOUT_CANARY_LAB", Mode: "enforce", Preset: "agent", ExpectVerdict: "deny", ExpectReasons: []string{"canary_detected", "host_not_allowed"}, Note: "destination cut + secret"},
+		{ID: "trifecta-02-unknown-clean", Suite: "trifecta_smoke", URL: "https://evil.example/clean", Mode: "enforce", Preset: "agent", ExpectVerdict: "deny", ExpectReasons: []string{"host_not_allowed"}, Note: "clean unknown = host_not_allowed only"},
+	}
+
+	out := make([]CaseSpec, 0, len(r20)+len(ssrf)+len(allow)+len(fpSigned)+len(fpSession)+len(agentEgress)+len(exfilTrue)+len(browseCompat)+len(redirectPolicy)+len(trifecta))
 	out = append(out, r20...)
 	out = append(out, ssrf...)
 	out = append(out, allow...)
+	out = append(out, fpSigned...)
+	out = append(out, fpSession...)
+	out = append(out, agentEgress...)
+	out = append(out, exfilTrue...)
+	out = append(out, browseCompat...)
+	out = append(out, redirectPolicy...)
+	out = append(out, trifecta...)
 	return out
 }
 

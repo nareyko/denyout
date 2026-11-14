@@ -6,22 +6,30 @@ import (
 	"github.com/nareyko/denyout/internal/policy"
 )
 
-func TestWholeDeviceAllowsWebBlocksSecretsAndSSRF(t *testing.T) {
+func TestWholeDeviceAgentDeniesUnknownAllowsModels(t *testing.T) {
 	cfg, err := policy.DefaultWholeDevice()
 	if err != nil {
 		t.Fatal(err)
 	}
 	eng := policy.NewEngine(cfg)
 
-	allow, err := eng.EvaluateURL("https://example.com/")
+	denyHost, err := eng.EvaluateURL("https://example.com/")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if allow.Verdict != "allow" {
-		t.Fatalf("example.com: want allow, got %+v", allow)
+	if denyHost.Verdict != "deny" {
+		t.Fatalf("example.com: want deny (agent), got %+v", denyHost)
 	}
 
-	secret, err := eng.EvaluateURL("https://example.com/?api_key=sk-ant-testvalue123456")
+	allowModel, err := eng.EvaluateURL("https://api.anthropic.com/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if allowModel.Verdict != "allow" {
+		t.Fatalf("anthropic: want allow, got %+v", allowModel)
+	}
+
+	secret, err := eng.EvaluateURL("https://api.anthropic.com/?api_key=sk-ant-testvalue123456")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,6 +43,21 @@ func TestWholeDeviceAllowsWebBlocksSecretsAndSSRF(t *testing.T) {
 	}
 	if meta.Verdict != "deny" {
 		t.Fatalf("metadata: want deny, got %+v", meta)
+	}
+}
+
+func TestWholeDeviceBrowseAllowsWeb(t *testing.T) {
+	cfg, err := policy.DefaultWholeDeviceBrowse()
+	if err != nil {
+		t.Fatal(err)
+	}
+	eng := policy.NewEngine(cfg)
+	allow, err := eng.EvaluateURL("https://example.com/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if allow.Verdict != "allow" {
+		t.Fatalf("browse example.com: want allow, got %+v", allow)
 	}
 }
 

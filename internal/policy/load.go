@@ -119,9 +119,35 @@ scanners:
 	return LoadBytes(minimal)
 }
 
-// DefaultWholeDevice returns allow-web + secret/canary/SSRF hard denies (Protect this computer).
+// DefaultWholeDevice returns agent seatbelt: enforce + agent allowlist + scanners (Protect this computer).
 func DefaultWholeDevice() (*Config, error) {
 	path, err := findExamplePolicy("denyout.whole_device.yaml")
+	if err == nil {
+		return LoadFile(path)
+	}
+	minimal := []byte(`
+apiVersion: denyout/v1
+kind: Config
+mode: enforce
+preset: agent
+allow_private: false
+allow_ip_literals: false
+allowed_ports: [443, 80]
+deny: []
+scanners:
+  min_value_len: 6
+  named_query:
+    enabled: true
+  canaries:
+    - "DENYOUT_CANARY_"
+    - "ARVISER_CANARY_"
+`)
+	return LoadBytes(minimal)
+}
+
+// DefaultWholeDeviceBrowse returns legacy blocklist (allow web; secrets/SSRF still deny).
+func DefaultWholeDeviceBrowse() (*Config, error) {
+	path, err := findExamplePolicy("denyout.whole_device_browse.yaml")
 	if err == nil {
 		return LoadFile(path)
 	}
@@ -146,7 +172,7 @@ scanners:
 	return LoadBytes(minimal)
 }
 
-// DefaultWholeDeviceAsk returns deny-unknown hosts until Allow once/Always (Ask mode).
+// DefaultWholeDeviceAsk returns deny-unknown hosts until Allow once/Always (Ask mode) on agent allowlist.
 func DefaultWholeDeviceAsk(extraAllow []Rule) (*Config, error) {
 	path, err := findExamplePolicy("denyout.whole_device_ask.yaml")
 	var cfg *Config
@@ -157,13 +183,12 @@ func DefaultWholeDeviceAsk(extraAllow []Rule) (*Config, error) {
 apiVersion: denyout/v1
 kind: Config
 mode: enforce
-preset: none
+preset: agent
 allow_private: false
 allow_ip_literals: false
 allowed_ports: [443, 80]
 allow: []
-deny:
-  - host: pastebin.com
+deny: []
 scanners:
   min_value_len: 6
   named_query:
@@ -227,14 +252,20 @@ func mergePreset(cfg *Config) error {
 }
 
 func loadPresetHosts(name string) ([]string, error) {
-	if name != "models" && name != "models+pkg" && name != "strict" && name != "dev" {
+	switch name {
+	case "models", "models+pkg", "strict", "dev", "agent":
+	default:
 		return nil, fmt.Errorf("unknown preset %q", name)
 	}
-	// models / models+pkg / strict / dev — for stub, models hosts are enough; others extend later.
-	path, err := findPresetFile("models.yaml")
+	file := "models.yaml"
+	fallback := defaultModelsHosts
+	if name == "agent" {
+		file = "agent.yaml"
+		fallback = defaultAgentHosts
+	}
+	path, err := findPresetFile(file)
 	if err != nil {
-		// Built-in fallback so schema-valid minimal configs still work in tests.
-		return defaultModelsHosts(), nil
+		return fallback(), nil
 	}
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -247,7 +278,7 @@ func loadPresetHosts(name string) ([]string, error) {
 		return nil, err
 	}
 	if len(doc.Hosts) == 0 {
-		return defaultModelsHosts(), nil
+		return fallback(), nil
 	}
 	return doc.Hosts, nil
 }
@@ -282,4 +313,18 @@ func defaultModelsHosts() []string {
 		"api.together.xyz",
 		"api.fireworks.ai",
 	}
+}
+
+func defaultAgentHosts() []string {
+	h := defaultModelsHosts()
+	extra := []string{
+		"proxy.golang.org", "sum.golang.org", "index.golang.org",
+		"registry.npmjs.org", "pypi.org", "files.pythonhosted.org",
+		"crates.io", "static.crates.io",
+		"github.com", "api.github.com", "raw.githubusercontent.com",
+		"objects.githubusercontent.com", "release-assets.githubusercontent.com",
+		"codeload.github.com", "alive.github.com", "gitlab.com",
+		"api2.cursor.sh", "api2direct.cursor.sh", "api3.cursor.sh",
+	}
+	return append(h, extra...)
 }

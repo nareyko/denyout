@@ -135,6 +135,7 @@
       <h2>Status</h2>
       <div class="panel">
         <div class="row"><span class="k">Mode</span><span class="v" id="mode">—</span></div>
+        <div class="row"><span class="k">Profile</span><span class="v" id="profile">—</span></div>
         <div class="row"><span class="k">Protection</span><span class="v" id="protection">—</span></div>
         <div class="row"><span class="k">Version</span><span class="v" id="version">—</span></div>
         <div class="row"><span class="k">Last block</span><span class="v" id="last-deny">none</span></div>
@@ -155,6 +156,7 @@
         <div class="toggles">
           <label class="toggle"><input type="checkbox" id="notify" /> Notifications</label>
           <label class="toggle"><input type="checkbox" id="ask" /> Ask before new sites</label>
+          <label class="toggle"><input type="checkbox" id="browse" /> Browse profile (legacy)</label>
         </div>
       </div>
     </section>
@@ -162,6 +164,11 @@
     <section>
       <h2>Activity</h2>
       <div class="panel">
+        <div class="toggles" style="margin-bottom:0.75rem">
+          <label class="toggle"><input type="radio" name="reason" value="" checked /> All</label>
+          <label class="toggle"><input type="radio" name="reason" value="host_not_allowed" /> host_not_allowed</label>
+          <label class="toggle"><input type="radio" name="reason" value="secret_in_url" /> secret_in_url</label>
+        </div>
         <ul class="denials" id="denials"></ul>
         <p class="empty" id="denials-empty">No deny events yet.</p>
         <div class="actions">
@@ -183,8 +190,12 @@
       return j;
     }
 
+    let allDenials = [];
+    let reasonFilter = "";
+
     function renderStatus(s) {
       $("mode").textContent = s.mode_label || s.mode || "—";
+      $("profile").textContent = s.policy_profile || "agent";
       $("protection").textContent = s.protection_on ? "on" : "off";
       $("version").textContent = s.version || "—";
       const last = s.last_deny_host
@@ -195,6 +206,7 @@
       $("diag-dir").textContent = s.diagnostics_dir || "—";
       $("notify").checked = !!s.notify;
       $("ask").checked = !!s.ask_mode;
+      $("browse").checked = (s.policy_profile || "agent") === "browse";
 
       const mode = s.mode || "off";
       ["computer", "session", "off"].forEach((m) => {
@@ -224,16 +236,22 @@
       const ul = $("denials");
       const empty = $("denials-empty");
       ul.innerHTML = "";
-      if (!list || !list.length) {
+      let filtered = list || [];
+      if (reasonFilter) {
+        filtered = filtered.filter((e) => (e.reasons || []).includes(reasonFilter));
+      }
+      if (!filtered.length) {
         empty.hidden = false;
+        empty.textContent = "No deny events yet.";
         return;
       }
       empty.hidden = true;
-      list.slice().reverse().forEach((e) => {
+      filtered.slice().reverse().forEach((e) => {
         const li = document.createElement("li");
         const host = (e.network && e.network.dest_host) || "?";
         const reasons = (e.reasons || []).join(", ") || "-";
         const mode = e.mode || "";
+        const prof = e.policy_profile ? " · " + e.policy_profile : "";
         li.innerHTML =
           (e.ts || "") +
           '  <span class="host">' +
@@ -241,7 +259,8 @@
           "</span>  [" +
           reasons +
           "]" +
-          (mode ? "  · " + mode : "");
+          (mode ? "  · " + mode : "") +
+          prof;
         ul.appendChild(li);
       });
     }
@@ -250,7 +269,8 @@
       const s = await api("/api/desktop/status");
       renderStatus(s);
       const d = await api("/api/desktop/denials?limit=80");
-      renderDenials(d.events || []);
+      allDenials = d.events || [];
+      renderDenials(allDenials);
     }
 
     document.querySelectorAll("[data-mode]").forEach((btn) => {
@@ -276,6 +296,7 @@
           body: JSON.stringify({
             notify: $("notify").checked,
             ask_mode: $("ask").checked,
+            policy_profile: $("browse").checked ? "browse" : "agent",
           }),
         });
         await refresh();
@@ -285,6 +306,13 @@
     }
     $("notify").onchange = saveSettings;
     $("ask").onchange = saveSettings;
+    $("browse").onchange = saveSettings;
+    document.querySelectorAll('input[name="reason"]').forEach((el) => {
+      el.onchange = () => {
+        reasonFilter = el.value;
+        renderDenials(allDenials);
+      };
+    });
     $("btn-refresh").onclick = () => refresh().catch((e) => alert(e.message));
 
     refresh().catch((e) => {

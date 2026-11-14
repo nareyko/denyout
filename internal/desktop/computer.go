@@ -87,7 +87,9 @@ func (a *App) startComputer() error {
 	if len(a.state.AlwaysAllowHosts) > 0 {
 		env = append(env, "DENYOUT_ALWAYS_ALLOW="+strings.Join(a.state.AlwaysAllowHosts, ","))
 	}
+	profile := normalizePolicyProfile(a.state.PolicyProfile)
 	a.mu.Unlock()
+	env = append(env, "DENYOUT_POLICY_PROFILE="+profile)
 	cmd.Env = env
 	if err := cmd.Start(); err != nil {
 		_ = hostguard.ElevateRemove(port, uid)

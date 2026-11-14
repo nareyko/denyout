@@ -1,0 +1,21 @@
+# Hop2 destination re-eval (proxy strips Location when hop2 would deny).
+suite: redirect_policy
+cases:
+  - id: redir-01-hop2-evil
+    url: "https://evil.example/exfil"
+    mode: enforce
+    preset: agent
+    expect: deny
+    reasons: [host_not_allowed]
+    note: "hop1 allowlisted → hop2 evil"
+  - id: redir-02-hop2-ok
+    url: "https://api.openai.com/"
+    mode: enforce
+    preset: agent
+    expect: allow
+  - id: redir-03-hop2-example
+    url: "https://example.com/"
+    mode: enforce
+    preset: agent
+    expect: deny
+    reasons: [host_not_allowed]

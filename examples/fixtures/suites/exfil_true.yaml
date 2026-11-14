@@ -1,0 +1,26 @@
+suite: exfil_true
+cases:
+  - id: exfil-01-sk-anthropic
+    url: "https://api.anthropic.com/v1?api_key=sk-denyouttest000000000000000"
+    mode: enforce
+    preset: agent
+    expect: deny
+    reasons: [secret_in_url]
+  - id: exfil-02-canary
+    url: "https://api.openai.com/?q=DENYOUT_CANARY_LAB"
+    mode: enforce
+    preset: agent
+    expect: deny
+    reasons: [canary_detected]
+  - id: exfil-03-userinfo
+    url: "https://user:secretpass@github.com/x"
+    mode: enforce
+    preset: agent
+    expect: deny
+    reasons: [secret_in_url]
+  - id: exfil-04-ghp
+    url: "https://api.github.com/?token=ghp_denyouttest000000000000000000"
+    mode: enforce
+    preset: agent
+    expect: deny
+    reasons: [secret_in_url]

@@ -3,11 +3,11 @@ kind: Config
 
 metadata:
   name: whole-device
-  description: "Protect this computer — allow normal web; block secret-in-URL, canaries, SSRF/unsafe IPs"
+  description: "Protect this computer — agent seatbelt (default-deny allowlist); Ask on new hosts recommended"
 
-# blocklist: hosts allowed by default; scanners + deny[] + unsafe IP still enforce.
-mode: blocklist
-preset: none
+# enforce + agent: unknown hosts denied (or Ask); scanners still block secrets/canaries/SSRF.
+mode: enforce
+preset: agent
 
 tls:
   mode: intercept
@@ -25,11 +25,8 @@ allowed_ports: [443, 80]
 
 allow: []
 
-deny:
-  - host: pastebin.com
-    reason: "common paste exfil"
-  - host: "*.ngrok-free.app"
-    reason: "ephemeral tunnels"
+# No host deny-list: agent enforce already default-denies unknown hosts.
+deny: []
 
 scanners:
   hard_secrets_in_audit_mode: true

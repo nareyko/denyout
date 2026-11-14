@@ -18,7 +18,7 @@ metadata:
   name: laptop-default
 
 mode: enforce            # enforce | audit | blocklist | ask
-preset: models           # models | models+pkg | strict | none
+preset: models           # models | models+pkg | strict | none | dev | agent
 
 tls:
   mode: intercept        # intercept | passthrough
@@ -88,7 +88,7 @@ server:
 | `apiVersion` | string | — | `denyout/v1` |
 | `kind` | string | `Config` | |
 | `mode` | enum | `enforce` | |
-| `preset` | enum | `models` | Applied before `allow` merge; `none` = no preset |
+| `preset` | enum | `models` | Applied before `allow` merge; `none` = no preset; `agent` = desktop seatbelt allowlist (0.1.9+) |
 | `tls.mode` | enum | `intercept` | |
 | `tls.session_ca` | bool | true | |
 | `listen.host` | string | `127.0.0.1` | |
@@ -151,6 +151,10 @@ Adds: `registry.npmjs.org`, `pypi.org`, `files.pythonhosted.org`, `proxy.golang.
 
 No preset hosts; only explicit `allow`.
 
+### `agent` (0.1.9+ desktop default)
+
+Models + registries (`proxy.golang.org`, `sum.golang.org`, `registry.npmjs.org`, `pypi.org`, …) + git/CDN (`github.com`, `api.github.com`, `raw.githubusercontent.com`, `release-assets.githubusercontent.com`, …) + Cursor runtime hosts (`api2.cursor.sh`, …). See `presets/agent.yaml`.
+
 ## 5. Env overrides
 
 | Env | Maps to |
@@ -160,6 +164,8 @@ No preset hosts; only explicit `allow`.
 | `DENYOUT_TLS_MODE` | `tls.mode` |
 | `DENYOUT_LISTEN_PORT` | `listen.port` |
 | `DENYOUT_AUDIT_PATH` | `audit.jsonl_path` |
+| `DENYOUT_POLICY_PROFILE` | desktop proxyd: `agent` \| `browse` |
+| `DENYOUT_ALWAYS_ALLOW` | comma-separated always-allow hosts |
 | `DENYOUT_KILL` | if `1`, all verdicts deny |
 | `DENYOUT_ALLOW_INSECURE_OVERRIDE` | gates dangerous env merges |
 

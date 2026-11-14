@@ -33,17 +33,19 @@ type DenyHook func(host string, reasons []string)
 
 // Config for the local proxy.
 type Config struct {
-	Engine      *policy.Engine
-	Audit       *audit.Sink
-	SessionID   string
-	PolicyHash  string
-	Version     string
-	TLSMode     TLSMode
-	CA          *SessionCA
-	ListenHost  string // default 127.0.0.1
-	ListenPort  int    // 0 = ephemeral
-	OnDeny      DenyHook
-	Transparent bool // accept redirected raw TCP (SNI/Host), not only HTTP-proxy protocol
+	Engine        *policy.Engine
+	Audit         *audit.Sink
+	SessionID     string
+	PolicyHash    string
+	Version       string
+	TLSMode       TLSMode
+	CA            *SessionCA
+	ListenHost    string // default 127.0.0.1
+	ListenPort    int    // 0 = ephemeral
+	OnDeny        DenyHook
+	Transparent   bool   // accept redirected raw TCP (SNI/Host), not only HTTP-proxy protocol
+	PolicyProfile string // agent | browse (audit attribution)
+	Process       string // best-effort client label
 }
 
 // Server is the HTTP proxy.
@@ -218,6 +220,10 @@ func (s *Server) roundTripIntercept(client io.ReadWriteCloser, req *http.Request
 	}
 	rawURL += req.URL.RequestURI()
 
+	bodyMax := 65536
+	if s.cfg.Engine != nil && s.cfg.Engine.Cfg != nil {
+		bodyMax = s.cfg.Engine.Cfg.BodyScanMaxBytesOrDefault()
+	}
 	rv := policy.RequestView{
 		SessionID:  s.cfg.SessionID,
 		DestHost:   host,
@@ -231,6 +237,7 @@ func (s *Server) roundTripIntercept(client io.ReadWriteCloser, req *http.Request
 		RawURL:     rawURL,
 		Inspection: "intercept",
 		Headers:    req.Header,
+		BodyPrefix: peekRequestBody(req, bodyMax),
 	}
 	d := s.cfg.Engine.Evaluate(rv)
 	s.logDecision(rv, d, start)
@@ -301,7 +308,49 @@ func (s *Server) roundTripIntercept(client io.ReadWriteCloser, req *http.Request
 		return
 	}
 	defer upResp.Body.Close()
+	s.stripDeniedRedirect(upResp, start)
 	_ = upResp.Write(client)
+}
+
+// stripDeniedRedirect re-evaluates absolute Location hosts (open-redirect / EchoLeak class).
+// Relative Locations are left alone. Denied destinations lose Location so clients cannot follow.
+func (s *Server) stripDeniedRedirect(resp *http.Response, start time.Time) {
+	if resp == nil || s.cfg.Engine == nil {
+		return
+	}
+	loc := resp.Header.Get("Location")
+	if loc == "" {
+		return
+	}
+	u, err := url.Parse(loc)
+	if err != nil || !u.IsAbs() || u.Hostname() == "" {
+		return
+	}
+	d, err := s.cfg.Engine.EvaluateURL(u.String())
+	if err != nil {
+		d = policy.Decision{Verdict: "deny", Reasons: []string{"dns_failure"}}
+	}
+	rv := policy.RequestView{
+		SessionID:  s.cfg.SessionID,
+		DestHost:   u.Hostname(),
+		DestPort:   443,
+		Protocol:   u.Scheme,
+		Method:     "GET",
+		Path:       u.Path,
+		RawQuery:   u.RawQuery,
+		RawURL:     u.String(),
+		Inspection: "redirect",
+	}
+	if p := u.Port(); p != "" {
+		fmt.Sscanf(p, "%d", &rv.DestPort)
+	} else if u.Scheme == "http" {
+		rv.DestPort = 80
+	}
+	s.logDecision(rv, d, start)
+	if d.Verdict == "deny" {
+		resp.Header.Del("Location")
+		resp.Header.Set("X-DenyOut-Redirect", "stripped")
+	}
 }
 
 func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
@@ -323,6 +372,10 @@ func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
 	if !u.IsAbs() {
 		raw = "http://" + r.Host + r.URL.RequestURI()
 	}
+	bodyMax := 65536
+	if s.cfg.Engine != nil && s.cfg.Engine.Cfg != nil {
+		bodyMax = s.cfg.Engine.Cfg.BodyScanMaxBytesOrDefault()
+	}
 	rv := policy.RequestView{
 		SessionID:  s.cfg.SessionID,
 		DestHost:   host,
@@ -335,6 +388,7 @@ func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
 		RawURL:     raw,
 		Inspection: "cleartext",
 		Headers:    r.Header,
+		BodyPrefix: peekRequestBody(r, bodyMax),
 	}
 	d := s.cfg.Engine.Evaluate(rv)
 	s.logDecision(rv, d, start)
@@ -349,6 +403,7 @@ func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer resp.Body.Close()
+	s.stripDeniedRedirect(resp, start)
 	for k, vv := range resp.Header {
 		for _, v := range vv {
 			w.Header().Add(k, v)
@@ -413,6 +468,8 @@ func (s *Server) logDecision(rv policy.RequestView, d policy.Decision, start tim
 		PolicyHash:     s.cfg.PolicyHash,
 		DenyOutVersion: s.cfg.Version,
 		WouldDeny:      d.WouldDeny,
+		PolicyProfile:  s.cfg.PolicyProfile,
+		Process:        s.cfg.Process,
 	}
 	_ = s.cfg.Audit.Log(ev)
 	if d.Verdict == "deny" {

@@ -62,6 +62,7 @@ type Rule struct {
 type Scanners struct {
 	HardSecretsInAuditMode *bool    `yaml:"hard_secrets_in_audit_mode" json:"hard_secrets_in_audit_mode"`
 	MinValueLen            int      `yaml:"min_value_len" json:"min_value_len"`
+	BodyScanMaxBytes       int      `yaml:"body_scan_max_bytes" json:"body_scan_max_bytes"`
 	Canaries               []string `yaml:"canaries" json:"canaries"`
 	NamedQuery             *struct {
 		Enabled *bool `yaml:"enabled" json:"enabled"`
@@ -93,4 +94,15 @@ func (c *Config) NamedQueryEnabled() bool {
 		return true
 	}
 	return *c.Scanners.NamedQuery.Enabled
+}
+
+// BodyScanMaxBytesOrDefault returns request-body scan cap (default 64KiB; negative disables).
+func (c *Config) BodyScanMaxBytesOrDefault() int {
+	if c.Scanners.BodyScanMaxBytes < 0 {
+		return 0
+	}
+	if c.Scanners.BodyScanMaxBytes == 0 {
+		return 65536
+	}
+	return c.Scanners.BodyScanMaxBytes
 }

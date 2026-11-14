@@ -55,8 +55,19 @@ denyout run -- curl -I https://api.anthropic.com
 
 Tray: **Computer** / **Session** / **Off** (active mode marked ✓; re-click is a no-op), settings toggles, **Open activity…** (loopback Activity/Settings page), **Open diagnostics…**, **Copy last error**.
 
-- **Activity** (`http://127.0.0.1:…/activity`): mode, recent denials from `audit.jsonl`, notify/Ask, NSS/clipboard hints.
+- **Activity** (`http://127.0.0.1:…/activity`): mode, recent denials from `audit.jsonl`, notify/Ask, policy profile (Agent vs Browse), reason filter (`host_not_allowed` / `secret_in_url`), NSS/clipboard hints.
 - **Diagnostics** folder: `~/.local/state/denyout/` (`desktop.log`, `last-error.txt`, `audit.jsonl`, `README.txt`). Elevation failures (pkexec/UAC) are in `last-error.txt` / `desktop.log` — not in audit.
+
+### Policy profiles (0.1.9+)
+
+| Profile | Default? | Behavior |
+| --- | --- | --- |
+| **Agent** | Yes (Computer / Session) | Enforce + `presets/agent.yaml` allowlist (models, registries, git/CDN, Cursor). Unknown hosts → deny or Ask. Implements **Rule of Two on egress**: private data + untrusted content may exist on the machine; external communication is limited to the allowlist (or HITL Ask). |
+| **Browse** | Advanced toggle | Legacy blocklist — normal web allowed; secrets/canaries/SSRF/deny-hosts still block. |
+
+New installs: `AskMode=true`, `policy_profile=agent`. Upgrades with empty `policy_profile` migrate to `agent`. Examples: [`denyout.whole_device.yaml`](../examples/policies/denyout.whole_device.yaml) (agent), [`denyout.whole_device_browse.yaml`](../examples/policies/denyout.whole_device_browse.yaml) (browse).
+
+Manual QA: [`qa-agent-seatbelt.md`](qa-agent-seatbelt.md).
 
 Install elevates **at most once** (in the tray process). Turning protection off may ask once more to remove host rules.
 
@@ -93,7 +104,7 @@ One release pipeline feeds every channel; package managers only re-point at Rele
 | Windows | WinDivert + `denyout-windivert.exe` — see [`hostguard-windows.md`](hostguard-windows.md) | `certutil` Root store | UAC |
 
 CLI helper: `denyout hostctl render|apply|remove --port N --ca PATH --uid N`.  
-Default policy: [`examples/policies/denyout.whole_device.yaml`](../examples/policies/denyout.whole_device.yaml) (allow web + scanners). Ask mode: `denyout.whole_device_ask.yaml`.
+Default policy: [`examples/policies/denyout.whole_device.yaml`](../examples/policies/denyout.whole_device.yaml) (enforce + agent allowlist + scanners). Browse (legacy): `denyout.whole_device_browse.yaml`. Ask mode: `denyout.whole_device_ask.yaml`.
 
 Proxy accepts **transparent** connections (TLS SNI / HTTP Host), not only HTTP-proxy CONNECT.
 

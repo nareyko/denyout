@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -19,6 +20,7 @@ type State struct {
 	SetupDone         bool     `json:"setup_done"`
 	Notify            bool     `json:"notify"`
 	AskMode           bool     `json:"ask_mode"`
+	PolicyProfile     string   `json:"policy_profile,omitempty"`    // agent (default) | browse
 	Scope             string   `json:"scope,omitempty"`              // computer | session | empty
 	ProtectionOn      bool     `json:"protection_on"`               // restore on login
 	ComputerEnabled   bool     `json:"computer_enabled"`            // legacy / mirror of scope=computer+on
@@ -36,7 +38,8 @@ var stateMu sync.Mutex
 func DefaultState() State {
 	return State{
 		Notify:            true,
-		AskMode:           false,
+		AskMode:           true, // HITL on new hosts (agent seatbelt)
+		PolicyProfile:     PolicyProfileAgent,
 		ComputerAvailable: true,
 	}
 }
@@ -83,6 +86,10 @@ func LoadState() State {
 	// Older files lacked computer_available — treat as available.
 	if !jsonHasComputerAvailable(b) {
 		st.ComputerAvailable = true
+	}
+	// Upgrade: empty policy_profile → agent (new default seatbelt).
+	if strings.TrimSpace(st.PolicyProfile) == "" {
+		st.PolicyProfile = PolicyProfileAgent
 	}
 	return st
 }

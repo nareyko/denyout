@@ -15,7 +15,8 @@ func Install(opts Options) error {
 	st := LoadState()
 	st.SetupDone = true
 	st.Notify = true
-	st.AskMode = false
+	st.AskMode = true
+	st.PolicyProfile = PolicyProfileAgent
 	st.ComputerAvailable = true
 	// Prefer whole-computer; tray will try once, then fall back to session.
 	st.Scope = ScopeComputer

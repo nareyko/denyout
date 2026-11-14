@@ -75,6 +75,24 @@ func (a *App) runTray(ctx context.Context) error {
 			a.restartActiveProtector()
 		}
 	})
+	browseItem := menu.Add("Advanced: Browse profile", func() {
+		a.mu.Lock()
+		if normalizePolicyProfile(a.state.PolicyProfile) == PolicyProfileBrowse {
+			a.state.PolicyProfile = PolicyProfileAgent
+		} else {
+			a.state.PolicyProfile = PolicyProfileBrowse
+		}
+		profile := a.state.PolicyProfile
+		st := a.state
+		wasOn := a.proxyd != nil || a.session != nil
+		a.mu.Unlock()
+		_ = SaveState(st)
+		AppendDesktopLog("INFO policy_profile=%s", profile)
+		notify.Info("DenyOut", "Policy profile: "+profile)
+		if wasOn {
+			a.restartActiveProtector()
+		}
+	})
 	menu.AddSeparator()
 	menu.Add("Advanced: protect shell", func() {
 		a.mu.Lock()
@@ -125,6 +143,7 @@ func (a *App) runTray(ctx context.Context) error {
 				last := a.lastDeny
 				notifyOn := a.state.Notify
 				askOn := a.state.AskMode
+				browseOn := normalizePolicyProfile(a.state.PolicyProfile) == PolicyProfileBrowse
 				avail := a.state.ComputerAvailable
 				a.mu.Unlock()
 
@@ -148,6 +167,7 @@ func (a *App) runTray(ctx context.Context) error {
 
 				notifyItem.SetLabel(checkedLabel("Notifications", notifyOn))
 				askItem.SetLabel(checkedLabel("Ask before new sites", askOn))
+				browseItem.SetLabel(checkedLabel("Advanced: Browse profile", browseOn))
 
 				tray.SetTooltip("DenyOut — " + modeLabel(mode))
 

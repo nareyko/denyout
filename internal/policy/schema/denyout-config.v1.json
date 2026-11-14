@@ -22,7 +22,7 @@
     },
     "preset": {
       "type": "string",
-      "enum": ["models", "models+pkg", "strict", "none", "dev"]
+      "enum": ["models", "models+pkg", "strict", "none", "dev", "agent"]
     },
     "tls": {
       "type": "object",

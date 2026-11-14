@@ -21,14 +21,14 @@ type RunOptions struct {
 
 // CaseResult is one evaluated fixture.
 type CaseResult struct {
-	CaseID   string
-	Suite    string
-	URL      string
-	Verdict  string
-	Reasons  []string
-	Expect   string
-	Passed   bool
-	Detail   string
+	CaseID    string
+	Suite     string
+	URL       string
+	Verdict   string
+	Reasons   []string
+	Expect    string
+	Passed    bool
+	Detail    string
 	WouldDeny bool
 }
 
@@ -82,21 +82,34 @@ func RunDB(db *sql.DB, opts RunOptions) (*RunReport, error) {
 		return nil, err
 	}
 
+	tx, err := db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
 	rep := &RunReport{RunID: runID}
+	cfgCache := map[string]*policy.Config{}
 	for _, c := range cases {
 		var expectReasons []string
 		if c.expectReasonsJSON != "" && c.expectReasonsJSON != "null" {
 			_ = json.Unmarshal([]byte(c.expectReasonsJSON), &expectReasons)
 		}
 
-		cfg, err := configFor(c.mode, c.preset)
-		if err != nil {
-			cr := CaseResult{CaseID: c.id, Suite: c.suite, URL: secrets.RedactURL(c.rawURL), Passed: false, Detail: err.Error(), Expect: c.expectVerdict}
-			rep.Results = append(rep.Results, cr)
-			rep.Failed++
-			rep.Total++
-			_ = insertResult(db, runID, cr)
-			continue
+		ckey := c.mode + "|" + c.preset
+		cfg, ok := cfgCache[ckey]
+		if !ok {
+			var err error
+			cfg, err = configFor(c.mode, c.preset)
+			if err != nil {
+				cr := CaseResult{CaseID: c.id, Suite: c.suite, URL: secrets.RedactURL(c.rawURL), Passed: false, Detail: err.Error(), Expect: c.expectVerdict}
+				rep.Results = append(rep.Results, cr)
+				rep.Failed++
+				rep.Total++
+				_ = insertResultTx(tx, runID, cr)
+				continue
+			}
+			cfgCache[ckey] = cfg
 		}
 
 		d, err := policy.EvaluateURL(cfg, c.rawURL)
@@ -105,7 +118,7 @@ func RunDB(db *sql.DB, opts RunOptions) (*RunReport, error) {
 			rep.Results = append(rep.Results, cr)
 			rep.Failed++
 			rep.Total++
-			_ = insertResult(db, runID, cr)
+			_ = insertResultTx(tx, runID, cr)
 			continue
 		}
 
@@ -126,15 +139,20 @@ func RunDB(db *sql.DB, opts RunOptions) (*RunReport, error) {
 		} else {
 			rep.Failed++
 		}
-		_ = insertResult(db, runID, cr)
+		_ = insertResultTx(tx, runID, cr)
 	}
 
-	ok := 0
+	okFlag := 0
 	if rep.Failed == 0 {
-		ok = 1
+		okFlag = 1
 	}
 	finished := time.Now().UTC().Format(time.RFC3339Nano)
-	_, _ = db.Exec(`UPDATE runs SET finished_at = ?, ok = ? WHERE id = ?`, finished, ok, runID)
+	if _, err := tx.Exec(`UPDATE runs SET finished_at = ?, ok = ? WHERE id = ?`, finished, okFlag, runID); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
 	return rep, nil
 }
 
@@ -173,6 +191,14 @@ func containsAny(have, want []string) bool {
 }
 
 func insertResult(db *sql.DB, runID string, cr CaseResult) error {
+	return insertResultTx(db, runID, cr)
+}
+
+type execer interface {
+	Exec(query string, args ...any) (sql.Result, error)
+}
+
+func insertResultTx(db execer, runID string, cr CaseResult) error {
 	reasons, _ := json.Marshal(cr.Reasons)
 	passed := 0
 	if cr.Passed {
@@ -190,11 +216,20 @@ func configFor(mode, preset string) (*policy.Config, error) {
 	if preset == "" {
 		preset = "models"
 	}
+	denyBlock := "deny: []"
+	if mode == "blocklist" {
+		// Explicit deny hosts matter only when the web is otherwise allowed.
+		denyBlock = "deny:\n  - host: pastebin.com"
+	}
 	yaml := fmt.Sprintf(`
 apiVersion: denyout/v1
 kind: Config
 mode: %s
 preset: %s
+allow_private: false
+allow_ip_literals: false
+allowed_ports: [443, 80]
+%s
 scanners:
   hard_secrets_in_audit_mode: true
   min_value_len: 6
@@ -206,6 +241,6 @@ scanners:
     - "DENYOUT_CANARY_"
     - "ARVISER_CANARY_"
     - "SECRET_MARKER_"
-`, mode, preset)
+`, mode, preset, denyBlock)
 	return policy.LoadBytes([]byte(strings.TrimSpace(yaml) + "\n"))
 }

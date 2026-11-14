@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/nareyko/denyout/internal/notify"
-	"github.com/nareyko/denyout/internal/policy"
 	"github.com/nareyko/denyout/internal/proxy"
 	"github.com/nareyko/denyout/internal/run"
 )
@@ -19,8 +18,6 @@ func (a *App) startSession() error {
 		a.mu.Unlock()
 		return fmt.Errorf("protection is already on")
 	}
-	ask := a.state.AskMode
-	always := append([]string{}, a.state.AlwaysAllowHosts...)
 	a.status = "Starting…"
 	ver := a.opts.Version
 	a.mu.Unlock()
@@ -31,31 +28,23 @@ func (a *App) startSession() error {
 		return err
 	}
 
-	var cfg *policy.Config
-	var err error
-	if ask {
-		var rules []policy.Rule
-		for _, h := range always {
-			h = strings.TrimSpace(h)
-			if h != "" {
-				rules = append(rules, policy.Rule{Host: h, Reason: "user_always"})
-			}
-		}
-		cfg, err = policy.DefaultWholeDeviceAsk(rules)
-	} else {
-		cfg, err = policy.DefaultWholeDevice()
-	}
+	cfg, err := a.desktopPolicyConfig()
 	if err != nil {
 		a.setStatus("Error")
 		return err
 	}
 
+	a.mu.Lock()
+	profile := normalizePolicyProfile(a.state.PolicyProfile)
+	a.mu.Unlock()
 	sess, err := run.StartSession(run.SessionOptions{
-		Config:    cfg,
-		TLSMode:   proxy.TLSIntercept,
-		Version:   ver,
-		CADir:     caDir,
-		PersistCA: true,
+		Config:        cfg,
+		TLSMode:       proxy.TLSIntercept,
+		Version:       ver,
+		CADir:         caDir,
+		PersistCA:     true,
+		PolicyProfile: profile,
+		Process:       "desktop-session",
 		OnDeny: func(host string, reasons []string) {
 			a.onSessionDeny(host, reasons)
 		},

@@ -34,6 +34,8 @@ type Event struct {
 	PolicyHash     string    `json:"policy_hash"`
 	DenyOutVersion string    `json:"denyout_version"`
 	WouldDeny      bool      `json:"would_deny,omitempty"`
+	PolicyProfile  string    `json:"policy_profile,omitempty"` // agent | browse
+	Process        string    `json:"process,omitempty"`        // best-effort client label
 }
 
 // Network fields.

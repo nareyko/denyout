@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -485,20 +486,27 @@ func cmdHostctlProxyd(args []string) int {
 		fmt.Fprintln(os.Stderr, "denyout hostctl proxyd: --port and --ca-dir required")
 		return 2
 	}
-	var cfg *policy.Config
-	var err error
-	if ask {
-		var rules []policy.Rule
-		if raw := os.Getenv("DENYOUT_ALWAYS_ALLOW"); raw != "" {
-			for _, h := range strings.Split(raw, ",") {
-				h = strings.TrimSpace(h)
-				if h != "" {
-					rules = append(rules, policy.Rule{Host: h, Reason: "user_always"})
-				}
+	var rules []policy.Rule
+	if raw := os.Getenv("DENYOUT_ALWAYS_ALLOW"); raw != "" {
+		for _, h := range strings.Split(raw, ",") {
+			h = strings.TrimSpace(h)
+			if h != "" {
+				rules = append(rules, policy.Rule{Host: h, Reason: "user_always"})
 			}
 		}
+	}
+	profile := strings.ToLower(strings.TrimSpace(os.Getenv("DENYOUT_POLICY_PROFILE")))
+	if profile == "" {
+		profile = "agent"
+	}
+	var cfg *policy.Config
+	var err error
+	switch {
+	case profile == "browse":
+		cfg, err = policy.DefaultWholeDeviceBrowse()
+	case ask || len(rules) > 0:
 		cfg, err = policy.DefaultWholeDeviceAsk(rules)
-	} else {
+	default:
 		cfg, err = policy.DefaultWholeDevice()
 	}
 	if err != nil {
@@ -507,13 +515,15 @@ func cmdHostctlProxyd(args []string) int {
 	}
 	var sessRef *run.Session
 	sess, err := run.StartSession(run.SessionOptions{
-		Config:      cfg,
-		TLSMode:     proxy.TLSIntercept,
-		Version:     version,
-		CADir:       caDir,
-		PersistCA:   true,
-		Transparent: true,
-		ListenPort:  port,
+		Config:        cfg,
+		TLSMode:       proxy.TLSIntercept,
+		Version:       version,
+		CADir:         caDir,
+		PersistCA:     true,
+		Transparent:   true,
+		ListenPort:    port,
+		PolicyProfile: profile,
+		Process:       "proxyd",
 		OnDeny: func(host string, reasons []string) {
 			hostNotAllowed := false
 			for _, r := range reasons {
@@ -952,12 +962,18 @@ func cmdGUI(args []string) int {
 func cmdTest(args []string) int {
 	dbPath := "examples/fixtures/denyout-lab.sqlite"
 	suite := ""
+	quiet := false
+	metrics := false
+	var corpusJSONL []string
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch {
 		case a == "--help" || a == "-h":
-			fmt.Println("Usage: denyout test [--db path] [--suite name]")
+			fmt.Println("Usage: denyout test [--db path] [--suite name] [--corpus-jsonl path]... [--quiet] [--metrics]")
 			fmt.Println("  Seeds the lab DB if needed, runs active fixtures (no network dial).")
+			fmt.Println("  --corpus-jsonl  import external JSONL cases (Prowl / egress-bench) before run")
+			fmt.Println("  --quiet         print summary only (needed for large corpora)")
+			fmt.Println("  --metrics       print TP/FP/TN/FN precision/recall (deny = positive class)")
 			return 0
 		case a == "--db":
 			i++
@@ -977,16 +993,52 @@ func cmdTest(args []string) int {
 			suite = args[i]
 		case strings.HasPrefix(a, "--suite="):
 			suite = strings.TrimPrefix(a, "--suite=")
+		case a == "--corpus-jsonl":
+			i++
+			if i >= len(args) {
+				fmt.Fprintln(os.Stderr, "denyout test: --corpus-jsonl requires a path")
+				return 2
+			}
+			corpusJSONL = append(corpusJSONL, args[i])
+		case strings.HasPrefix(a, "--corpus-jsonl="):
+			corpusJSONL = append(corpusJSONL, strings.TrimPrefix(a, "--corpus-jsonl="))
+		case a == "--quiet":
+			quiet = true
+		case a == "--metrics":
+			metrics = true
 		default:
 			fmt.Fprintf(os.Stderr, "denyout test: unknown flag %q\n", a)
 			return 2
 		}
 	}
 
-	db, err := lab.OpenSeeded(dbPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "denyout test: %v\n", err)
-		return 2
+	if len(corpusJSONL) > 0 && dbPath == "examples/fixtures/denyout-lab.sqlite" {
+		dbPath = "examples/fixtures/denyout-lab-corpus.sqlite"
+	}
+
+	var db *sql.DB
+	var err error
+	if len(corpusJSONL) > 0 {
+		db, err = lab.Open(dbPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "denyout test: %v\n", err)
+			return 2
+		}
+		for _, p := range corpusJSONL {
+			n, err := lab.SeedJSONL(db, p)
+			if err != nil {
+				_ = db.Close()
+				fmt.Fprintf(os.Stderr, "denyout test: import %s: %v\n", p, err)
+				return 2
+			}
+			fmt.Fprintf(os.Stderr, "denyout test: imported %d cases from %s\n", n, p)
+		}
+	} else {
+		db, err = lab.OpenSeeded(dbPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "denyout test: %v\n", err)
+			return 2
+		}
 	}
 	defer db.Close()
 
@@ -1008,14 +1060,25 @@ func cmdTest(args []string) int {
 		return 2
 	}
 
-	for _, r := range rep.Results {
-		status := "PASS"
-		if !r.Passed {
-			status = "FAIL"
+	if !quiet {
+		for _, r := range rep.Results {
+			status := "PASS"
+			if !r.Passed {
+				status = "FAIL"
+			}
+			fmt.Printf("%s %s suite=%s verdict=%s reasons=%v %s\n", status, r.CaseID, r.Suite, r.Verdict, r.Reasons, r.Detail)
 		}
-		fmt.Printf("%s %s suite=%s verdict=%s reasons=%v %s\n", status, r.CaseID, r.Suite, r.Verdict, r.Reasons, r.Detail)
 	}
 	fmt.Printf("summary run_id=%s passed=%d failed=%d total=%d db=%s\n", rep.RunID, rep.Passed, rep.Failed, rep.Total, dbPath)
+	if metrics || len(corpusJSONL) > 0 {
+		m := lab.MetricsFromResults(rep.Results)
+		fmt.Printf("metrics tp=%d fp=%d tn=%d fn=%d precision=%.4f recall=%.4f specificity=%.4f\n",
+			m.TP, m.FP, m.TN, m.FN, m.Precision(), m.Recall(), m.Specificity())
+	}
+	if len(corpusJSONL) > 0 {
+		// Large external corpora are yardsticks (metrics), not hard CI gates.
+		return 0
+	}
 	if rep.Failed > 0 {
 		return 1
 	}

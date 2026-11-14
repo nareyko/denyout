@@ -66,6 +66,7 @@ func (a *App) handleDesktopStatus(w http.ResponseWriter, r *http.Request) {
 		"status":            status,
 		"ask_mode":          st.AskMode,
 		"notify":            st.Notify,
+		"policy_profile":    normalizePolicyProfile(st.PolicyProfile),
 		"version":           ver,
 		"last_deny_host":    lastDeny,
 		"last_deny_summary": st.LastDenySummary,
@@ -168,8 +169,9 @@ func (a *App) handleDesktopSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		AskMode *bool `json:"ask_mode"`
-		Notify  *bool `json:"notify"`
+		AskMode       *bool   `json:"ask_mode"`
+		Notify        *bool   `json:"notify"`
+		PolicyProfile *string `json:"policy_profile"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeJSONErr(w, http.StatusBadRequest, "invalid json")
@@ -183,18 +185,27 @@ func (a *App) handleDesktopSettings(w http.ResponseWriter, r *http.Request) {
 		a.state.Notify = *body.Notify
 		notify.SetEnabled(a.state.Notify)
 	}
+	profileChanged := false
+	if body.PolicyProfile != nil {
+		np := normalizePolicyProfile(*body.PolicyProfile)
+		if normalizePolicyProfile(a.state.PolicyProfile) != np {
+			a.state.PolicyProfile = np
+			profileChanged = true
+		}
+	}
 	st := a.state
 	wasOn := a.proxyd != nil || a.session != nil
 	askChanged := body.AskMode != nil
 	a.mu.Unlock()
 	_ = SaveState(st)
-	if wasOn && askChanged {
+	if wasOn && (askChanged || profileChanged) {
 		a.restartActiveProtector()
 	}
 	writeJSON(w, map[string]any{
-		"ok":       true,
-		"ask_mode": st.AskMode,
-		"notify":   st.Notify,
+		"ok":             true,
+		"ask_mode":       st.AskMode,
+		"notify":         st.Notify,
+		"policy_profile": normalizePolicyProfile(st.PolicyProfile),
 	})
 }
 

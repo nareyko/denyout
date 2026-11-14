@@ -37,13 +37,24 @@
   "bytes_out": 0,
   "latency_ms": 2,
   "policy_hash": "sha256:abcd…",
-  "denyout_version": "0.1.0"
+  "denyout_version": "0.1.9",
+  "policy_profile": "agent",
+  "process": "proxyd"
 }
 ```
 
 ### Required fields
 
 `schema_version`, `event_id`, `ts`, `session_id`, `verdict`, `reasons`, `mode`, `network.dest_host`, `network.dest_port`, `policy_hash`, `denyout_version`.
+
+### Optional attribution (0.1.9+)
+
+| Field | Meaning |
+| --- | --- |
+| `policy_profile` | `agent` \| `browse` (desktop seatbelt profile) |
+| `process` | Best-effort client label (e.g. `proxyd`, `desktop-session`); empty OK |
+
+Activity UI can filter denials by reason (`host_not_allowed` vs `secret_in_url`).
 
 ### Forbidden by default
 

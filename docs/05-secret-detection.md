@@ -14,8 +14,8 @@ This is **not** a general DLP product. It is a high-precision seatbelt for agent
 | URL path (CONNECT target path N/A) | ✗ | ✓ |
 | Query string | ✗ | ✓ |
 | Userinfo (`user:pass@host`) | if present in URL | ✓ |
-| Headers (Authorization, Cookie, X-Api-Key, …) | ✗ | ✓ |
-| Body prefix | ✗ | ✓ (capped) |
+| Headers (`Authorization`, `Cookie`, `X-Api-Key`, …) | ✗ | ✓ hard deny (`secret_in_header`); auth-like headers to **allowlisted** hosts allowed (API calls); canaries always deny |
+| Body prefix | ✗ | ✓ hard deny (`secret_in_body`), first `body_scan_max_bytes` of json/form/text |
 
 Fragment (`#...`) is not sent to servers; **MAY** still appear in some client logs — out of scope unless visible to proxy.
 
@@ -56,6 +56,17 @@ Match substring in URL (path+query), headers values, body prefix → reason `can
 Any URL with `userinfo` containing password-like form → `secret_in_url`.
 
 ### 4.3 Named query parameters
+
+**Tiers (0.1.9+):**
+
+| Tier | Names (examples) | Behavior |
+| --- | --- | --- |
+| High-confidence | `api_key`, `password`, `client_secret`, `aws_secret_access_key`, `private_key`, `authorization`, … | Deny when value length ≥ min |
+| Context-sensitive | `session`, `session_id`, `token`, `sig`, `signature`, `hmac` | Deny only when value matches token shape / high-risk prefix |
+
+**Structural carve-outs** (no `secret_in_url` from JWT/sig noise alone): GitHub `release-assets.githubusercontent.com` signed query; AWS SigV4 when all required `X-Amz-*` present once. Hard secrets (`sk-`, `ghp_`, canaries, userinfo) still deny on any host.
+
+**Prefix pack (0.1.9+):** Stripe `sk_live_`/`rk_live_`, SendGrid `SG.…`, GitLab `glpat-`/`glrt-`/…, HuggingFace `hf_`, npm `npm_`, Slack webhooks/`xoxt-`, Telegram/Discord (M/N/O…), DigitalOcean `dop_v1_`, Shopify `shp*`, AWS `AKIA`/`ASIA` (+ access-key/secret **pair**), DB URIs with `user:pass@`, `Authorization: Basic …`, Azure `AccountKey=`, PEM after query-decode. Named high-confidence: `dd_api_key`/`database_url`/… — not bare `auth`/`key`. Still **not** Twilio bare SIDs, AROA, generic passwords / raw high-entropy.
 
 Case-insensitive param names in:
 
