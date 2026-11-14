@@ -54,6 +54,44 @@ func TestHeaderAuthAllowlistedOK(t *testing.T) {
 	}
 }
 
+func TestBrowseModeAuthHeadersToCursorOK(t *testing.T) {
+	cfg, err := policy.DefaultWholeDeviceBrowse()
+	if err != nil {
+		t.Fatal(err)
+	}
+	eng := policy.NewEngine(cfg)
+	d := eng.Evaluate(policy.RequestView{
+		DestHost: "api2.cursor.sh",
+		DestPort: 443,
+		RawURL:   "https://api2.cursor.sh/aiserver.v1.AiService/Stream",
+		Headers: map[string][]string{
+			"Authorization": {"Bearer crsr_denyouttest000000000000000000000000"},
+		},
+	})
+	if d.Verdict != "allow" {
+		t.Fatalf("Safe desktop must allow Cursor API auth headers, got %+v", d)
+	}
+}
+
+func TestBrowseModeAuthHeadersStillDeniedOnDenyHost(t *testing.T) {
+	cfg, err := policy.DefaultWholeDeviceBrowse()
+	if err != nil {
+		t.Fatal(err)
+	}
+	eng := policy.NewEngine(cfg)
+	d := eng.Evaluate(policy.RequestView{
+		DestHost: "pastebin.com",
+		DestPort: 443,
+		RawURL:   "https://pastebin.com/",
+		Headers: map[string][]string{
+			"Authorization": {"Bearer sk-denyouttest000000000000000"},
+		},
+	})
+	if d.Verdict != "deny" {
+		t.Fatalf("want deny toward deny-listed host, got %+v", d)
+	}
+}
+
 func TestBodyPrefixSecretDenied(t *testing.T) {
 	cfg, err := policy.DefaultEnforceModels()
 	if err != nil {

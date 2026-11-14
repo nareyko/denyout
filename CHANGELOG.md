@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.2.1 — Safe desktop Cursor/API auth headers (2026-11-14)
+
+### Fixed
+
+- **Safe desktop** no longer treats normal `Authorization` / API-key headers to ordinary sites (e.g. `api2.cursor.sh`) as `secret_in_header` exfil. Blocklist mode allows auth headers except toward explicit deny hosts / canaries.
+
 ## 0.2.0 — Safe desktop, profiles, wrap learning, srt (2026-11-14)
 
 ### Changed
