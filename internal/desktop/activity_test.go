@@ -81,9 +81,18 @@ func TestControlReadyAndSessionRestore(t *testing.T) {
 		}
 	}
 
-	got := desktop.LoadState()
+	// Bootstrap continues after /ready (restore clears legacy Session). Poll state.
+	var got desktop.State
+	deadline = time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		got = desktop.LoadState()
+		if got.LastDenyHost == "blocked.example" && got.SetupDone {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
 	if got.LastDenyHost != "blocked.example" {
-		t.Fatalf("hydrate last_deny: %+v", got)
+		t.Fatalf("hydrate last_deny path=%s got=%+v", desktop.StatePath(), got)
 	}
 	// Legacy Session scope must not silently restore - cleared to Off.
 	if got.Scope == desktop.ScopeSession && got.ProtectionOn {
