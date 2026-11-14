@@ -79,6 +79,10 @@ jobs:
           if [ -z "${TAG}" ]; then
             TAG="dev"
           fi
+          # macOS 15 SDK: Wails/WebKit needs UniformTypeIdentifiers for UTType.
+          if [ "${{ matrix.goos }}" = "darwin" ]; then
+            export CGO_LDFLAGS="-framework UniformTypeIdentifiers ${CGO_LDFLAGS:-}"
+          fi
           EXT=""
           if [ "${{ matrix.goos }}" = "windows" ]; then EXT=".exe"; fi
           OUT="denyout-desktop_${TAG}_${{ matrix.goos }}_${{ matrix.goarch }}${EXT}"
