@@ -16,27 +16,27 @@ import (
 
 // AgentProfile is a named wrap / optional Computer policy overlay.
 type AgentProfile struct {
-	ID               string        `yaml:"id" json:"id"`
-	Name             string        `yaml:"name" json:"name"`
-	Command          []string      `yaml:"command" json:"command"`
-	WorkDir          string        `yaml:"workdir,omitempty" json:"workdir,omitempty"`
-	Preset           string        `yaml:"preset" json:"preset"` // models | agent | none
-	ExtraAllow       []string      `yaml:"extra_allow,omitempty" json:"extra_allow,omitempty"`
-	PendingOnce      []string      `yaml:"pending_once,omitempty" json:"pending_once,omitempty"`
-	AppliedPacks     []AppliedPack `yaml:"applied_packs,omitempty" json:"applied_packs,omitempty"`
-	AskMode          bool          `yaml:"ask_mode" json:"ask_mode"`
-	Notify           bool          `yaml:"notify" json:"notify"`
-	TLSMode          string        `yaml:"tls_mode,omitempty" json:"tls_mode,omitempty"`
-	RequireIsolation bool          `yaml:"require_isolation,omitempty" json:"require_isolation,omitempty"`
-	Sandbox          string        `yaml:"sandbox,omitempty" json:"sandbox,omitempty"` // srt
-	Learning         Learning      `yaml:"learning" json:"learning"`
+	ID string `yaml:"id" json:"id"`
+	Name string `yaml:"name" json:"name"`
+	Command []string `yaml:"command" json:"command"`
+	WorkDir string `yaml:"workdir,omitempty" json:"workdir,omitempty"`
+	Preset string `yaml:"preset" json:"preset"` // models | agent | none
+	ExtraAllow []string `yaml:"extra_allow,omitempty" json:"extra_allow,omitempty"`
+	PendingOnce []string `yaml:"pending_once,omitempty" json:"pending_once,omitempty"`
+	AppliedPacks []AppliedPack `yaml:"applied_packs,omitempty" json:"applied_packs,omitempty"`
+	AskMode bool `yaml:"ask_mode" json:"ask_mode"`
+	Notify bool `yaml:"notify" json:"notify"`
+	TLSMode string `yaml:"tls_mode,omitempty" json:"tls_mode,omitempty"`
+	RequireIsolation bool `yaml:"require_isolation,omitempty" json:"require_isolation,omitempty"`
+	Sandbox string `yaml:"sandbox,omitempty" json:"sandbox,omitempty"` // srt
+	Learning Learning `yaml:"learning" json:"learning"`
 }
 
-// Learning tracks Once→Pin flow.
+// Learning tracks Once->Pin flow.
 type Learning struct {
-	Enabled       bool   `yaml:"enabled" json:"enabled"`
-	StartedAt     string `yaml:"started_at,omitempty" json:"started_at,omitempty"`
-	DurationHours int    `yaml:"duration_hours,omitempty" json:"duration_hours,omitempty"`
+	Enabled bool `yaml:"enabled" json:"enabled"`
+	StartedAt string `yaml:"started_at,omitempty" json:"started_at,omitempty"`
+	DurationHours int `yaml:"duration_hours,omitempty" json:"duration_hours,omitempty"`
 }
 
 // NormalizeProfileName clamps display name.
@@ -56,13 +56,13 @@ func NormalizeProfileName(name string) string {
 func NewAgentProfile(name string, command []string) AgentProfile {
 	id := slugID(name)
 	return AgentProfile{
-		ID:       id,
-		Name:     NormalizeProfileName(name),
-		Command:  command,
-		Preset:   "agent",
-		AskMode:  true,
-		Notify:   true,
-		TLSMode:  "intercept",
+		ID: id,
+		Name: NormalizeProfileName(name),
+		Command: command,
+		Preset: "agent",
+		AskMode: true,
+		Notify: true,
+		TLSMode: "intercept",
 		Learning: Learning{Enabled: true, StartedAt: time.Now().UTC().Format(time.RFC3339), DurationHours: 24},
 	}
 }
@@ -237,12 +237,12 @@ allowed_ports: [443, 80]
 allow: []
 deny: []
 scanners:
-  min_value_len: 6
-  named_query:
-    enabled: true
-  canaries:
-    - "DENYOUT_CANARY_"
-    - "ARVISER_CANARY_"
+ min_value_len: 6
+ named_query:
+ enabled: true
+ canaries:
+ - "DENYOUT_CANARY_"
+ - "ARVISER_CANARY_"
 `)
 		cfg, err := policy.LoadBytes(minimal)
 		if err != nil {
@@ -266,22 +266,22 @@ func (p AgentProfile) WriteTempConfig() (string, error) {
 	}
 	// Serialize via JSON round-trip is lossy; build minimal YAML from known fields.
 	type rule struct {
-		Host   string `yaml:"host"`
+		Host string `yaml:"host"`
 		Reason string `yaml:"reason,omitempty"`
 	}
 	doc := map[string]any{
-		"apiVersion":        "denyout/v1",
-		"kind":              "Config",
-		"mode":              "enforce",
-		"preset":            p.Preset,
-		"allow_private":     false,
+		"apiVersion": "denyout/v1",
+		"kind": "Config",
+		"mode": "enforce",
+		"preset": p.Preset,
+		"allow_private": false,
 		"allow_ip_literals": false,
-		"allowed_ports":     []int{443, 80},
-		"tls":               map[string]any{"mode": "intercept", "session_ca": true},
+		"allowed_ports": []int{443, 80},
+		"tls": map[string]any{"mode": "intercept", "session_ca": true},
 		"scanners": map[string]any{
 			"min_value_len": 6,
-			"named_query":   map[string]any{"enabled": true},
-			"canaries":      []string{"DENYOUT_CANARY_", "ARVISER_CANARY_"},
+			"named_query": map[string]any{"enabled": true},
+			"canaries": []string{"DENYOUT_CANARY_", "ARVISER_CANARY_"},
 		},
 	}
 	if p.Preset == "" {
@@ -327,7 +327,7 @@ func (p AgentProfile) CommandLine() string {
 	}
 	s := strings.Join(p.Command, " ")
 	if utf8.RuneCountInString(s) > 48 {
-		return string([]rune(s)[:45]) + "…"
+		return string([]rune(s)[:45]) + "..."
 	}
 	return s
 }

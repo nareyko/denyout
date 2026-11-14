@@ -1,11 +1,11 @@
-# D04 — Policy engine
+# D04 - Policy engine
 
 ## 1. Modes
 
 | Mode | Forward when | Block when | Typical use |
 | --- | --- | --- | --- |
 | `enforce` | Host (and L2 path/method if present) matches allow rules **and** scanners clean | Else | Production default |
-| `audit` | Always (except hard SSRF denies — see below) | Never (except hard SSRF) | Build allowlist |
+| `audit` | Always (except hard SSRF denies - see below) | Never (except hard SSRF) | Build allowlist |
 | `blocklist` | Always except listed deny hosts / scanner hits | Listed / scanner | Soft posture |
 | `ask` | Allow rules **or** interactive approval | Deny / timeout | Desktop only |
 
@@ -20,24 +20,24 @@ Rationale: audit mode must not become an SSRF open redirect into cloud metadata.
 
 ```text
 RequestView {
-  session_id: string
-  agent_id: string?              # server
-  timestamp: time
-  network: {
-    server_name: string?         # SNI / CONNECT host
-    dest_host: string            # hostname requested
-    dest_port: uint16
-    dest_ips: [ip]               # after resolution
-    protocol: http|https|tcp
-  }
-  http?: {                       # present in L2 or cleartext
-    method: string
-    path: string
-    raw_query: string
-    headers: map[string][]string
-    body_prefix: bytes           # up to N KB scanned
-  }
-  inspection: passthrough|intercept|cleartext
+ session_id: string
+ agent_id: string? # server
+ timestamp: time
+ network: {
+ server_name: string? # SNI / CONNECT host
+ dest_host: string # hostname requested
+ dest_port: uint16
+ dest_ips: [ip] # after resolution
+ protocol: http|https|tcp
+ }
+ http?: { # present in L2 or cleartext
+ method: string
+ path: string
+ raw_query: string
+ headers: map[string][]string
+ body_prefix: bytes # up to N KB scanned
+ }
+ inspection: passthrough|intercept|cleartext
 }
 ```
 
@@ -47,46 +47,46 @@ Given `RequestView` R and `Policy` P.
 
 List books (see [`ux-iters/threat-lists-plan.md`](ux-iters/threat-lists-plan.md)): **A** agent allow, **B** personal decisions, **C** threat intel subscriptions, **D** product unbreak.
 
-1. **Normalize host** (lowercase, strip trailing dot; IDNA to ASCII).  
-2. **DNS resolve** (unless IP literal).  
-3. **Unsafe IP check** on all resolved addresses → if any unsafe and not explicitly allowed → `deny` reason `unsafe_ip`.  
-4. **Port check** — if `allowed_ports` set and port ∉ set → deny `port_not_allowed`.  
-5. **Secret / canary scanners** on available fields (D05) → on hit:  
-   - `enforce` / `ask` / `blocklist`: `deny` reason `secret_*` / `canary_detected`  
-   - `audit`: do **not** forward if `audit.hard_secrets: true` (default **true** for URL secrets); else log `would_deny` and forward.  
-6. **Book B — user Allow forever / timed allow** (host-specific Always / timed) → `allow` (skips Book C).  
-7. **Book D — product unbreak** → allow for **threat-list purposes only** (scanners still apply).  
-8. **Explicit deny hosts** (policy `deny:`) → `deny` reason `host_denied`.  
-9. **Book C — enabled threat subscriptions** (phishing / malware / stronger / later telemetry) → `deny` reason `threat_list` (map to clear post-block HITL). Applies in **all modes**.  
-10. **Book B — remembered Keep / timed deny** → quiet / throttled path as on desktop today.  
+1. **Normalize host** (lowercase, strip trailing dot; IDNA to ASCII). 
+2. **DNS resolve** (unless IP literal). 
+3. **Unsafe IP check** on all resolved addresses -> if any unsafe and not explicitly allowed -> `deny` reason `unsafe_ip`. 
+4. **Port check** - if `allowed_ports` set and port ∉ set -> deny `port_not_allowed`. 
+5. **Secret / canary scanners** on available fields (D05) -> on hit: 
+ - `enforce` / `ask` / `blocklist`: `deny` reason `secret_*` / `canary_detected` 
+ - `audit`: do **not** forward if `audit.hard_secrets: true` (default **true** for URL secrets); else log `would_deny` and forward. 
+6. **Book B - user Allow forever / timed allow** (host-specific Always / timed) -> `allow` (skips Book C). 
+7. **Book D - product unbreak** -> allow for **threat-list purposes only** (scanners still apply). 
+8. **Explicit deny hosts** (policy `deny:`) -> `deny` reason `host_denied`. 
+9. **Book C - enabled threat subscriptions** (phishing / malware / stronger / later telemetry) -> `deny` reason `threat_list` (map to clear post-block HITL). Applies in **all modes**. 
+10. **Book B - remembered Keep / timed deny** -> quiet / throttled path as on desktop today. 
 11. **Mode branch:**
-   - `enforce`: match Book A allow rules; else deny `host_not_allowed` (or `path_not_allowed`).  
-   - `blocklist`: match deny hosts → deny; else allow (scanners + Book C already applied).  
-   - `audit`: allow (unless hard denies / Book C). Log `would_deny` if enforce would deny.  
-   - `ask`: if Book A allow match → allow; else prompt; on approve → allow once/session; on deny/timeout → deny.  
-12. **Rate limits** → deny `rate_limited`.  
-13. **Emit audit** with final verdict.  
+ - `enforce`: match Book A allow rules; else deny `host_not_allowed` (or `path_not_allowed`). 
+ - `blocklist`: match deny hosts -> deny; else allow (scanners + Book C already applied). 
+ - `audit`: allow (unless hard denies / Book C). Log `would_deny` if enforce would deny. 
+ - `ask`: if Book A allow match -> allow; else prompt; on approve -> allow once/session; on deny/timeout -> deny. 
+12. **Rate limits** -> deny `rate_limited`. 
+13. **Emit audit** with final verdict. 
 14. Return decision to proxy.
 
 **Invariants:**
 
-- Scanner deny in enforce cannot be overridden by a wide host allow rule.  
-- Book A pack / profile allows do **not** bypass Book C; only Book B **Always / timed allow on that host** (and Book D unbreak for threat lists) do.  
+- Scanner deny in enforce cannot be overridden by a wide host allow rule. 
+- Book A pack / profile allows do **not** bypass Book C; only Book B **Always / timed allow on that host** (and Book D unbreak for threat lists) do. 
 - Book B Allow and Book D beat Book C. Book C does not replace agent default-deny.
 
 ## 4. Allow rule schema
 
 ```yaml
 allow:
-  - host: api.anthropic.com          # exact
-  - host: "*.github.com"             # suffix match; see rules
-  - host: registry.npmjs.org
-    ports: [443]
-  - host: api.example.com            # L2 only enrichment
-    methods: [GET, POST]
-    paths:
-      - prefix: /v1/
-      - regex: "^/public/.*"
+ - host: api.anthropic.com # exact
+ - host: "*.github.com" # suffix match; see rules
+ - host: registry.npmjs.org
+ ports: [443]
+ - host: api.example.com # L2 only enrichment
+ methods: [GET, POST]
+ paths:
+ - prefix: /v1/
+ - regex: "^/public/.*"
 ```
 
 ### 4.1 Host matching rules
@@ -101,16 +101,16 @@ IP literals are **hard-denied** when `allow_ip_literals` is false (default): eva
 
 ### 4.2 Path matching (L2)
 
-- If rule has `paths` / `methods` and inspection is passthrough → treat as **host-only** match and SHOULD log `degraded_path_policy`.  
+- If rule has `paths` / `methods` and inspection is passthrough -> treat as **host-only** match and SHOULD log `degraded_path_policy`. 
 - Prefer failing closed for rules marked `require_intercept: true`.
 
 ## 5. Deny rules
 
 ```yaml
 deny:
-  - host: pastebin.com
-  - host: "*.ngrok-free.app"
-  - reason: "known exfil paste"
+ - host: pastebin.com
+ - host: "*.ngrok-free.app"
+ - reason: "known exfil paste"
 ```
 
 Explicit policy `deny:` hosts are step **8** in §3 (after user Allow / unbreak, before Book C). Reason: `host_denied`.
@@ -119,10 +119,10 @@ Explicit policy `deny:` hosts are step **8** in §3 (after user Allow / unbreak,
 
 DenyOut **MUST** treat as unsafe unless explicitly allowed per CIDR:
 
-- `169.254.0.0/16` (link-local / metadata)  
-- `fd00:ec2::254` and cloud metadata equivalents documented in config  
-- `127.0.0.0/8`, `::1` as **destination via proxy toward upstream** (proxy listening local is fine)  
-- `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `fc00::/7` — default deny in desktop `models` preset; server preset may set `allow_private: true` for in-cluster APIs via explicit hosts
+- `169.254.0.0/16` (link-local / metadata) 
+- `fd00:ec2::254` and cloud metadata equivalents documented in config 
+- `127.0.0.0/8`, `::1` as **destination via proxy toward upstream** (proxy listening local is fine) 
+- `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `fc00::/7` - default deny in desktop `models` preset; server preset may set `allow_private: true` for in-cluster APIs via explicit hosts
 
 **DNS rebinding:** After CONNECT, if upstream IP changes on reconnect mid-session, re-check. For each new dial, resolve + unsafe check again.
 
@@ -130,32 +130,32 @@ DenyOut **MUST** treat as unsafe unless explicitly allowed per CIDR:
 
 ```yaml
 limits:
-  per_host_rpm: 120
-  global_rpm: 600
-  per_host_burst: 40
+ per_host_rpm: 120
+ global_rpm: 600
+ per_host_burst: 40
 ```
 
-Counters in memory per session (desktop) or per agent_id (server). Exhaustion → deny.
+Counters in memory per session (desktop) or per agent_id (server). Exhaustion -> deny.
 
 ## 8. Approval (`ask`) semantics
 
 Desktop only in MVP.
 
-- Channel: terminal TUI prompt and/or OS notification action.  
-- Timeout default 30s → deny.  
-- Approvals: `once` | `session` | `remember_host` (writes to user config with confirmation).  
-- **MUST** show full host + redacted URL.  
+- Channel: terminal TUI prompt and/or OS notification action. 
+- Timeout default 30s -> deny. 
+- Approvals: `once` | `session` | `remember_host` (writes to user config with confirmation). 
+- **MUST** show full host + redacted URL. 
 - **MUST NOT** auto-approve scanner hits (`secret_*`).
 
 ## 9. Policy reload
 
-- `SIGHUP` or file watch reloads policy.  
-- Invalid new policy: **keep old**, log error (availability); optional `strict_reload: true` → fail closed new connections.  
+- `SIGHUP` or file watch reloads policy. 
+- Invalid new policy: **keep old**, log error (availability); optional `strict_reload: true` -> fail closed new connections. 
 - Audit event `policy_reload` with hash of policy bytes.
 
 ## 10. Determinism
 
-Same `(Policy, RequestView, rate-state)` → same verdict. Timeouts in `ask` are non-deterministic by nature; record timeout reason.
+Same `(Policy, RequestView, rate-state)` -> same verdict. Timeouts in `ask` are non-deterministic by nature; record timeout reason.
 
 ## 11. Reason codes (stable strings)
 

@@ -1,37 +1,37 @@
 # DenyOut
 
-**Free seatbelt for your laptop or AI agents: Protect this computer (outbound web while On) or wrap one process — secret-looking URLs and unsafe destinations blocked.**
+**Free seatbelt for your laptop or AI agents: Protect this computer (outbound web while On) or wrap one process - secret-looking URLs and unsafe destinations blocked.**
 
-Site: [https://denyout.com](https://denyout.com) · Canon GitHub (planned): [`nareyko/denyout`](https://github.com/nareyko/denyout)
+Site: [https://denyout.com](https://denyout.com) - Canon GitHub (planned): [`nareyko/denyout`](https://github.com/nareyko/denyout)
 
 Agents that can read untrusted text, see sensitive data, and reach the network form a [lethal trifecta](https://arviser.com/guides/lethal-trifecta). DenyOut puts a local policy proxy on the path: **Protect computer** defaults to **Safe desktop** (web works; secret-looking links blocked). **My agents** wraps python/CLI tools under an allowlist with rare Ask. Whole-PC **Agents only** is intentional (confirm). Audit stays on-device. See [CHANGELOG](CHANGELOG.md).
 
 ```bash
-# Linux / macOS — silent; auto-detects Desktop (GUI) vs Server (headless)
+# Linux / macOS - silent; auto-detects Desktop (GUI) vs Server (headless)
 curl -fsSL https://raw.githubusercontent.com/nareyko/denyout/main/install.sh | sh
 # force:
-#   curl … | sh -s -- --desktop
-#   curl … | sh -s -- --server
-#   DENYOUT_INSTALL_MODE=desktop|server sh install.sh
+# curl ... | sh -s -- --desktop
+# curl ... | sh -s -- --server
+# DENYOUT_INSTALL_MODE=desktop|server sh install.sh
 
-# Desktop: Safe desktop + tray (admin once; stays Off if admin fails — no Session fallback)
-denyout-desktop                 # tray + Wails UI (Activity / My agents / Settings / Problems)
-denyout desktop                 # CLI fallback tray (native dialogs)
+# Desktop: Safe desktop + tray (admin once; stays Off if admin fails - no Session fallback)
+denyout-desktop # tray + Wails UI (Activity / My agents / Settings / Problems)
+denyout desktop # CLI fallback tray (native dialogs)
 denyout profile create --name bot -- python app.py
 denyout run --profile bot
-# denyout desktop --web-ui      # optional localhost UI for tests only
+# denyout desktop --web-ui # optional localhost UI for tests only
 
-# Advanced / CI — wrap one process
+# Advanced / CI - wrap one process
 denyout run -- curl -I https://api.anthropic.com
-denyout run --sandbox=srt -- python app.py   # Stronger isolation (requires srt)
+denyout run --sandbox=srt -- python app.py # Stronger isolation (requires srt)
 
 # from this repo (dev)
 go run ./cmd/denyout version
 go run ./cmd/denyout check 'https://evil.example/x?api_key=DENYOUT_CANARY_LAB'
 ```
 
-**Tray (compact):** Status · **Protect computer** · **My agents…** · **Off** · **Open DenyOut…** · **Quit**.
-Left-click opens Activity. **Agents only (whole PC)** lives under Settings → Advanced (confirm). Full inventory: [`docs/07-desktop-ux.md`](docs/07-desktop-ux.md).
+**Tray (compact):** Status - **Protect computer** - **My agents...** - **Off** - **Open DenyOut...** - **Quit**.
+Left-click opens Activity. **Agents only (whole PC)** lives under Settings -> Advanced (confirm). Full inventory: [`docs/07-desktop-ux.md`](docs/07-desktop-ux.md).
 
 Windows: download the zip from [Releases](https://github.com/nareyko/denyout/releases) and follow [`docs/install-windows.md`](docs/install-windows.md).
 
@@ -39,13 +39,11 @@ Windows: download the zip from [Releases](https://github.com/nareyko/denyout/rel
 
 **Protect computer (Safe desktop)** is the primary desktop path. **My agents** wraps AI/tools. Admin failure stays Off (no silent Session). Remaining for the Dec 1 bet: timed **M4** install on three OS; Windows WinDivert bridge packaging.
 
-**Language:** English only · **License:** Apache-2.0 · **Platforms:** Ubuntu, macOS, Windows.
+**Language:** English only - **License:** Apache-2.0 - **Platforms:** Ubuntu, macOS, Windows.
 
-**Install:** GitHub Releases + SHA256SUMS; Linux/macOS [`install.sh`](install.sh) → `~/.local/bin` (`denyout` + `denyout-desktop` when published); Windows zip + [`docs/install-windows.md`](docs/install-windows.md). See [`docs/07-desktop.md`](docs/07-desktop.md).
+**Install:** GitHub Releases + SHA256SUMS; Linux/macOS [`install.sh`](install.sh) -> `~/.local/bin` (`denyout` + `denyout-desktop` when published); Windows zip + [`docs/install-windows.md`](docs/install-windows.md). See [`docs/07-desktop.md`](docs/07-desktop.md).
 
 Internal Bet Tree / monetization / full decision log live in a **private HQ** sibling (`denyout-hq`), not in this repo.
-
-Agent playbooks: thin stubs in [`prompts/`](prompts/) → sibling [`agent-prompts`](https://github.com/nareyko/agent-prompts). Multi-root workspace: `~/projects/denyout-hq/denyout.code-workspace`.
 
 | Doc | Contents |
 | --- | --- |
@@ -76,7 +74,7 @@ Examples: [`examples/`](examples/). Schema: [`schemas/`](schemas/).
 
 Normative claims: [`docs/10-security-boundaries.md`](docs/10-security-boundaries.md).
 
-- **May claim:** with Protect computer **On** (Safe desktop), DenyOut protects **this user’s outbound web (HTTP/HTTPS)** against secret-looking links / canaries / hard SSRF; Agents only / wraps limit destinations to an allowlist (Ask when enabled).
+- **May claim:** with Protect computer **On** (Safe desktop), DenyOut protects **this user's outbound web (HTTP/HTTPS)** against secret-looking links / canaries / hard SSRF; Agents only / wraps limit destinations to an allowlist (Ask when enabled).
 - **Must not claim:** unbypassable, prompt-injection cure, phone coverage, or protection while Off / when hostguard failed. Without Stronger isolation (`srt`), some tools can bypass the proxy.
 - Residual: UDP, DoH, custom stacks; Windows needs WinDivert bridge for computer mode.
 
@@ -86,10 +84,10 @@ Normative claims: [`docs/10-security-boundaries.md`](docs/10-security-boundaries
 
 ## Author
 
-**Vadim Nareyko** — founder of [Arviser](https://arviser.com).  
+**Vadim Nareyko** - founder of [Arviser](https://arviser.com). 
 DenyOut (https://denyout.com) is a separate product brand; Arviser may recommend it as an egress control (e.g. R-20).
 
 ## License
 
-**Apache License 2.0** — [`LICENSE`](LICENSE), [`NOTICE`](NOTICE).  
+**Apache License 2.0** - [`LICENSE`](LICENSE), [`NOTICE`](NOTICE). 
 Copyright 2026 Vadim Nareyko. SPDX: `Apache-2.0`.

@@ -13,19 +13,19 @@ import (
 )
 
 var (
-	mu      sync.Mutex
+	mu sync.Mutex
 	enabled = true
-	level   = "normal" // quiet | normal | detailed
+	level = "normal" // quiet | normal | detailed
 )
 
 // Kind is an OS-toast category. Only whitelisted kinds may reach the desktop.
 type Kind string
 
 const (
-	KindKeepRepeat     Kind = "keep_repeat"
-	KindAllowUndo      Kind = "allow_undo"
+	KindKeepRepeat Kind = "keep_repeat"
+	KindAllowUndo Kind = "allow_undo"
 	KindProtectResumed Kind = "protect_resumed"
-	KindProtectFailed  Kind = "protect_failed"
+	KindProtectFailed Kind = "protect_failed"
 )
 
 // AllowedKind reports whether kind may emit an OS notification.
@@ -110,7 +110,7 @@ func Emit(kind Kind, title, body string) {
 
 // Action is a button on an actionable OS toast (Linux notify-send).
 type Action struct {
-	ID    string // returned when chosen
+	ID string // returned when chosen
 	Label string
 }
 

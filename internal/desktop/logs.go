@@ -38,15 +38,15 @@ func ReadmePath() string {
 	return filepath.Join(LogDir(), "README.txt")
 }
 
-const logsReadme = `DenyOut diagnostics — which file to send
+const logsReadme = `DenyOut diagnostics - which file to send
 
-1) last-error.txt  ← SEND THIS for admin / protect failures
-2) desktop.log     ← send if last-error is empty or unclear
-3) audit.jsonl     ← traffic decisions (allow/deny). NOT an admin error log.
-   Rotates when large (~32 MiB). Use: denyout audit tail --denials
+1) last-error.txt -> SEND THIS for admin / protect failures
+2) desktop.log -> send if last-error is empty or unclear
+3) audit.jsonl -> traffic decisions (allow/deny). NOT an admin error log.
+ Rotates when large (~32 MiB). Use: denyout audit tail --denials
 
-Left-click the tray icon (or Open DenyOut…) for Home / History.
-Settings → Advanced for Always-allow list and diagnostics.
+Left-click the tray icon (or Open DenyOut...) for Home / History.
+Settings -> Advanced for Always-allow list and diagnostics.
 Problems covers admin/CA errors and this folder.
 
 If last-error.txt says "No errors recorded yet", Protect is OK or the
@@ -60,7 +60,7 @@ func LastErrorSummary() string {
 		return ""
 	}
 	if len(s) > 600 {
-		return s[:600] + "…"
+		return s[:600] + "..."
 	}
 	return s
 }
@@ -186,7 +186,7 @@ func copyToClipboard(text string) error {
 func openLogsOrPrint() {
 	AppendDesktopLog("INFO open diagnostics dir=%s", LogDir())
 	if err := OpenLogs(); err != nil {
-		fmt.Fprintf(os.Stderr, "denyout desktop: open diagnostics: %v\n  dir: %s\n", err, LogDir())
+		fmt.Fprintf(os.Stderr, "denyout desktop: open diagnostics: %v\n dir: %s\n", err, LogDir())
 		notifyLogHint()
 	}
 }
@@ -202,15 +202,15 @@ func copyLastErrorOrPrint() {
 			return
 		}
 		AppendDesktopLog("INFO copied status (no error) to clipboard")
-		notify.Info("DenyOut", "No DenyOut error recorded — status OK.")
+		notify.Info("DenyOut", "No DenyOut error recorded - status OK.")
 		return
 	}
 	if err != nil {
-		AppendDesktopLog("WARN clipboard: %v — print last error instead", err)
+		AppendDesktopLog("WARN clipboard: %v - print last error instead", err)
 		fmt.Fprintln(os.Stderr, "----- DenyOut last error (copy from here) -----")
 		fmt.Fprintln(os.Stderr, text)
 		fmt.Fprintln(os.Stderr, "----- end -----")
-		notify.Info("DenyOut", "Could not copy — see terminal or "+LastErrorPath())
+		notify.Info("DenyOut", "Could not copy - see terminal or "+LastErrorPath())
 		return
 	}
 	AppendDesktopLog("INFO copied last error to clipboard (%d bytes)", len(text))

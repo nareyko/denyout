@@ -7,7 +7,7 @@ import (
 	"github.com/nareyko/denyout/internal/notify"
 )
 
-// Code-level NF checks for notifications rework (pairs with manual M1–M18).
+// Code-level NF checks for notifications rework (pairs with manual M1-M18).
 func TestNF_DecisionActionsAndWhitelist(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	notify.SetLevel("normal")
@@ -20,7 +20,7 @@ func TestNF_DecisionActionsAndWhitelist(t *testing.T) {
 		t.Fatal("M3: Decide later must not Keep")
 	}
 
-	// M5 path: explicit Keep → remembered
+	// M5 path: explicit Keep -> remembered
 	a.applyHardBlockDecision("a.example", "secret_in_url", DecisionKeep)
 	if !a.state.RememberedKeep("a.example", "secret_in_url") {
 		t.Fatal("M5: Keep forever")
@@ -45,7 +45,7 @@ func TestNF_DecisionActionsAndWhitelist(t *testing.T) {
 	// M15: Quiet filters keep-repeat kind
 	notify.SetLevel("quiet")
 	if notify.AllowedKind(notify.KindKeepRepeat) && notify.Level() == "quiet" {
-		// AllowedKind is structural; Quiet filtering is in Emit — check Level
+		// AllowedKind is structural; Quiet filtering is in Emit - check Level
 	}
 	notify.Emit(notify.KindKeepRepeat, "t", "must not show in quiet")
 	notify.SetLevel("normal")
@@ -84,7 +84,7 @@ func TestNF_BatchDedupe(t *testing.T) {
 		a.handlePostBlockDeny("one.test", []string{"secret_in_url"}, "")
 		close(done)
 	}()
-	// Second while busy → queue
+	// Second while busy -> queue
 	time.Sleep(20 * time.Millisecond)
 	a.handlePostBlockDeny("two.test", []string{"canary_detected"}, "")
 	select {

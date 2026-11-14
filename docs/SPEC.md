@@ -1,13 +1,13 @@
-# DenyOut — Master Specification
+# DenyOut - Master Specification
 
 | Field | Value |
 | --- | --- |
 | Product | DenyOut |
 | Domain | https://denyout.com |
 | Spec version | 0.1.0-draft |
-| Status | Draft — normative for implementation planning |
+| Status | Draft - normative for implementation planning |
 | Date | 2026-11-13 |
-| Author | Vadim Nareyko — founder, [Arviser](https://arviser.com) |
+| Author | Vadim Nareyko - founder, [Arviser](https://arviser.com) |
 | Copyright | © 2026 Vadim Nareyko |
 | License | Apache-2.0 (see `LICENSE`, `NOTICE`) |
 | Related | Arviser AI security risk catalog (R-20, lethal trifecta). Internal bets/HQ: sibling `denyout-hq` (private). |
@@ -39,10 +39,10 @@ If a later code change conflicts with this spec, either update the code or revis
 | D12 | [12-mvp-and-roadmap.md](12-mvp-and-roadmap.md) | Planning (informative) |
 | D13 | [13-competitors.md](13-competitors.md) | Informative |
 | D14 | [14-testing.md](14-testing.md) | **Normative** acceptance tests for MVP |
-| — | [updates/README.md](updates/README.md) | Public app update manifest (no account) |
-| — | [cloud-sync.md](cloud-sync.md) | Optional account settings sync schema (no secrets) |
-| — | [design-decisions.md](design-decisions.md) | Locked technical decisions (public) |
-| — | [IMPLEMENTATION.md](IMPLEMENTATION.md) | Public engineering checklist |
+| - | [updates/README.md](updates/README.md) | Public app update manifest (no account) |
+| - | [cloud-sync.md](cloud-sync.md) | Optional account settings sync schema (no secrets) |
+| - | [design-decisions.md](design-decisions.md) | Locked technical decisions (public) |
+| - | [IMPLEMENTATION.md](IMPLEMENTATION.md) | Public engineering checklist |
 
 ## 3. Glossary
 
@@ -69,9 +69,9 @@ If a later code change conflicts with this spec, either update the code or revis
 
 1. **Default-deny outbound** for agent workloads that opt in (desktop wrap) or are forced (server network).
 2. **Block secret-bearing URLs** and obvious exfil patterns even toward otherwise-allowed hosts when configured.
-3. **Audit** every decision out-of-band from the agent’s writable filesystem where deployment allows.
+3. **Audit** every decision out-of-band from the agent's writable filesystem where deployment allows.
 4. **Same policy language** for laptop CLI and server sidecar.
-5. **Honest boundaries**: document bypasses; never market as “unbypassable” without OS-level enforcement.
+5. **Honest boundaries**: document bypasses; never market as "unbypassable" without OS-level enforcement.
 
 ### 4.2 MUST NOT claim (see D10)
 
@@ -82,7 +82,7 @@ If a later code change conflicts with this spec, either update the code or revis
 
 ### 4.3 Primary UX
 
-**Desktop (P1):** silent install → tray icon + compact menu → left-click opens **Home**; clear blocks as **Keep blocked** / **Allow this site**; power in Settings tabs. Full surface inventory (install / tray / menu / every screen): [`07-desktop-ux.md`](07-desktop-ux.md).
+**Desktop (P1):** silent install -> tray icon + compact menu -> left-click opens **Home**; clear blocks as **Keep blocked** / **Allow this site**; power in Settings tabs. Full surface inventory (install / tray / menu / every screen): [`07-desktop-ux.md`](07-desktop-ux.md).
 
 **CLI / wrap:**
 
@@ -90,44 +90,44 @@ If a later code change conflicts with this spec, either update the code or revis
 denyout run [--policy PATH] [--mode MODE] -- <command> [args...]
 ```
 
-Zero-thinking wrap path: install → `denyout run -- <agent>` → first denials as notifications + log; expand allowlist only as needed.
+Zero-thinking wrap path: install -> `denyout run -- <agent>` -> first denials as notifications + log; expand allowlist only as needed.
 
 ## 5. High-level decision flow (normative sketch)
 
 ```text
 outbound request from workload
-        │
-        ▼
+ │
+ ▼
 ┌───────────────────┐
-│ Authenticate path │  (desktop: child-only listener; server: mesh/SA token — phase-dependent)
+│ Authenticate path │ (desktop: child-only listener; server: mesh/SA token - phase-dependent)
 └─────────┬─────────┘
-          ▼
+ ▼
 ┌───────────────────┐
-│ Parse destination │  host, port, SNI, (if intercept) method/path/headers/body
+│ Parse destination │ host, port, SNI, (if intercept) method/path/headers/body
 └─────────┬─────────┘
-          ▼
+ ▼
 ┌───────────────────┐
-│ SSRF / unsafe IP  │  deny link-local, metadata, loopback-escape, RFC1918 unless explicitly allowed
+│ SSRF / unsafe IP │ deny link-local, metadata, loopback-escape, RFC1918 unless explicitly allowed
 └─────────┬─────────┘
-          ▼
+ ▼
 ┌───────────────────┐
-│ Secret scanners   │  URL → headers → body (config order); any hit → deny (enforce) or log (audit)
+│ Secret scanners │ URL -> headers -> body (config order); any hit -> deny (enforce) or log (audit)
 └─────────┬─────────┘
-          ▼
+ ▼
 ┌───────────────────┐
-│ Mode + allowlist  │  enforce | audit | blocklist | ask
+│ Mode + allowlist │ enforce | audit | blocklist | ask
 └─────────┬─────────┘
-          ▼
+ ▼
 ┌───────────────────┐
-│ Rate / budget     │  optional per-host and global caps
+│ Rate / budget │ optional per-host and global caps
 └─────────┬─────────┘
-          ▼
+ ▼
 ┌───────────────────┐
-│ Emit audit event  │  then allow or deny response to client
+│ Emit audit event │ then allow or deny response to client
 └───────────────────┘
 ```
 
-Exact order is specified in [04-policy-engine.md](04-policy-engine.md) (including Books A–D: agent allow, personal decisions, threat intel, product unbreak). Secret scanners **MUST** run before allowlist success is finalized so that `api.evil.com` is not required for blocking `https://cdn.allowed.example/x?token=SECRET`. Desktop threat-list UX: [ux-iters/threat-lists-plan.md](ux-iters/threat-lists-plan.md).
+Exact order is specified in [04-policy-engine.md](04-policy-engine.md) (including Books A-D: agent allow, personal decisions, threat intel, product unbreak). Secret scanners **MUST** run before allowlist success is finalized so that `api.evil.com` is not required for blocking `https://cdn.allowed.example/x?token=SECRET`. Desktop threat-list UX: [ux-iters/threat-lists-plan.md](ux-iters/threat-lists-plan.md).
 
 ## 6. Deployment shapes
 
@@ -148,9 +148,9 @@ Exact order is specified in [04-policy-engine.md](04-policy-engine.md) (includin
 
 See end of [12-mvp-and-roadmap.md](12-mvp-and-roadmap.md). Critical ones:
 
-1. Exact v1 vs later cut during build (private HQ `decisions.md` §1 — in process).  
-2. GUI: `denyout gui` localhost web UI locked for Dec 1 (see [`design-decisions.md`](design-decisions.md)); deeper screens later.  
-3. Language **Go**, license **Apache-2.0**, TLS default **intercept** — [`design-decisions.md`](design-decisions.md).
+1. Exact v1 vs later cut during build (private HQ `decisions.md` §1 - in process). 
+2. GUI: `denyout gui` localhost web UI locked for Dec 1 (see [`design-decisions.md`](design-decisions.md)); deeper screens later. 
+3. Language **Go**, license **Apache-2.0**, TLS default **intercept** - [`design-decisions.md`](design-decisions.md).
 
 ## 9. Change control
 

@@ -59,6 +59,6 @@ func detachCmd(cmd *exec.Cmd) {
 	const createNewProcessGroup = 0x00000200
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		CreationFlags: createNewProcessGroup,
-		HideWindow:    true,
+		HideWindow: true,
 	}
 }

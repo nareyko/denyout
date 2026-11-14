@@ -13,13 +13,13 @@ import (
 
 // UpdateCheckView is the Settings / Home payload for program updates (no account).
 type UpdateCheckView struct {
-	Newer         bool   `json:"newer"`
-	Local         string `json:"local"`
+	Newer bool `json:"newer"`
+	Local string `json:"local"`
 	RemoteVersion string `json:"remote_version,omitempty"`
-	URL           string `json:"url,omitempty"`
-	Notes         string `json:"notes,omitempty"`
-	Message       string `json:"message"`
-	CheckedAt     string `json:"checked_at,omitempty"`
+	URL string `json:"url,omitempty"`
+	Notes string `json:"notes,omitempty"`
+	Message string `json:"message"`
+	CheckedAt string `json:"checked_at,omitempty"`
 }
 
 // UICheckForUpdates fetches the public manifest and updates persisted tip fields.
@@ -57,8 +57,8 @@ func (a *App) UICheckForUpdates() (UpdateCheckView, error) {
 		a.mu.Unlock()
 		_ = SaveState(st)
 		return UpdateCheckView{
-			Local:     local,
-			Message:   msg,
+			Local: local,
+			Message: msg,
 			CheckedAt: checked,
 		}, nil
 	}
@@ -79,15 +79,15 @@ func (a *App) UICheckForUpdates() (UpdateCheckView, error) {
 	_ = SaveState(st)
 
 	out := UpdateCheckView{
-		Newer:         res.Newer,
-		Local:         local,
+		Newer: res.Newer,
+		Local: local,
 		RemoteVersion: res.Remote.Version,
-		URL:           res.Remote.URL,
-		Notes:         res.Remote.Notes,
-		CheckedAt:     checked,
+		URL: res.Remote.URL,
+		Notes: res.Remote.Notes,
+		CheckedAt: checked,
 	}
 	if res.Newer {
-		out.Message = "A newer DenyOut is available. Open the release link when you are ready — no sign-in needed."
+		out.Message = "A newer DenyOut is available. Open the release link when you are ready - no sign-in needed."
 	} else {
 		out.Message = "You are up to date."
 	}
@@ -112,7 +112,7 @@ func (a *App) UIOpenUpdateURL() error {
 	u := strings.TrimSpace(a.state.UpdateAvailableURL)
 	a.mu.Unlock()
 	if u == "" {
-		return errors.New("no update link yet — check for updates first")
+		return errors.New("no update link yet - check for updates first")
 	}
 	openBrowser(u)
 	return nil

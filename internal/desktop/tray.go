@@ -18,7 +18,7 @@ func (a *App) RunTray(ctx context.Context) error {
 func (a *App) runTray(ctx context.Context) error {
 	tray := systray.New()
 	tray.SetIcon(iconIdlePNG)
-	tray.SetTooltip("DenyOut — Off")
+	tray.SetTooltip("DenyOut - Off")
 	tray.SetAppName("DenyOut")
 
 	// Left-click: Home, or History when needs attention / last deny pending review.
@@ -48,7 +48,7 @@ func (a *App) runTray(ctx context.Context) error {
 	computerItem := menu.Add("Protect computer", func() {
 		_ = a.enableSafeDesktop()
 	})
-	menu.Add("My agents…", func() {
+	menu.Add("My agents...", func() {
 		go a.myAgentsMenu()
 	})
 	offItem := menu.Add("Off", func() {
@@ -56,7 +56,7 @@ func (a *App) runTray(ctx context.Context) error {
 	})
 	menu.AddSeparator()
 
-	menu.Add("Open DenyOut…", func() {
+	menu.Add("Open DenyOut...", func() {
 		go a.RequestOpenUI("home")
 	})
 	menu.AddSeparator()
@@ -112,7 +112,7 @@ func (a *App) runTray(ctx context.Context) error {
 				offItem.SetLabel(checkedLabel("Off", mode == ModeOff && pauseUntil == ""))
 				offItem.SetDisabled(mode == ModeOff)
 
-				tray.SetTooltip("DenyOut — " + label)
+				tray.SetTooltip("DenyOut - " + label)
 
 				switch {
 				case needsAttention, strings.Contains(strings.ToLower(st), "error"), strings.Contains(st, "Needs"):
@@ -126,7 +126,7 @@ func (a *App) runTray(ctx context.Context) error {
 		}
 	}()
 
-	fmt.Fprintln(os.Stderr, "denyout desktop: tray ready — left-click opens DenyOut")
+	fmt.Fprintln(os.Stderr, "denyout desktop: tray ready - left-click opens DenyOut")
 	errCh := make(chan error, 1)
 	go func() { errCh <- tray.Run() }()
 

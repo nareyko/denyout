@@ -13,7 +13,7 @@ import (
 )
 
 // runFirstRunWizard shows Protect computer / Protect AI agents / Not now.
-// Headless / no dialog toolkit → mark setup done Off (CLI path).
+// Headless / no dialog toolkit -> mark setup done Off (CLI path).
 func (a *App) runFirstRunWizard() {
 	if runtime.GOOS == "linux" && !dialogToolkitAvailable() {
 		a.finishSetupNotNow("Install zenity (or kdialog) for the desktop setup dialog, or use: denyout profile create")
@@ -101,12 +101,12 @@ func (a *App) showYourSetup(mode string) {
 	text := YourSetupText(mode)
 	if dialogToolkitAvailable() {
 		// Q2: offer Open DenyOut once (primary); Got it dismisses without opening.
-		if nativeConfirm("DenyOut — Your setup", text, "Open DenyOut", "Got it") {
+		if nativeConfirm("DenyOut - Your setup", text, "Open DenyOut", "Got it") {
 			a.RequestOpenUI("home")
 		}
 		return
 	}
-	notify.Info("DenyOut — Your setup", text)
+	notify.Info("DenyOut - Your setup", text)
 }
 
 // YourSetupText is shared EN copy for native + Wails Your setup (Q6).
@@ -114,25 +114,25 @@ func YourSetupText(mode string) string {
 	var status string
 	switch mode {
 	case "safe":
-		status = "You are protected.\nBrowse as usual — we’ll only interrupt for clear risks."
+		status = "You are protected.\nBrowse as usual - we'll only interrupt for clear risks."
 	case "agents":
 		status = "Protect computer is off for now.\nUse My agents for AI tools, or turn on Protect computer from Home or the tray."
 	default:
 		status = "Protection is off.\nTurn on Protect computer from Home or the tray when you are ready."
 	}
 	return status + "\n\n" +
-		"• When something is blocked: Keep blocked or Allow this site.\n" +
-		"• Open DenyOut (Home) to see if you are protected and what was blocked.\n" +
-		"• If Protect failed, open Problems.\n\n" +
+		"- When something is blocked: Keep blocked or Allow this site.\n" +
+		"- Open DenyOut (Home) to see if you are protected and what was blocked.\n" +
+		"- If Protect failed, open Problems.\n\n" +
 		"Privacy: decisions stay on this computer."
 }
 
 func nativeFirstRunChoice() string {
 	title := "DenyOut"
 	text := "How should DenyOut protect this computer?\n\n" +
-		"• Protect computer — Safe desktop: internet works as usual; blocks suspicious links.\n" +
-		"• Protect AI agents — wrap a program (python, Cursor agent, …); rest of PC unchanged.\n" +
-		"• Not now — leave off; open the tray later."
+		"- Protect computer - Safe desktop: internet works as usual; blocks suspicious links.\n" +
+		"- Protect AI agents - wrap a program (python, Cursor agent, ...); rest of PC unchanged.\n" +
+		"- Not now - leave off; open the tray later."
 	switch runtime.GOOS {
 	case "linux":
 		if zenity, err := exec.LookPath("zenity"); err == nil {
@@ -238,7 +238,7 @@ func (a *App) maybeMigrateUXv2() {
 		switchToSafe = nativeConfirm(
 			"DenyOut update",
 			"Earlier DenyOut versions defaulted to Agents only on the whole computer (messengers and many sites can break).\n\n"+
-				"Switch to Safe desktop? (Recommended — web works; agents use wrap profiles.)\n\n"+
+				"Switch to Safe desktop? (Recommended - web works; agents use wrap profiles.)\n\n"+
 				"Choose Keep Agents only only if you still want whole-PC allowlist mode.",
 			"Switch to Safe desktop",
 			"Keep Agents only",

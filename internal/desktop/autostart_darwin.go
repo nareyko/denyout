@@ -20,22 +20,22 @@ func registerAutostartDarwin(self string) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	args := fmt.Sprintf(`    <string>%s</string>
-    <string>desktop</string>`, self)
+	args := fmt.Sprintf(` <string>%s</string>
+ <string>desktop</string>`, self)
 	if strings.Contains(filepath.Base(self), "denyout-desktop") {
-		args = fmt.Sprintf(`    <string>%s</string>`, self)
+		args = fmt.Sprintf(` <string>%s</string>`, self)
 	}
 	plist := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>Label</key><string>com.denyout.desktop</string>
-  <key>ProgramArguments</key>
-  <array>
+ <key>Label</key><string>com.denyout.desktop</string>
+ <key>ProgramArguments</key>
+ <array>
 %s
-  </array>
-  <key>RunAtLoad</key><true/>
-  <key>KeepAlive</key><false/>
+ </array>
+ <key>RunAtLoad</key><true/>
+ <key>KeepAlive</key><false/>
 </dict>
 </plist>
 `, args)
@@ -73,7 +73,7 @@ func updateMacAutostartEnv(proxyURL, caFile string) error {
 	if i := strings.Index(s, "<key>EnvironmentVariables</key>"); i >= 0 {
 		rest := s[i:]
 		if j := strings.Index(rest, "</dict>"); j >= 0 {
-			// find closing of EnvironmentVariables dict — rough: remove from key through next </dict>
+			// find closing of EnvironmentVariables dict - rough: remove from key through next </dict>
 			end := i + j + len("</dict>")
 			s = s[:i] + s[end:]
 		}
@@ -81,19 +81,19 @@ func updateMacAutostartEnv(proxyURL, caFile string) error {
 	if proxyURL == "" {
 		return os.WriteFile(path, []byte(s), 0o644)
 	}
-	env := fmt.Sprintf(`  <key>EnvironmentVariables</key>
-  <dict>
-    <key>HTTP_PROXY</key><string>%s</string>
-    <key>HTTPS_PROXY</key><string>%s</string>
-    <key>http_proxy</key><string>%s</string>
-    <key>https_proxy</key><string>%s</string>
+	env := fmt.Sprintf(` <key>EnvironmentVariables</key>
+ <dict>
+ <key>HTTP_PROXY</key><string>%s</string>
+ <key>HTTPS_PROXY</key><string>%s</string>
+ <key>http_proxy</key><string>%s</string>
+ <key>https_proxy</key><string>%s</string>
 `, proxyURL, proxyURL, proxyURL, proxyURL)
 	if caFile != "" {
-		env += fmt.Sprintf(`    <key>SSL_CERT_FILE</key><string>%s</string>
-    <key>NODE_EXTRA_CA_CERTS</key><string>%s</string>
+		env += fmt.Sprintf(` <key>SSL_CERT_FILE</key><string>%s</string>
+ <key>NODE_EXTRA_CA_CERTS</key><string>%s</string>
 `, caFile, caFile)
 	}
-	env += `  </dict>
+	env += ` </dict>
 `
 	s = strings.Replace(s, "</dict>\n</plist>", env+"</dict>\n</plist>", 1)
 	return os.WriteFile(path, []byte(s), 0o644)

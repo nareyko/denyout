@@ -14,10 +14,10 @@ import (
 )
 
 type wrapProc struct {
-	id      string
-	name    string
-	cmd     *exec.Cmd
-	sess    *run.Session
+	id string
+	name string
+	cmd *exec.Cmd
+	sess *run.Session
 	started time.Time
 }
 
@@ -32,14 +32,14 @@ func (a *App) ensureWraps() {
 // wizardNewAgent creates a profile via native dialogs; optionally starts it.
 func (a *App) wizardNewAgent(start bool) {
 	if !dialogToolkitAvailable() {
-		notify.Info("DenyOut", "Install zenity for the agent wizard, or: denyout profile create --name … -- cmd")
+		notify.Info("DenyOut", "Install zenity for the agent wizard, or: denyout profile create --name ... -- cmd")
 		return
 	}
-	name, ok := nativeEntry("DenyOut — new agent", "Name for this agent (1–40 characters):", "My agent")
+	name, ok := nativeEntry("DenyOut - new agent", "Name for this agent (1-40 characters):", "My agent")
 	if !ok || strings.TrimSpace(name) == "" {
 		return
 	}
-	cmdLine, ok := nativeEntry("DenyOut — command", "Command to run under protection (e.g. python app.py or claude):", "")
+	cmdLine, ok := nativeEntry("DenyOut - command", "Command to run under protection (e.g. python app.py or claude):", "")
 	if !ok || strings.TrimSpace(cmdLine) == "" {
 		return
 	}
@@ -48,9 +48,9 @@ func (a *App) wizardNewAgent(start bool) {
 			return
 		}
 	}
-	workdir, _ := nativeEntry("DenyOut — working folder", "Working directory (optional, leave blank for current):", "")
+	workdir, _ := nativeEntry("DenyOut - working folder", "Working directory (optional, leave blank for current):", "")
 	preset := "agent"
-	if nativeConfirm("DenyOut — allowlist", "Use Agent + Cursor allowlist? (Recommended)\n\nNo = Models only (stricter).", "Agent + Cursor", "Models only") {
+	if nativeConfirm("DenyOut - allowlist", "Use Agent + Cursor allowlist? (Recommended)\n\nNo = Models only (stricter).", "Agent + Cursor", "Models only") {
 		preset = "agent"
 	} else {
 		preset = "models"
@@ -58,7 +58,7 @@ func (a *App) wizardNewAgent(start bool) {
 	isolation := false
 	if run.SRTAvailable() {
 		isolation = nativeConfirm(
-			"DenyOut — stronger isolation",
+			"DenyOut - stronger isolation",
 			"Enable Stronger isolation (srt)?\n\nBlocks bypass of the proxy. Requires the srt tool installed.",
 			"Enable",
 			"Skip",
@@ -83,8 +83,8 @@ func (a *App) wizardNewAgent(start bool) {
 	}
 	if pack, err := LookupAllowPack(packID); err == nil {
 		if nativeConfirm(
-			"DenyOut — recommended hosts",
-			"Add recommended hosts?\n\n"+pack.Name+": "+pack.Description+"\n\nYou can Undo the pack later in My agents → Edit.",
+			"DenyOut - recommended hosts",
+			"Add recommended hosts?\n\n"+pack.Name+": "+pack.Description+"\n\nYou can Undo the pack later in My agents -> Edit.",
 			"Add hosts",
 			"Skip",
 		) {
@@ -138,7 +138,7 @@ func (a *App) startProfile(id string) error {
 		sandbox = "srt"
 	}
 	if (sandbox == "srt" || p.RequireIsolation) && !run.SRTAvailable() {
-		return fmt.Errorf("stronger isolation required but srt was not found in PATH — install sandbox-runtime or turn off require_isolation")
+		return fmt.Errorf("stronger isolation required but srt was not found in PATH - install sandbox-runtime or turn off require_isolation")
 	}
 
 	var sessRef *run.Session
@@ -147,13 +147,13 @@ func (a *App) startProfile(id string) error {
 	ask := p.AskMode
 	threats := a.ensureThreatStore(false)
 	sess, err := run.StartSession(run.SessionOptions{
-		Config:        cfg,
-		TLSMode:       proxy.TLSIntercept,
-		Version:       a.opts.Version,
-		Sandbox:       sandbox,
+		Config: cfg,
+		TLSMode: proxy.TLSIntercept,
+		Version: a.opts.Version,
+		Sandbox: sandbox,
 		PolicyProfile: "agent",
-		Process:       "wrap:" + p.ID,
-		Threats:       threats,
+		Process: "wrap:" + p.ID,
+		Threats: threats,
 		OnDeny: func(host string, reasons []string, redactedURL string) {
 			a.onWrapDeny(sessRef, profileID, profileName, ask, host, reasons, redactedURL)
 		},
@@ -205,7 +205,7 @@ func (a *App) startProfile(id string) error {
 	_ = SaveState(stSave)
 	notify.Info("DenyOut", "Started: "+p.Name)
 	if sandbox == "" {
-		fmt.Fprintln(os.Stderr, "denyout: note — without Stronger isolation (srt), some tools can bypass the proxy")
+		fmt.Fprintln(os.Stderr, "denyout: note - without Stronger isolation (srt), some tools can bypass the proxy")
 	}
 
 	go func() {
@@ -382,24 +382,24 @@ func (a *App) myAgentsMenu() {
 	}
 	a.mu.Unlock()
 
-	choices := []string{"➕ New agent…"}
+	choices := []string{"➕ New agent..."}
 	ids := []string{""}
 	for _, p := range profiles {
 		mark := "○"
 		if running[p.ID] {
-			mark = "●"
+			mark = "-"
 		}
 		pending := ""
 		if n := len(p.PendingOnce); n > 0 {
-			pending = fmt.Sprintf(" · learning %d", n)
+			pending = fmt.Sprintf(" - learning %d", n)
 		}
-		choices = append(choices, fmt.Sprintf("%s %s — %s%s", mark, p.Name, p.CommandLine(), pending))
+		choices = append(choices, fmt.Sprintf("%s %s - %s%s", mark, p.Name, p.CommandLine(), pending))
 		ids = append(ids, p.ID)
 	}
 	choices = append(choices, "Stop all agents")
 	ids = append(ids, "__stop_all__")
 
-	sel, ok := nativeListPick("DenyOut — My agents", "Select an agent:", choices)
+	sel, ok := nativeListPick("DenyOut - My agents", "Select an agent:", choices)
 	if !ok {
 		return
 	}
@@ -435,15 +435,15 @@ func (a *App) agentActions(id string) {
 	a.mu.Unlock()
 	items := []string{}
 	if running {
-		items = append(items, "Stop", "Edit…")
+		items = append(items, "Stop", "Edit...")
 	} else {
-		items = append(items, "Start", "Edit…", "Delete")
+		items = append(items, "Start", "Edit...", "Delete")
 	}
 	if len(p.PendingOnce) > 0 {
-		items = append(items, fmt.Sprintf("Pin learning (%d)…", len(p.PendingOnce)))
+		items = append(items, fmt.Sprintf("Pin learning (%d)...", len(p.PendingOnce)))
 	}
 	items = append(items, "Cancel")
-	sel, ok := nativeListPick("DenyOut — "+p.Name, "Action:", items)
+	sel, ok := nativeListPick("DenyOut - "+p.Name, "Action:", items)
 	if !ok {
 		return
 	}
@@ -456,7 +456,7 @@ func (a *App) agentActions(id string) {
 		a.stopProfile(id)
 	case strings.HasPrefix(sel, "Pin learning"):
 		a.pinLearningUI(id)
-	case sel == "Edit…":
+	case sel == "Edit...":
 		a.editProfileUI(id)
 	case sel == "Delete":
 		if nativeConfirm("DenyOut", "Delete agent "+p.Name+"?", "Delete", "Cancel") {
@@ -480,11 +480,11 @@ func (a *App) editProfileUI(id string) {
 		}
 		a.stopProfile(id)
 	}
-	name, ok := nativeEntry("DenyOut — name", "Name:", p.Name)
+	name, ok := nativeEntry("DenyOut - name", "Name:", p.Name)
 	if !ok {
 		return
 	}
-	cmdLine, ok := nativeEntry("DenyOut — command", "Command:", strings.Join(p.Command, " "))
+	cmdLine, ok := nativeEntry("DenyOut - command", "Command:", strings.Join(p.Command, " "))
 	if !ok {
 		return
 	}
@@ -493,7 +493,7 @@ func (a *App) editProfileUI(id string) {
 			return
 		}
 	}
-	wd, _ := nativeEntry("DenyOut — workdir", "Working directory:", p.WorkDir)
+	wd, _ := nativeEntry("DenyOut - workdir", "Working directory:", p.WorkDir)
 	oldCmd := strings.Join(p.Command, " ")
 	oldPreset := p.Preset
 	p.Name = NormalizeProfileName(name)

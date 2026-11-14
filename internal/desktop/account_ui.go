@@ -9,13 +9,13 @@ import (
 	"github.com/nareyko/denyout/internal/cloudsync"
 )
 
-// AccountView is Settings → Account status (optional; never required for Protect).
+// AccountView is Settings -> Account status (optional; never required for Protect).
 type AccountView struct {
-	SignedIn    bool   `json:"signed_in"`
-	Email       string `json:"email,omitempty"`
-	APIBase     string `json:"api_base,omitempty"`
-	SyncEnabled bool   `json:"sync_enabled"`
-	TrustLine   string `json:"trust_line"`
+	SignedIn bool `json:"signed_in"`
+	Email string `json:"email,omitempty"`
+	APIBase string `json:"api_base,omitempty"`
+	SyncEnabled bool `json:"sync_enabled"`
+	TrustLine string `json:"trust_line"`
 }
 
 const accountTrustLine = "Sign in to sync settings across computers. DenyOut works fully without an account."
@@ -27,8 +27,8 @@ func (a *App) accountClientLocked() *cloudsync.Client {
 	}
 	return &cloudsync.Client{
 		BaseURL: base,
-		HTTP:    a.accountHTTP,
-		Token:   a.state.AccountToken,
+		HTTP: a.accountHTTP,
+		Token: a.state.AccountToken,
 	}
 }
 
@@ -54,11 +54,11 @@ func accountViewLocked(a *App) AccountView {
 		syncOn = true // default ON after login; meaningless when signed out
 	}
 	return AccountView{
-		SignedIn:    email != "" && tok != "",
-		Email:       email,
-		APIBase:     base,
+		SignedIn: email != "" && tok != "",
+		Email: email,
+		APIBase: base,
 		SyncEnabled: syncOn,
-		TrustLine:   accountTrustLine,
+		TrustLine: accountTrustLine,
 	}
 }
 

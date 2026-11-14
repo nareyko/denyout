@@ -7,17 +7,17 @@ import (
 	"os/exec"
 )
 
-func registerAutostartLinux(string) error  { return fmt.Errorf("not linux") }
+func registerAutostartLinux(string) error { return fmt.Errorf("not linux") }
 func registerAutostartDarwin(string) error { return fmt.Errorf("not darwin") }
 func registerAutostartWindows(string) error {
 	return fmt.Errorf("not windows")
 }
-func unregisterAutostartLinux() error   { return nil }
-func unregisterAutostartDarwin() error  { return nil }
+func unregisterAutostartLinux() error { return nil }
+func unregisterAutostartDarwin() error { return nil }
 func unregisterAutostartWindows() error { return nil }
 
 func updateMacAutostartEnv(string, string) error { return nil }
 func writeWindowsUserProxy(string, string) error { return nil }
-func clearWindowsUserProxy() error               { return nil }
+func clearWindowsUserProxy() error { return nil }
 
 func detachCmd(cmd *exec.Cmd) {}

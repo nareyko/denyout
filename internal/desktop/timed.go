@@ -44,7 +44,7 @@ func (a *App) sweepTimedRules() {
 	for _, r := range a.state.TimedDenies {
 		exp, err := time.Parse(time.RFC3339, r.ExpiresAt)
 		if err != nil || !now.Before(exp) {
-			// Timed deny ended → silent back to policy (no dialog).
+			// Timed deny ended -> silent back to policy (no dialog).
 			continue
 		}
 		aliveDenies = append(aliveDenies, r)
@@ -61,7 +61,7 @@ func (a *App) sweepTimedRules() {
 		if host == "" {
 			continue
 		}
-		// Timed allow ended → ask again (decision dialog).
+		// Timed allow ended -> ask again (decision dialog).
 		go a.handlePostBlockDeny(host, []string{"host_denied"}, "")
 	}
 

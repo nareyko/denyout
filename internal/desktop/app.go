@@ -40,13 +40,13 @@ var _ = iconPNG
 
 // Options for denyout desktop.
 type Options struct {
-	ConfigPath    string
-	Version       string
-	ForceSetup    bool
-	NoTray        bool
-	NoOpen        bool
-	WebUI         bool   // optional localhost settings UI (advanced / tests only)
-	Listen        string // web UI listen when WebUI; default 127.0.0.1:0
+	ConfigPath string
+	Version string
+	ForceSetup bool
+	NoTray bool
+	NoOpen bool
+	WebUI bool // optional localhost settings UI (advanced / tests only)
+	Listen string // web UI listen when WebUI; default 127.0.0.1:0
 	ControlListen string // activity/control listen; default 127.0.0.1:0 (tests may pin)
 	// OpenUI is called when tray wants the modern window (Wails). route: home|activity|profiles|settings|problems|""
 	OpenUI func(route string)
@@ -58,21 +58,21 @@ type Options struct {
 type App struct {
 	opts Options
 
-	mu          sync.Mutex
-	state       State
-	lastDeny    string
-	status      string
-	protect     *exec.Cmd    // advanced process wrap
-	session     *run.Session // session-mode in-process proxy
-	proxyd      *exec.Cmd    // computer-mode transparent proxy subprocess
-	proxyPort   int
-	wizardURL   string // only set when WebUI is enabled
-	controlURL  string // Ask IPC for proxyd
-	asks        *askFlight
-	wraps       map[string]*wrapProc
-	threats     *threatlists.Store // Book C cache (shared across Protect restarts)
-	updateHTTP  *http.Client       // optional; tests inject; nil → default
-	accountHTTP *http.Client       // optional; tests inject for account API
+	mu sync.Mutex
+	state State
+	lastDeny string
+	status string
+	protect *exec.Cmd // advanced process wrap
+	session *run.Session // session-mode in-process proxy
+	proxyd *exec.Cmd // computer-mode transparent proxy subprocess
+	proxyPort int
+	wizardURL string // only set when WebUI is enabled
+	controlURL string // Ask IPC for proxyd
+	asks *askFlight
+	wraps map[string]*wrapProc
+	threats *threatlists.Store // Book C cache (shared across Protect restarts)
+	updateHTTP *http.Client // optional; tests inject; nil -> default
+	accountHTTP *http.Client // optional; tests inject for account API
 }
 
 func applyNotifyPrefs(st State) {
@@ -235,19 +235,19 @@ func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	writeJSON(w, map[string]any{
-		"setup_done":         a.state.SetupDone,
-		"status":             a.status,
-		"last_deny":          a.lastDeny,
-		"notify":             a.state.Notify,
-		"ask_mode":           a.state.AskMode,
-		"scope":              a.state.Scope,
-		"protection_on":      a.state.ProtectionOn,
-		"computer_enabled":   a.state.ComputerEnabled,
+		"setup_done": a.state.SetupDone,
+		"status": a.status,
+		"last_deny": a.lastDeny,
+		"notify": a.state.Notify,
+		"ask_mode": a.state.AskMode,
+		"scope": a.state.Scope,
+		"protection_on": a.state.ProtectionOn,
+		"computer_enabled": a.state.ComputerEnabled,
 		"computer_available": a.state.ComputerAvailable,
-		"agent":              a.state.PreferredAgent,
-		"always_allow":       a.state.AlwaysAllowHosts,
-		"version":            a.opts.Version,
-		"audit_log":          AuditLogPath(),
+		"agent": a.state.PreferredAgent,
+		"always_allow": a.state.AlwaysAllowHosts,
+		"version": a.opts.Version,
+		"audit_log": AuditLogPath(),
 	})
 }
 
@@ -257,9 +257,9 @@ func (a *App) handleSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Notify  bool `json:"notify"`
+		Notify bool `json:"notify"`
 		AskMode bool `json:"ask_mode"`
-		Skip    bool `json:"skip"`
+		Skip bool `json:"skip"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, err, 400)
@@ -285,7 +285,7 @@ func (a *App) handleSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Notify  *bool `json:"notify"`
+		Notify *bool `json:"notify"`
 		AskMode *bool `json:"ask_mode"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -319,8 +319,8 @@ func (a *App) handleComputer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Enabled bool   `json:"enabled"`
-		Scope   string `json:"scope"` // computer | session | off
+		Enabled bool `json:"enabled"`
+		Scope string `json:"scope"` // computer | session | off
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, err, 400)
@@ -346,10 +346,10 @@ func (a *App) handleAllow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Host   string `json:"host"`
-		Once   bool   `json:"once"`
-		Always bool   `json:"always"`
-		Deny   bool   `json:"deny"`
+		Host string `json:"host"`
+		Once bool `json:"once"`
+		Always bool `json:"always"`
+		Deny bool `json:"deny"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, err, 400)
@@ -382,7 +382,7 @@ func (a *App) handleProtect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Agent         string `json:"agent"`
+		Agent string `json:"agent"`
 		CustomCommand string `json:"custom_command"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
@@ -443,7 +443,7 @@ func (a *App) startProtect() error {
 	a.mu.Lock()
 	if a.protect != nil && a.protect.Process != nil {
 		a.mu.Unlock()
-		return fmt.Errorf("a protected agent is already running — stop it from the tray first")
+		return fmt.Errorf("a protected agent is already running - stop it from the tray first")
 	}
 	a.mu.Unlock()
 

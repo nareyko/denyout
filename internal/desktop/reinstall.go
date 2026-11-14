@@ -84,12 +84,12 @@ func stopPreviousWindows(selfPID int) {
 	script := `
 $me = ` + strconv.Itoa(selfPID) + `
 Get-CimInstance Win32_Process -Filter "Name='denyout.exe'" | ForEach-Object {
-  if ($_.ProcessId -eq $me) { return }
-  $cmd = $_.CommandLine
-  if ($null -eq $cmd) { return }
-  if ($cmd -match 'denyout(\.exe)?\s+desktop' -or $cmd -match 'denyout(\.exe)?\s+hostctl\s+proxyd') {
-    Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
-  }
+ if ($_.ProcessId -eq $me) { return }
+ $cmd = $_.CommandLine
+ if ($null -eq $cmd) { return }
+ if ($cmd -match 'denyout(\.exe)?\s+desktop' -or $cmd -match 'denyout(\.exe)?\s+hostctl\s+proxyd') {
+ Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+ }
 }
 `
 	_ = exec.Command("powershell", "-NoProfile", "-Command", script).Run()

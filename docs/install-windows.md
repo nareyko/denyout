@@ -1,6 +1,6 @@
 # Install DenyOut on Windows (MVP)
 
-Short English install path for **M4**. Winget is optional later — not required.
+Short English install path for **M4**. Winget is optional later - not required.
 
 ## 1. Download
 
@@ -27,13 +27,13 @@ Expand-Archive .\denyout_*_windows_amd64.zip -DestinationPath $env:LOCALAPPDATA\
 $env:Path = "$env:LOCALAPPDATA\DenyOut;" + $env:Path
 ```
 
-Persist PATH via **Settings → System → About → Advanced system settings → Environment Variables** (User `Path`), or:
+Persist PATH via **Settings -> System -> About -> Advanced system settings -> Environment Variables** (User `Path`), or:
 
 ```powershell
 [Environment]::SetEnvironmentVariable(
-  "Path",
-  "$env:LOCALAPPDATA\DenyOut;" + [Environment]::GetEnvironmentVariable("Path", "User"),
-  "User")
+ "Path",
+ "$env:LOCALAPPDATA\DenyOut;" + [Environment]::GetEnvironmentVariable("Path", "User"),
+ "User")
 ```
 
 Ensure `denyout.exe` is directly under that folder (or adjust the path to the extracted folder that contains the exe).
@@ -51,7 +51,7 @@ denyout check "https://evil.example/x?api_key=DENYOUT_CANARY_LAB"
 denyout run -- curl.exe -I https://api.anthropic.com
 ```
 
-Expect the canary `check` to **deny**. Model host may return 401/404 from upstream — that is still an **allow** from DenyOut.
+Expect the canary `check` to **deny**. Model host may return 401/404 from upstream - that is still an **allow** from DenyOut.
 
 ## 5. If install takes >5 minutes or TLS intercept fails
 

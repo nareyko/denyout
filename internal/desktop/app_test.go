@@ -31,7 +31,7 @@ func TestWizardAPISetup(t *testing.T) {
 		errCh <- desktop.Run(ctx, desktop.Options{
 			NoTray: true,
 			NoOpen: true,
-			WebUI:  true,
+			WebUI: true,
 			Listen: addr,
 		})
 	}()

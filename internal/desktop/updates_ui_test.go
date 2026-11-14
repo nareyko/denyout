@@ -14,8 +14,8 @@ func TestUICheckForUpdatesNewer(t *testing.T) {
 	defer srv.Close()
 
 	a := &App{
-		opts:       Options{Version: "0.1.0"},
-		state:      DefaultState(),
+		opts: Options{Version: "0.1.0"},
+		state: DefaultState(),
 		updateHTTP: srv.Client(),
 	}
 	a.state.UpdateManifestURL = srv.URL
@@ -38,8 +38,8 @@ func TestUICheckForUpdatesNewer(t *testing.T) {
 
 func TestUICheckForUpdatesFailOpen(t *testing.T) {
 	a := &App{
-		opts:       Options{Version: "0.1.0"},
-		state:      DefaultState(),
+		opts: Options{Version: "0.1.0"},
+		state: DefaultState(),
 		updateHTTP: &http.Client{},
 	}
 	a.state.UpdateManifestURL = "http://127.0.0.1:1"

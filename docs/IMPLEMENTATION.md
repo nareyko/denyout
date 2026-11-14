@@ -2,8 +2,8 @@
 
 Engineering tasks for the DenyOut MVP. Product deadlines and internal bets are tracked in private HQ (`../denyout-hq/docs/CHECKLIST.md`).
 
-**Stack:** Go · YAML `denyout/v1` · TLS intercept default · Apache-2.0  
-**Target platforms:** Ubuntu, macOS, Windows  
+**Stack:** Go - YAML `denyout/v1` - TLS intercept default - Apache-2.0 
+**Target platforms:** Ubuntu, macOS, Windows 
 **Read first:** [`SPEC.md`](SPEC.md), [`design-decisions.md`](design-decisions.md), [`10-security-boundaries.md`](10-security-boundaries.md)
 
 ## A. Skeleton
@@ -35,7 +35,7 @@ Engineering tasks for the DenyOut MVP. Product deadlines and internal bets are t
 
 - [x] SQLite schema + seed (`internal/lab`; primary `r20-01-canary-query`)
 - [x] SQLite fixture DB + ≥20 R-20 / secret-URL cases (`r20_url` suite, 22 cases)
-- [x] `denyout test` / acceptance AT-01…AT-09 (`internal/accept`, CI)
+- [x] `denyout test` / acceptance AT-01...AT-09 (`internal/accept`, CI)
 - [x] Examples under `examples/canaries/` (pre-existing)
 - [x] M3 false-deny script (`scripts/m3-false-deny.sh` + `examples/m3/urls.txt`, CI)
 
@@ -51,11 +51,11 @@ Engineering tasks for the DenyOut MVP. Product deadlines and internal bets are t
 
 Locked recipes: [`07-desktop.md`](07-desktop.md) §3.
 
-- [x] `install.sh` (Linux/macOS → `~/.local/bin`, fetch Release + SHA256)
+- [x] `install.sh` (Linux/macOS -> `~/.local/bin`, fetch Release + SHA256)
 - [x] Windows zip + short EN `docs/install-windows.md` (winget optional stretch)
 - [x] Cross-build linux / darwin / windows (`.goreleaser.yaml` + `release` workflow on `v*` tags)
-- [ ] GitHub Release + SHA256SUMS (M6 must) — tag `v*` to publish; SBOM/cosign SHOULD if time
-- [ ] Timed M4 install smoke on each OS; failed OS → preview/unsupported in notes
+- [ ] GitHub Release + SHA256SUMS (M6 must) - tag `v*` to publish; SBOM/cosign SHOULD if time
+- [ ] Timed M4 install smoke on each OS; failed OS -> preview/unsupported in notes
 - [ ] Homebrew formula **after** first Release (not M4 blocker)
 
 ## G. Server (after desktop skeleton)
@@ -65,4 +65,4 @@ Locked recipes: [`07-desktop.md`](07-desktop.md) §3.
 
 ## Non-goals for MVP code
 
-Phone clients · MCP tool firewall · credential vault injection · hosted SaaS · OPA requirement · mandatory OS sandbox · paywalled binary.
+Phone clients - MCP tool firewall - credential vault injection - hosted SaaS - OPA requirement - mandatory OS sandbox - paywalled binary.

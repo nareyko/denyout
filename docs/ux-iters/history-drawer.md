@@ -1,4 +1,4 @@
-# Unit `history-drawer` — research & requirements
+# Unit `history-drawer` - research & requirements
 
 ## User job
 

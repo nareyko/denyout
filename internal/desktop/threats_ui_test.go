@@ -63,7 +63,7 @@ func TestMalwareOffDisablesStronger(t *testing.T) {
 	if err := st.SetEnabled(threatlists.IDHageziTIFMedium, true); err != nil {
 		t.Fatal(err)
 	}
-	// Fake active so UI would show on — then malware off should clear it.
+	// Fake active so UI would show on - then malware off should clear it.
 	if err := a.UISetBlockMalware(false); err != nil {
 		t.Fatal(err)
 	}

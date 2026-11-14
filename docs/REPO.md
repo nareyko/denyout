@@ -7,4 +7,4 @@
 
 Filter: if it does not help someone **install, understand, or verify** DenyOut, it belongs in HQ.
 
-Library playbook (future products): `@agent-prompts/conventions/public-hq-split.md` · `@agent-prompts/ops/bootstrap-public-product.md`.
+Authoring rules, agent playbooks, and IDE config stay in private HQ - not in this public tree.

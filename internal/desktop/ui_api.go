@@ -14,96 +14,96 @@ import (
 
 // DenialView is a UI-friendly denial row (secrets already redacted in URL).
 type DenialView struct {
-	ID            string   `json:"id"`
-	TS            string   `json:"ts"`
-	Host          string   `json:"host"`
-	URL           string   `json:"url"`
-	Why           string   `json:"why"`
-	Reasons       []string `json:"reasons"`
-	Process       string   `json:"process"`
-	Method        string   `json:"method,omitempty"`
-	Detectors     []string `json:"detectors,omitempty"`
-	PolicyProfile string   `json:"policy_profile,omitempty"`
-	Remembered    bool     `json:"remembered"`
+	ID string `json:"id"`
+	TS string `json:"ts"`
+	Host string `json:"host"`
+	URL string `json:"url"`
+	Why string `json:"why"`
+	Reasons []string `json:"reasons"`
+	Process string `json:"process"`
+	Method string `json:"method,omitempty"`
+	Detectors []string `json:"detectors,omitempty"`
+	PolicyProfile string `json:"policy_profile,omitempty"`
+	Remembered bool `json:"remembered"`
 }
 
 // DenialQuery filters ListDenials.
 type DenialQuery struct {
-	Search     string `json:"search"`
-	Reason     string `json:"reason"`
-	Process    string `json:"process"`
-	Remembered bool   `json:"remembered_only"`
-	Limit      int    `json:"limit"`
+	Search string `json:"search"`
+	Reason string `json:"reason"`
+	Process string `json:"process"`
+	Remembered bool `json:"remembered_only"`
+	Limit int `json:"limit"`
 }
 
 // UISnapshot is top-bar / settings state for the Wails shell.
 type UISnapshot struct {
-	Version            string      `json:"version"`
-	Status             string      `json:"status"`
-	Mode               string      `json:"mode"` // safe | agents | off | session
-	ModeLabel          string      `json:"mode_label"`
-	ProtectionOn       bool        `json:"protection_on"`
-	Notify             bool        `json:"notify"`
-	NotifyLevel        string      `json:"notify_level"`
-	DecisionTimeoutSec int         `json:"decision_timeout_sec"`
-	ReaskIntervalSec   int         `json:"reask_interval_sec"`
-	ProtectPausedUntil string      `json:"protect_paused_until,omitempty"`
-	TimedAllows        []TimedRule `json:"timed_allows"`
-	TimedDenies        []TimedRule `json:"timed_denies"`
-	AskMode            bool        `json:"ask_mode"`
-	Autostart          bool        `json:"autostart"`
-	AlwaysAllow        []string    `json:"always_allow"`
-	RememberedKeeps    []string    `json:"remembered_keeps"`
-	LastDenyHost       string      `json:"last_deny_host"`
-	LastDenyURL        string      `json:"last_deny_url"`
-	LastDenySummary    string      `json:"last_deny_summary"`
-	BlockedToday       int         `json:"blocked_today"`
-	YourSetupShown     bool        `json:"your_setup_shown"`
-	SetupDone          bool        `json:"setup_done"`
-	NewDenials         int         `json:"new_denials"`
-	ControlURL         string      `json:"control_url,omitempty"`
-	AuditPath          string      `json:"audit_path"`
-	LogDir             string      `json:"log_dir"`
-	DismissedTips      []string    `json:"dismissed_tips"`
-	AskPaused          bool        `json:"ask_paused"`
-	ProblemsAlert      bool        `json:"problems_alert"`
-	YourSetupText      string      `json:"your_setup_text"`
-	ChecklistDone      bool        `json:"checklist_done"`
-	UpdateAvailable    bool        `json:"update_available"`
-	UpdateVersion      string      `json:"update_version,omitempty"`
-	UpdateURL          string      `json:"update_url,omitempty"`
-	UpdateNotes        string      `json:"update_notes,omitempty"`
-	AccountSignedIn    bool        `json:"account_signed_in"`
-	AccountEmail       string      `json:"account_email,omitempty"`
-	AccountTrustLine   string      `json:"account_trust_line,omitempty"`
-	SyncEnabled        bool        `json:"sync_enabled"`
+	Version string `json:"version"`
+	Status string `json:"status"`
+	Mode string `json:"mode"` // safe | agents | off | session
+	ModeLabel string `json:"mode_label"`
+	ProtectionOn bool `json:"protection_on"`
+	Notify bool `json:"notify"`
+	NotifyLevel string `json:"notify_level"`
+	DecisionTimeoutSec int `json:"decision_timeout_sec"`
+	ReaskIntervalSec int `json:"reask_interval_sec"`
+	ProtectPausedUntil string `json:"protect_paused_until,omitempty"`
+	TimedAllows []TimedRule `json:"timed_allows"`
+	TimedDenies []TimedRule `json:"timed_denies"`
+	AskMode bool `json:"ask_mode"`
+	Autostart bool `json:"autostart"`
+	AlwaysAllow []string `json:"always_allow"`
+	RememberedKeeps []string `json:"remembered_keeps"`
+	LastDenyHost string `json:"last_deny_host"`
+	LastDenyURL string `json:"last_deny_url"`
+	LastDenySummary string `json:"last_deny_summary"`
+	BlockedToday int `json:"blocked_today"`
+	YourSetupShown bool `json:"your_setup_shown"`
+	SetupDone bool `json:"setup_done"`
+	NewDenials int `json:"new_denials"`
+	ControlURL string `json:"control_url,omitempty"`
+	AuditPath string `json:"audit_path"`
+	LogDir string `json:"log_dir"`
+	DismissedTips []string `json:"dismissed_tips"`
+	AskPaused bool `json:"ask_paused"`
+	ProblemsAlert bool `json:"problems_alert"`
+	YourSetupText string `json:"your_setup_text"`
+	ChecklistDone bool `json:"checklist_done"`
+	UpdateAvailable bool `json:"update_available"`
+	UpdateVersion string `json:"update_version,omitempty"`
+	UpdateURL string `json:"update_url,omitempty"`
+	UpdateNotes string `json:"update_notes,omitempty"`
+	AccountSignedIn bool `json:"account_signed_in"`
+	AccountEmail string `json:"account_email,omitempty"`
+	AccountTrustLine string `json:"account_trust_line,omitempty"`
+	SyncEnabled bool `json:"sync_enabled"`
 }
 
 // ProblemsView is the Problems screen payload.
 type ProblemsView struct {
-	LastError       string `json:"last_error"`
-	LastDenyHost    string `json:"last_deny_host"`
-	LastDenyURL     string `json:"last_deny_url"`
+	LastError string `json:"last_error"`
+	LastDenyHost string `json:"last_deny_host"`
+	LastDenyURL string `json:"last_deny_url"`
 	LastDenySummary string `json:"last_deny_summary"`
-	ControlOK       bool   `json:"control_ok"`
-	ProxydRunning   bool   `json:"proxyd_running"`
-	SessionRunning  bool   `json:"session_running"`
-	CAPresent       bool   `json:"ca_present"`
-	ClipboardOK     bool   `json:"clipboard_ok"`
-	LogDir          string `json:"log_dir"`
-	AuditPath       string `json:"audit_path"`
-	Status          string `json:"status"`
-	ModeLabel       string `json:"mode_label"`
-	UpdateAvailable bool   `json:"update_available"`
-	UpdateVersion   string `json:"update_version,omitempty"`
-	UpdateURL       string `json:"update_url,omitempty"`
+	ControlOK bool `json:"control_ok"`
+	ProxydRunning bool `json:"proxyd_running"`
+	SessionRunning bool `json:"session_running"`
+	CAPresent bool `json:"ca_present"`
+	ClipboardOK bool `json:"clipboard_ok"`
+	LogDir string `json:"log_dir"`
+	AuditPath string `json:"audit_path"`
+	Status string `json:"status"`
+	ModeLabel string `json:"mode_label"`
+	UpdateAvailable bool `json:"update_available"`
+	UpdateVersion string `json:"update_version,omitempty"`
+	UpdateURL string `json:"update_url,omitempty"`
 }
 
 // ProfileView is a profile row for the Profiles screen.
 type ProfileView struct {
 	AgentProfile
 	Running bool `json:"running"`
-	PID     int  `json:"pid,omitempty"`
+	PID int `json:"pid,omitempty"`
 }
 
 // GetUISnapshot returns shell state.
@@ -112,36 +112,36 @@ func (a *App) GetUISnapshot() UISnapshot {
 	defer a.mu.Unlock()
 	mode := uiModeLocked(a)
 	snap := UISnapshot{
-		Version:            a.opts.Version,
-		Status:             a.status,
-		Mode:               mode,
-		ModeLabel:          uiModeLabel(mode),
-		ProtectionOn:       a.state.ProtectionOn,
-		Notify:             a.state.Notify && a.state.NotifyLevel != "quiet",
-		NotifyLevel:        effectiveNotifyLevel(a.state),
+		Version: a.opts.Version,
+		Status: a.status,
+		Mode: mode,
+		ModeLabel: uiModeLabel(mode),
+		ProtectionOn: a.state.ProtectionOn,
+		Notify: a.state.Notify && a.state.NotifyLevel != "quiet",
+		NotifyLevel: effectiveNotifyLevel(a.state),
 		DecisionTimeoutSec: effectiveDecisionTimeoutSec(a.state),
-		ReaskIntervalSec:   effectiveReaskIntervalSec(a.state),
+		ReaskIntervalSec: effectiveReaskIntervalSec(a.state),
 		ProtectPausedUntil: a.state.ProtectPausedUntil,
-		TimedAllows:        append([]TimedRule(nil), a.state.TimedAllows...),
-		TimedDenies:        append([]TimedRule(nil), a.state.TimedDenies...),
-		AskMode:            a.state.AskMode,
-		Autostart:          a.state.Autostart,
-		AlwaysAllow:        append([]string(nil), a.state.AlwaysAllowHosts...),
-		RememberedKeeps:    append([]string(nil), a.state.RememberedKeeps...),
-		LastDenyHost:       a.state.LastDenyHost,
-		LastDenyURL:        a.state.LastDenyURL,
-		LastDenySummary:    a.state.LastDenySummary,
-		BlockedToday:       countBlockedToday(AuditLogPath(), time.Now()),
-		YourSetupShown:     a.state.YourSetupShown,
-		SetupDone:          a.state.SetupDone,
-		ControlURL:         a.controlURL,
-		AuditPath:          AuditLogPath(),
-		LogDir:             LogDir(),
-		DismissedTips:      append([]string(nil), a.state.DismissedTips...),
-		AskPaused:          a.state.AskPaused() || (a.asks != nil && a.asks.Paused()),
-		ProblemsAlert:      problemsUnhealthyLocked(a),
-		YourSetupText:      YourSetupText(mode),
-		ChecklistDone:      tipDismissedLocked(a, "checklist"),
+		TimedAllows: append([]TimedRule(nil), a.state.TimedAllows...),
+		TimedDenies: append([]TimedRule(nil), a.state.TimedDenies...),
+		AskMode: a.state.AskMode,
+		Autostart: a.state.Autostart,
+		AlwaysAllow: append([]string(nil), a.state.AlwaysAllowHosts...),
+		RememberedKeeps: append([]string(nil), a.state.RememberedKeeps...),
+		LastDenyHost: a.state.LastDenyHost,
+		LastDenyURL: a.state.LastDenyURL,
+		LastDenySummary: a.state.LastDenySummary,
+		BlockedToday: countBlockedToday(AuditLogPath(), time.Now()),
+		YourSetupShown: a.state.YourSetupShown,
+		SetupDone: a.state.SetupDone,
+		ControlURL: a.controlURL,
+		AuditPath: AuditLogPath(),
+		LogDir: LogDir(),
+		DismissedTips: append([]string(nil), a.state.DismissedTips...),
+		AskPaused: a.state.AskPaused() || (a.asks != nil && a.asks.Paused()),
+		ProblemsAlert: problemsUnhealthyLocked(a),
+		YourSetupText: YourSetupText(mode),
+		ChecklistDone: tipDismissedLocked(a, "checklist"),
 	}
 	if newer, ver, url, notes := updateTipLocked(a); newer {
 		snap.UpdateAvailable = true
@@ -203,7 +203,7 @@ func problemsUnhealthyLocked(a *App) bool {
 	if LastErrorSummary() != "" && (a.state.ComputerEnabled || a.state.ProtectionOn) && a.proxyd == nil {
 		return true
 	}
-	// Stale Book C (all enabled feeds > 7 days) — no lock: use already-open store only.
+	// Stale Book C (all enabled feeds > 7 days) - no lock: use already-open store only.
 	if a.threats != nil {
 		if (&threatlists.Updater{Store: a.threats}).NeedsAttention() {
 			return true
@@ -383,17 +383,17 @@ func (a *App) ListDenials(q DenialQuery) ([]DenialView, error) {
 			id = fmt.Sprintf("%s|%s|%d", e.TS, host, i)
 		}
 		out = append(out, DenialView{
-			ID:            id,
-			TS:            e.TS,
-			Host:          host,
-			URL:           urlStr,
-			Why:           why,
-			Reasons:       append([]string(nil), e.Reasons...),
-			Process:       e.Process,
-			Method:        method,
-			Detectors:     append([]string(nil), e.Detectors...),
+			ID: id,
+			TS: e.TS,
+			Host: host,
+			URL: urlStr,
+			Why: why,
+			Reasons: append([]string(nil), e.Reasons...),
+			Process: e.Process,
+			Method: method,
+			Detectors: append([]string(nil), e.Detectors...),
 			PolicyProfile: e.PolicyProfile,
-			Remembered:    remembered,
+			Remembered: remembered,
 		})
 		if len(out) >= limit {
 			break
@@ -439,7 +439,7 @@ func (a *App) UIRemoveAlwaysAllow(host string) error {
 	return nil
 }
 
-// UISetNotify toggles notifications (legacy bool → Quiet / Normal).
+// UISetNotify toggles notifications (legacy bool -> Quiet / Normal).
 func (a *App) UISetNotify(on bool) error {
 	if on {
 		return a.UISetNotifyLevel("normal")
@@ -567,7 +567,7 @@ func (a *App) UIEnableSafeDesktop() error {
 	return a.enableSafeDesktop()
 }
 
-// UIEnableAgentsOnly turns on Agents only (whole PC) — caller must confirm in UI.
+// UIEnableAgentsOnly turns on Agents only (whole PC) - caller must confirm in UI.
 func (a *App) UIEnableAgentsOnly() error {
 	return a.enableAgentsOnlyWholePC()
 }
@@ -589,19 +589,19 @@ func (a *App) GetProblems() ProblemsView {
 	ca := filepath.Join(CADir(), "ca.crt")
 	_, caErr := os.Stat(ca)
 	pv := ProblemsView{
-		LastError:       LastErrorSummary(),
-		LastDenyHost:    a.state.LastDenyHost,
-		LastDenyURL:     a.state.LastDenyURL,
+		LastError: LastErrorSummary(),
+		LastDenyHost: a.state.LastDenyHost,
+		LastDenyURL: a.state.LastDenyURL,
 		LastDenySummary: a.state.LastDenySummary,
-		ControlOK:       a.controlURL != "",
-		ProxydRunning:   a.proxyd != nil,
-		SessionRunning:  a.session != nil,
-		CAPresent:       caErr == nil,
-		ClipboardOK:     clipboardAvailable(),
-		LogDir:          LogDir(),
-		AuditPath:       AuditLogPath(),
-		Status:          a.status,
-		ModeLabel:       uiModeLabel(uiModeLocked(a)),
+		ControlOK: a.controlURL != "",
+		ProxydRunning: a.proxyd != nil,
+		SessionRunning: a.session != nil,
+		CAPresent: caErr == nil,
+		ClipboardOK: clipboardAvailable(),
+		LogDir: LogDir(),
+		AuditPath: AuditLogPath(),
+		Status: a.status,
+		ModeLabel: uiModeLabel(uiModeLocked(a)),
 	}
 	if newer, ver, url, _ := updateTipLocked(a); newer {
 		pv.UpdateAvailable = true
@@ -740,7 +740,7 @@ func (a *App) UIDiscardLearning(id string) error {
 
 // enableAgentsOnlyWholePC is the confirmed path (UI already confirmed).
 func (a *App) enableAgentsOnlyWholePC() error {
-	a.stopAllWraps("Agents only on whole PC — stopping wraps")
+	a.stopAllWraps("Agents only on whole PC - stopping wraps")
 	a.mu.Lock()
 	a.state.PolicyProfile = PolicyProfileAgent
 	a.state.AskMode = true

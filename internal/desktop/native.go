@@ -115,7 +115,7 @@ return r`, text)
 		}
 	case "windows":
 		ps := fmt.Sprintf(`Add-Type -AssemblyName PresentationFramework
-$r = [System.Windows.MessageBox]::Show(%q, 'DenyOut — new site', 'YesNoCancel', 'Question')
+$r = [System.Windows.MessageBox]::Show(%q, 'DenyOut - new site', 'YesNoCancel', 'Question')
 # Yes=Allow once, No=Always allow, Cancel=Keep blocked (default Cancel via focus)
 if ($r -eq 'Yes') { 'once' } elseif ($r -eq 'No') { 'always' } else { 'deny' }`, text)
 		out, err := exec.Command("powershell", "-NoProfile", "-Command", ps).Output()
@@ -208,14 +208,14 @@ func isIPLiteral(host string) bool {
 func (a *App) nativeShowActivity() {
 	for {
 		choice, ok := nativeListPick(
-			"DenyOut — What was blocked",
+			"DenyOut - What was blocked",
 			"Choose a view:",
-			[]string{"Blocked sites…", "Problems…", "Close"},
+			[]string{"Blocked sites...", "Problems...", "Close"},
 		)
 		if !ok || choice == "Close" || choice == "" {
 			return
 		}
-		if choice == "Problems…" {
+		if choice == "Problems..." {
 			a.showProblems()
 			continue
 		}
@@ -272,7 +272,7 @@ func (a *App) nativeShowActivity() {
 		case "problems":
 			a.showProblems()
 		default:
-			// close → back to menu
+			// close -> back to menu
 		}
 	}
 }
@@ -318,10 +318,10 @@ func (a *App) showDenialDetails(e audit.Event) {
 		code = e.Reasons[0]
 	}
 	if !dialogToolkitAvailable() {
-		notify.Info("DenyOut — Blocked request", text)
+		notify.Info("DenyOut - Blocked request", text)
 		return
 	}
-	sel, ok := nativeListPick("DenyOut — Blocked request", text+"\n\n", []string{
+	sel, ok := nativeListPick("DenyOut - Blocked request", text+"\n\n", []string{
 		"Allow this site",
 		"Always allow host",
 		"Copy URL",
@@ -379,21 +379,21 @@ func (a *App) showProblems() {
 		}
 		text += "\n"
 	}
-	text += "If Protect computer failed, protection stays Off — retry from Home or the tray.\n" +
+	text += "If Protect computer failed, protection stays Off - retry from Home or the tray.\n" +
 		"Logs rotate under your user state folder (audit.jsonl, desktop.log)."
 	if dialogToolkitAvailable() {
-		if nativeConfirm("DenyOut — Problems", text+"\n\n", "Copy last error", "Open diagnostics") {
+		if nativeConfirm("DenyOut - Problems", text+"\n\n", "Copy last error", "Open diagnostics") {
 			copyLastErrorOrPrint()
 		} else {
 			openLogsOrPrint()
 		}
 		return
 	}
-	notify.Info("DenyOut — Problems", last)
+	notify.Info("DenyOut - Problems", last)
 	openLogsOrPrint()
 }
 
-// helpAndProblems is tray Help & problems…
+// helpAndProblems is tray Help & problems...
 func (a *App) helpAndProblems() {
 	ver := a.opts.Version
 	if ver == "" {
@@ -401,18 +401,18 @@ func (a *App) helpAndProblems() {
 	}
 	text := fmt.Sprintf(
 		"DenyOut %s\n\n"+
-			"Protect computer — everyday browsing; clear threats → Keep blocked / Allow this site.\n"+
-			"My agents — wrap a program (Ask before new hosts).\n"+
-			"Agents only — whole-PC allowlist (Settings → Advanced; almost nobody needs this).\n\n"+
-			"Left-click tray / Open DenyOut… → Home.\n"+
-			"History = what was blocked. Settings → Advanced = allowed / silenced sites.\n"+
+			"Protect computer - everyday browsing; clear threats -> Keep blocked / Allow this site.\n"+
+			"My agents - wrap a program (Ask before new hosts).\n"+
+			"Agents only - whole-PC allowlist (Settings -> Advanced; almost nobody needs this).\n\n"+
+			"Left-click tray / Open DenyOut... -> Home.\n"+
+			"History = what was blocked. Settings -> Advanced = allowed / silenced sites.\n"+
 			"Problems = when Protect failed.\n\n"+
 			"Privacy: decisions stay on this computer.",
 		ver,
 	)
 	if dialogToolkitAvailable() {
-		sel, ok := nativeListPick("DenyOut — Help & problems", text, []string{
-			"Open Problems…",
+		sel, ok := nativeListPick("DenyOut - Help & problems", text, []string{
+			"Open Problems...",
 			"Open diagnostics folder",
 			"Copy last error",
 			"Close",
@@ -421,7 +421,7 @@ func (a *App) helpAndProblems() {
 			return
 		}
 		switch sel {
-		case "Open Problems…":
+		case "Open Problems...":
 			a.showProblems()
 		case "Open diagnostics folder":
 			openLogsOrPrint()
@@ -430,7 +430,7 @@ func (a *App) helpAndProblems() {
 		}
 		return
 	}
-	notify.Info("DenyOut — Help", text)
+	notify.Info("DenyOut - Help", text)
 	a.showProblems()
 }
 
@@ -468,9 +468,9 @@ func nativeDenialsChooser(events []audit.Event) (selectedHost, action string, ev
 				}
 				urlStr := audit.TruncateMiddle(audit.DisplayURL(e.Network, e.HTTP), 64)
 				why := notify.HumanReasons(e.Reasons)
-				label := fmt.Sprintf("%s — %s", host, why)
+				label := fmt.Sprintf("%s - %s", host, why)
 				if urlStr != "" {
-					label = fmt.Sprintf("%s — %s — %s", host, urlStr, why)
+					label = fmt.Sprintf("%s - %s - %s", host, urlStr, why)
 				}
 				items = append(items, host, label)
 				if _, ok := byHost[host]; !ok {
@@ -481,7 +481,7 @@ func nativeDenialsChooser(events []audit.Event) (selectedHost, action string, ev
 			if len(items) == 0 {
 				return "", "close", nil
 			}
-			args := append([]string{"--menu", "Recent denials — pick a row (URL shown in label)", "--title", "DenyOut — What was blocked"}, items...)
+			args := append([]string{"--menu", "Recent denials - pick a row (URL shown in label)", "--title", "DenyOut - What was blocked"}, items...)
 			out, err := exec.Command(kdialog, args...).Output()
 			if err != nil {
 				return "", "close", nil
@@ -501,9 +501,9 @@ func nativeDenialsChooser(events []audit.Event) (selectedHost, action string, ev
 			}
 			urlStr := audit.TruncateMiddle(audit.DisplayURL(e.Network, e.HTTP), 48)
 			why := notify.HumanReasons(e.Reasons)
-			line := fmt.Sprintf("%s — %s", host, why)
+			line := fmt.Sprintf("%s - %s", host, why)
 			if urlStr != "" {
-				line = fmt.Sprintf("%s — %s — %s", host, urlStr, why)
+				line = fmt.Sprintf("%s - %s - %s", host, urlStr, why)
 			}
 			// Escape quotes for AppleScript.
 			line = strings.ReplaceAll(line, `"`, `'`)
@@ -517,9 +517,9 @@ func nativeDenialsChooser(events []audit.Event) (selectedHost, action string, ev
 		}
 		list := strings.Join(lines, `","`)
 		script := fmt.Sprintf(`set hostList to {"%s"}
-set chosen to choose from list hostList with prompt "Recent denials (host — URL — why). Open details?" OK button name "Details" cancel button name "Close"
+set chosen to choose from list hostList with prompt "Recent denials (host - URL - why). Open details?" OK button name "Details" cancel button name "Close"
 if chosen is false then
-  return "CLOSE"
+ return "CLOSE"
 end if
 return item 1 of chosen`, list)
 		out, err := exec.Command("osascript", "-e", script).Output()
@@ -554,14 +554,14 @@ return item 1 of chosen`, list)
 			urlStr := audit.TruncateMiddle(audit.DisplayURL(e.Network, e.HTTP), 72)
 			why := notify.HumanReasons(e.Reasons)
 			if urlStr != "" {
-				fmt.Fprintf(&b, "- %s\n  %s\n  %s\n", host, urlStr, why)
+				fmt.Fprintf(&b, "- %s\n %s\n %s\n", host, urlStr, why)
 			} else {
 				fmt.Fprintf(&b, "- %s (%s)\n", host, why)
 			}
 			n++
 		}
 		msg := b.String() + "\n\nOpen details for first host " + firstHost + "?"
-		ps := fmt.Sprintf("Add-Type -AssemblyName PresentationFramework; $r = [System.Windows.MessageBox]::Show(%q, 'DenyOut — What was blocked', 'YesNo', 'Information'); if ($r -eq 'Yes') { 'details' } else { 'close' }", msg)
+		ps := fmt.Sprintf("Add-Type -AssemblyName PresentationFramework; $r = [System.Windows.MessageBox]::Show(%q, 'DenyOut - What was blocked', 'YesNo', 'Information'); if ($r -eq 'Yes') { 'details' } else { 'close' }", msg)
 		out, err := exec.Command("powershell", "-NoProfile", "-Command", ps).Output()
 		if err != nil {
 			return "", "close", nil
@@ -581,7 +581,7 @@ func nativeDenialsChooserZenityV2(events []audit.Event) (selectedHost, reason, a
 	}
 	args := []string{
 		"--list",
-		"--title=DenyOut — What was blocked",
+		"--title=DenyOut - What was blocked",
 		"--text=Select a row. Secrets in URLs are redacted. Details shows the full request.",
 		"--column=#",
 		"--column=Time",
@@ -624,7 +624,7 @@ func nativeDenialsChooserZenityV2(events []audit.Event) (selectedHost, reason, a
 			why = "-"
 		}
 		if len(why) > 72 {
-			why = why[:69] + "…"
+			why = why[:69] + "..."
 		}
 		urlStr := audit.DisplayURL(e.Network, e.HTTP)
 		if urlStr == "" {

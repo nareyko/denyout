@@ -2,7 +2,7 @@
 
 Signed-in users may sync a **settings document** across machines. Protect and local settings work **without** an account.
 
-API (interim): private HQ `services/denyout-api` → later private denyout.com web repo / `api.denyout.com`.
+API (interim): private HQ `services/denyout-api` -> later private denyout.com web repo / `api.denyout.com`.
 
 ## Document shape
 
@@ -25,25 +25,25 @@ Example blob:
 
 ```json
 {
-  "schema_version": 1,
-  "updated_at": "2026-11-14T12:00:00Z",
-  "settings": {
-    "notify_level": "normal",
-    "always_allow_hosts": ["api.openai.com"],
-    "block_phishing": true,
-    "block_malware": true
-  }
+ "schema_version": 1,
+ "updated_at": "2026-11-14T12:00:00Z",
+ "settings": {
+ "notify_level": "normal",
+ "always_allow_hosts": ["api.openai.com"],
+ "block_phishing": true,
+ "block_malware": true
+ }
 }
 ```
 
 ## Account UI
 
-**Settings → Advanced → Account:** email one-time code sign-in / sign out / **Sync now** / **Delete cloud data**.  
-Trust line: works fully without an account. Protect is never gated on login.  
+**Settings -> Advanced -> Account:** email one-time code sign-in / sign out / **Sync now** / **Delete cloud data**. 
+Trust line: works fully without an account. Protect is never gated on login. 
 **Delete cloud data** removes the server account + synced blob, then signs out locally; Protect settings on disk stay.
 
 ## Sync now
 
 When signed in and **Sync settings** is on, **Sync now** pulls the cloud document, applies last-write-wins by `updated_at`, then pushes if local is newer (or cloud is empty).
 
-Signed out or sync off → **local only** (no upload).
+Signed out or sync off -> **local only** (no upload).

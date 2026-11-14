@@ -1,4 +1,4 @@
-# Unit `settings-basic` — research & requirements
+# Unit `settings-basic` - research & requirements
 
 ## User job
 

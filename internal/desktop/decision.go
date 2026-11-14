@@ -11,32 +11,32 @@ import (
 
 // Decision actions returned by presenters / native dialogs.
 const (
-	DecisionKeep       = "keep"
-	DecisionAllow      = "allow"
-	DecisionLater      = "later"
-	DecisionOpen       = "open"
-	DecisionKeepTimed  = "keep_timed:"  // suffix duration e.g. keep_timed:1h
+	DecisionKeep = "keep"
+	DecisionAllow = "allow"
+	DecisionLater = "later"
+	DecisionOpen = "open"
+	DecisionKeepTimed = "keep_timed:" // suffix duration e.g. keep_timed:1h
 	DecisionAllowTimed = "allow_timed:" // suffix duration
 )
 
 // DecisionPrompt is one hard-block decision (compact dialog / in-app modal).
 type DecisionPrompt struct {
-	ID      string
-	Host    string
-	Reason  string
-	Why     string
-	URL     string
+	ID string
+	Host string
+	Reason string
+	Why string
+	URL string
 	Timeout time.Duration
-	Taught  bool
+	Taught bool
 }
 
 // DecisionPresenter shows a compact decision UI and returns an action string.
-// nil → native zenity/kdialog fallback.
+// nil -> native zenity/kdialog fallback.
 type DecisionPresenter func(p DecisionPrompt) string
 
 var (
 	decisionPresMu sync.Mutex
-	decisionPres   DecisionPresenter
+	decisionPres DecisionPresenter
 )
 
 // SetDecisionPresenter registers the in-app (Wails) decision UI. Pass nil to clear.
@@ -74,8 +74,8 @@ func reaskInterval(a *App) time.Duration {
 
 var (
 	promptThrottleMu sync.Mutex
-	promptLastAt     = map[string]time.Time{}
-	ignoreCount      = map[string]int{}
+	promptLastAt = map[string]time.Time{}
+	ignoreCount = map[string]int{}
 )
 
 func shouldThrottlePrompt(key string, every time.Duration) bool {
@@ -276,7 +276,7 @@ func parseTimedSuffix(action, prefix string) (time.Duration, bool) {
 	case "1h":
 		return time.Hour, true
 	case "tomorrow":
-		// Until local tomorrow 00:00 — approximate 24h for v1.
+		// Until local tomorrow 00:00 - approximate 24h for v1.
 		return 24 * time.Hour, true
 	default:
 		return 0, false

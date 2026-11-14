@@ -2,8 +2,8 @@ package desktop
 
 // Protection mode from live processes (not only desktop.json).
 const (
-	ModeOff      = "off"
-	ModeSession  = "session"
+	ModeOff = "off"
+	ModeSession = "session"
 	ModeComputer = "computer"
 )
 

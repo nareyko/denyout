@@ -14,18 +14,18 @@ var packsFS embed.FS
 
 // AllowPack is a curated Book A allow fragment (DenyOut-maintained).
 type AllowPack struct {
-	ID          string   `yaml:"id" json:"id"`
-	Version     int      `yaml:"version" json:"version"`
-	Name        string   `yaml:"name" json:"name"`
-	Description string   `yaml:"description" json:"description"`
-	Hosts       []string `yaml:"hosts" json:"hosts"`
+	ID string `yaml:"id" json:"id"`
+	Version int `yaml:"version" json:"version"`
+	Name string `yaml:"name" json:"name"`
+	Description string `yaml:"description" json:"description"`
+	Hosts []string `yaml:"hosts" json:"hosts"`
 }
 
 // AppliedPack tracks which pack hosts were added to a profile (for Undo pack).
 type AppliedPack struct {
-	ID      string   `yaml:"id" json:"id"`
-	Version int      `yaml:"version" json:"version"`
-	Hosts   []string `yaml:"hosts" json:"hosts"` // hosts this pack introduced
+	ID string `yaml:"id" json:"id"`
+	Version int `yaml:"version" json:"version"`
+	Hosts []string `yaml:"hosts" json:"hosts"` // hosts this pack introduced
 }
 
 // ListAllowPacks returns embedded starter packs (sorted by id).

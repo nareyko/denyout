@@ -9,7 +9,7 @@ import (
 
 // Install performs silent desktop setup: Safe desktop preference, autostart,
 // detach tray. Elevation happens at most once inside the tray process
-// (restoreProtection) — never Apply+Remove+Apply from the installer.
+// (restoreProtection) - never Apply+Remove+Apply from the installer.
 func Install(opts Options) error {
 	_ = opts
 	st := LoadState()
@@ -35,14 +35,14 @@ func Install(opts Options) error {
 		fmt.Fprintln(os.Stderr, "denyout install: login autostart registered")
 	}
 
-	fmt.Fprintln(os.Stderr, "denyout install: stopping previous tray/proxyd (if any)…")
+	fmt.Fprintln(os.Stderr, "denyout install: stopping previous tray/proxyd (if any)...")
 	StopPreviousInstances()
 
 	if err := DetachDesktop(); err != nil {
 		return fmt.Errorf("start tray: %w", err)
 	}
 
-	fmt.Fprintln(os.Stderr, "denyout install: tray started — approve admin once if prompted (stays Off on failure; no Session fallback)")
+	fmt.Fprintln(os.Stderr, "denyout install: tray started - approve admin once if prompted (stays Off on failure; no Session fallback)")
 	fmt.Fprintf(os.Stderr, "denyout install: done (scope=%s profile=%s protection_on=%v)\n", st.Scope, st.PolicyProfile, st.ProtectionOn)
 	return nil
 }

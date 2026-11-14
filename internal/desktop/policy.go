@@ -8,8 +8,8 @@ import (
 
 // Policy profiles for desktop Computer.
 const (
-	PolicyProfileAgent  = "agent"  // Agents only — default-deny allowlist
-	PolicyProfileBrowse = "browse" // Safe desktop — web OK, scanners on
+	PolicyProfileAgent = "agent" // Agents only - default-deny allowlist
+	PolicyProfileBrowse = "browse" // Safe desktop - web OK, scanners on
 )
 
 func normalizePolicyProfile(p string) string {

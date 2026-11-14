@@ -1,4 +1,4 @@
-# Unit `history` — research & requirements
+# Unit `history` - research & requirements
 
 ## User job
 

@@ -13,13 +13,13 @@ const postBlockQuietEvery = time.Minute // keep-repeat toast throttle (P3 may ho
 
 // clearPostBlockReasons are Safe-desktop threats that use post-block confirm (not Pre-act Ask).
 var clearPostBlockReasons = map[string]bool{
-	"secret_in_url":    true,
+	"secret_in_url": true,
 	"secret_in_header": true,
-	"secret_in_body":   true,
-	"canary_detected":  true,
-	"host_denied":      true,
-	"threat_list":      true,
-	"unsafe_ip":        true,
+	"secret_in_body": true,
+	"canary_detected": true,
+	"host_denied": true,
+	"threat_list": true,
+	"unsafe_ip": true,
 }
 
 func primaryPostBlockReason(reasons []string) string {
@@ -136,9 +136,9 @@ var postBlockQuietAt = map[string]time.Time{}
 var decisionBusy bool
 
 type queuedDecision struct {
-	Host   string
+	Host string
 	Reason string
-	URL    string
+	URL string
 }
 
 var decisionQueue []queuedDecision
@@ -177,11 +177,11 @@ func (a *App) handlePostBlockDeny(host string, reasons []string, redactedURL str
 		}
 		postBlockQuietAt[key] = time.Now()
 		postBlockMu.Unlock()
-		msg := fmt.Sprintf("Blocked %s again — %s", host, notify.HumanReasons([]string{reason}))
+		msg := fmt.Sprintf("Blocked %s again - %s", host, notify.HumanReasons([]string{reason}))
 		if urlLine != "" {
 			msg += "\n" + urlLine
 		}
-		msg += "\nOpen DenyOut → History if you need to change this later."
+		msg += "\nOpen DenyOut -> History if you need to change this later."
 		notify.Emit(notify.KindKeepRepeat, "DenyOut", msg)
 		return
 	}
@@ -245,12 +245,12 @@ func (a *App) runDecisionBatch(batch []queuedDecision, taught bool) {
 		it := seen[order[0]]
 		why := notify.HumanReasons([]string{it.Reason})
 		action := a.presentHardBlockDecision(DecisionPrompt{
-			Host:    it.Host,
-			Reason:  it.Reason,
-			Why:     why,
-			URL:     it.URL,
+			Host: it.Host,
+			Reason: it.Reason,
+			Why: why,
+			URL: it.URL,
 			Timeout: decisionTimeout(a),
-			Taught:  taught,
+			Taught: taught,
 		})
 		a.applyHardBlockDecision(it.Host, it.Reason, action)
 		return
@@ -264,19 +264,19 @@ func (a *App) runDecisionBatch(batch []queuedDecision, taught bool) {
 		it := seen[k]
 		hosts = append(hosts, it.Host)
 		hostKeys[it.Host] = append(hostKeys[it.Host], k)
-		body.WriteString("• ")
+		body.WriteString("- ")
 		body.WriteString(it.Host)
-		body.WriteString(" — ")
+		body.WriteString(" - ")
 		body.WriteString(notify.HumanReasons([]string{it.Reason}))
 		body.WriteByte('\n')
 	}
 	_ = hosts
 	action := a.presentHardBlockDecision(DecisionPrompt{
-		Host:    fmt.Sprintf("%d sites", len(hostKeys)),
-		Reason:  "batch",
-		Why:     strings.TrimSpace(body.String()),
+		Host: fmt.Sprintf("%d sites", len(hostKeys)),
+		Reason: "batch",
+		Why: strings.TrimSpace(body.String()),
 		Timeout: decisionTimeout(a),
-		Taught:  true,
+		Taught: true,
 	})
 	// Apply same action to every pending item (bulk Keep / Allow / later).
 	for _, k := range order {
@@ -315,7 +315,7 @@ func (a *App) applyHardBlockDecision(host, reason, action string) {
 	case action == DecisionOpen:
 		notePromptIgnore(key)
 		a.RequestOpenUI("activity")
-	default: // later / timeout / unknown — do NOT remember Keep
+	default: // later / timeout / unknown - do NOT remember Keep
 		notePromptIgnore(key)
 	}
 }

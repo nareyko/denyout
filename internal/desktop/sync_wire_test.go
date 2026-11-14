@@ -34,8 +34,8 @@ func TestUISyncNowPushAndPull(t *testing.T) {
 			if len(stored) == 0 {
 				_ = json.NewEncoder(w).Encode(map[string]any{
 					"schema_version": 1,
-					"updated_at":     time.Time{}.UTC().Format(time.RFC3339),
-					"settings":       map[string]any{},
+					"updated_at": time.Time{}.UTC().Format(time.RFC3339),
+					"settings": map[string]any{},
 				})
 				return
 			}

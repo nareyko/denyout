@@ -17,26 +17,26 @@ const askStormCount = 3
 const askPauseDefault = 15 * time.Minute
 
 type askCall struct {
-	wg     sync.WaitGroup
+	wg sync.WaitGroup
 	action string
 }
 
 // askFlight coalesces Ask per host, serializes dialogs globally, supports pause.
 type askFlight struct {
-	mu          sync.Mutex
-	pending     map[string]*askCall
-	suppress    map[string]time.Time
-	ipLast      map[string]time.Time
-	global      sync.Mutex // one Ask UI at a time
-	askTimes    []time.Time
+	mu sync.Mutex
+	pending map[string]*askCall
+	suppress map[string]time.Time
+	ipLast map[string]time.Time
+	global sync.Mutex // one Ask UI at a time
+	askTimes []time.Time
 	pausedUntil time.Time
 }
 
 func newAskFlight() *askFlight {
 	return &askFlight{
-		pending:  make(map[string]*askCall),
+		pending: make(map[string]*askCall),
 		suppress: make(map[string]time.Time),
-		ipLast:   make(map[string]time.Time),
+		ipLast: make(map[string]time.Time),
 	}
 }
 
@@ -148,7 +148,7 @@ func maybeOfferAskPause(f *askFlight) {
 		"Keep asking",
 	) {
 		f.SetPaused(askPauseDefault)
-		notify.Info("DenyOut", "Asks paused for 15 minutes. New sites stay blocked. Resume from Settings → Advanced.")
+		notify.Info("DenyOut", "Asks paused for 15 minutes. New sites stay blocked. Resume from Settings -> Advanced.")
 	}
 }
 

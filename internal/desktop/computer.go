@@ -24,7 +24,7 @@ func (a *App) startComputer() error {
 	ask := a.state.AskMode
 	wizard := a.wizardURL
 	control := a.controlURL
-	a.status = "Starting…"
+	a.status = "Starting..."
 	a.mu.Unlock()
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -55,7 +55,7 @@ func (a *App) startComputer() error {
 	}
 	// Chrome/Electron use NSS, not only the system trust store.
 	if err := hostguard.TrustCAForUserBrowsers(caPath); err != nil {
-		AppendDesktopLog("WARN browser CA trust (NSS): %v — Chrome may show SSL errors", err)
+		AppendDesktopLog("WARN browser CA trust (NSS): %v - Chrome may show SSL errors", err)
 	} else {
 		AppendDesktopLog("INFO browser CA trusted in user NSS DB")
 	}
@@ -137,7 +137,7 @@ func (a *App) startComputer() error {
 }
 
 // stopComputerOpts stops computer-mode proxyd.
-// If elevateRemove is false, only kills proxyd — next ElevateApply replaces nft/pf
+// If elevateRemove is false, only kills proxyd - next ElevateApply replaces nft/pf
 // in one admin prompt (avoid Remove+Apply = two passwords).
 func (a *App) stopComputerOpts(keepRestore, elevateRemove bool) {
 	a.mu.Lock()
@@ -173,7 +173,7 @@ func (a *App) stopComputerOpts(keepRestore, elevateRemove bool) {
 		}
 	}
 	// Only tear down hostguard when leaving computer mode for real.
-	// Session mode also stores proxyPort — must not trigger ElevateRemove/pkexec.
+	// Session mode also stores proxyPort - must not trigger ElevateRemove/pkexec.
 	if elevateRemove && hadProxyd && port > 0 {
 		uid, _ := hostguard.CurrentUID()
 		_ = hostguard.ElevateRemove(port, uid)
@@ -192,7 +192,7 @@ func (a *App) stopAllKeepRestore() {
 }
 
 func (a *App) stopProtection() {
-	a.stopComputerOpts(false, true) // user turned off → one Remove prompt
+	a.stopComputerOpts(false, true) // user turned off -> one Remove prompt
 	a.stopSession()
 	a.mu.Lock()
 	a.state.ProtectionOn = false
@@ -225,7 +225,7 @@ func (a *App) allowHostOnce(host string) error {
 		sess.AllowHost(host, "user_once")
 		return nil
 	}
-	// proxyd: once without IPC to live engine → persist + restart
+	// proxyd: once without IPC to live engine -> persist + restart
 	return a.allowHostAlways(host)
 }
 
@@ -268,7 +268,7 @@ func (a *App) enableComputerFromTray() error {
 		stFail := a.state
 		a.mu.Unlock()
 		_ = SaveState(stFail)
-		notify.Emit(notify.KindProtectFailed, "DenyOut", "A password window should have appeared. If you cancelled it, protection stayed Off. Open DenyOut → Problems, or try Protect computer again.")
+		notify.Emit(notify.KindProtectFailed, "DenyOut", "A password window should have appeared. If you cancelled it, protection stayed Off. Open DenyOut -> Problems, or try Protect computer again.")
 		return err
 	}
 	AppendDesktopLog("INFO computer mode on profile=%s", normalizePolicyProfile(a.state.PolicyProfile))
@@ -278,7 +278,7 @@ func (a *App) enableComputerFromTray() error {
 	if !clipboardAvailable() {
 		AppendDesktopLog("INFO hint: install wl-clipboard for Copy last error")
 	}
-	// Success: Home/tray status only — no OS “You’re protected” toast (notifications whitelist).
+	// Success: Home/tray status only - no OS "You're protected" toast (notifications whitelist).
 	return nil
 }
 
@@ -286,7 +286,7 @@ func (a *App) enableSessionFromTray() error {
 	if a.currentMode() == ModeSession {
 		return nil
 	}
-	a.stopComputerOpts(false, true) // leaving computer → Remove once
+	a.stopComputerOpts(false, true) // leaving computer -> Remove once
 	if err := a.startSession(); err != nil {
 		fmt.Fprintf(os.Stderr, "denyout desktop: %v\n", err)
 		a.setStatus("Error")
@@ -302,7 +302,7 @@ func (a *App) stopProtectionFromTray() {
 	choice := a.chooseProtectPause()
 	a.stopProtection()
 	a.applyProtectPauseChoice(choice)
-	// Intentional Off: no OS nag — Home/tray show status.
+	// Intentional Off: no OS nag - Home/tray show status.
 }
 
 // chooseProtectPause asks how long to leave Protect off. Empty = until manual On.
@@ -314,7 +314,7 @@ func (a *App) chooseProtectPause() string {
 	if last != "" {
 		def = last
 	}
-	title := "DenyOut — Pause protection"
+	title := "DenyOut - Pause protection"
 	text := "How long should Protect stay off?\n(Default: " + def + "; forever is available but not the default.)"
 	if runtime.GOOS == "linux" {
 		if zenity, err := exec.LookPath("zenity"); err == nil {
@@ -391,9 +391,9 @@ func (a *App) restartActiveProtector() {
 	switch scope {
 	case ScopeComputer:
 		if err := a.startComputer(); err != nil {
-			fmt.Fprintf(os.Stderr, "denyout desktop: restart computer failed: %v — staying Off\n", err)
+			fmt.Fprintf(os.Stderr, "denyout desktop: restart computer failed: %v - staying Off\n", err)
 			a.setStatus("Needs admin")
-			notify.Emit(notify.KindProtectFailed, "DenyOut", "Could not restart Protect computer — staying Off. Retry from Open DenyOut or the tray.")
+			notify.Emit(notify.KindProtectFailed, "DenyOut", "Could not restart Protect computer - staying Off. Retry from Open DenyOut or the tray.")
 		}
 	case ScopeSession:
 		// Session is not a user-facing restore target after UX v2.
@@ -413,7 +413,7 @@ func (a *App) restoreProtection() {
 	if !on {
 		return
 	}
-	// Migrate legacy session preference → Off (no morning Session surprise).
+	// Migrate legacy session preference -> Off (no morning Session surprise).
 	if scope == ScopeSession {
 		AppendDesktopLog("INFO restore: ignoring legacy session scope (no silent Session)")
 		a.mu.Lock()
@@ -433,7 +433,7 @@ func (a *App) restoreProtection() {
 		return
 	}
 	if err := a.startComputer(); err != nil {
-		fmt.Fprintf(os.Stderr, "denyout desktop: restore computer failed: %v — staying Off\n", err)
+		fmt.Fprintf(os.Stderr, "denyout desktop: restore computer failed: %v - staying Off\n", err)
 		RecordError("restore.computer", err.Error())
 		a.mu.Lock()
 		a.state.ComputerAvailable = false

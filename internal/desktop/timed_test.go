@@ -30,8 +30,8 @@ func TestTimedAllowStored(t *testing.T) {
 func TestRememberedKeepIncludesActiveTimedDeny(t *testing.T) {
 	st := DefaultState()
 	st.TimedDenies = []TimedRule{{
-		Host:      "x.test",
-		Reason:    "canary_detected",
+		Host: "x.test",
+		Reason: "canary_detected",
 		ExpiresAt: time.Now().Add(time.Hour).UTC().Format(time.RFC3339),
 	}}
 	if !st.RememberedKeep("x.test", "canary_detected") {

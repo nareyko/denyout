@@ -40,8 +40,8 @@ func TestControlReadyAndSessionRestore(t *testing.T) {
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- desktop.Run(ctx, desktop.Options{
-			NoTray:        true,
-			Version:       "test",
+			NoTray: true,
+			Version: "test",
 			ControlListen: addr,
 		})
 	}()
@@ -85,7 +85,7 @@ func TestControlReadyAndSessionRestore(t *testing.T) {
 	if got.LastDenyHost != "blocked.example" {
 		t.Fatalf("hydrate last_deny: %+v", got)
 	}
-	// Legacy Session scope must not silently restore — cleared to Off.
+	// Legacy Session scope must not silently restore - cleared to Off.
 	if got.Scope == desktop.ScopeSession && got.ProtectionOn {
 		t.Fatalf("legacy session must not stay on after restore, got %+v", got)
 	}

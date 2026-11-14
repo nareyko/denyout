@@ -41,3 +41,15 @@ cmd/denyout-desktop/frontend/node_modules/
 *.syso
 
 cmd/denyout-desktop/frontend/*.tsbuildinfo
+
+# Authoring / agent tooling (lives in private denyout-hq only)
+.cursor/
+prompts/
+AGENTS.md
+CLAUDE.md
+.claude/
+
+# Local doc builds / audit caches
+/site-reference/
+/site/
+/tmp/

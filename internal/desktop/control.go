@@ -13,8 +13,8 @@ import (
 )
 
 // startControlServer listens on 127.0.0.1 for proxyd Ask IPC (no browser UI).
-// GET/POST /ask?host=… → native dialog → {"action":"once|always|deny"}
-// POST /always {"host":"…"} persists Always allow.
+// GET/POST /ask?host=... -> native dialog -> {"action":"once|always|deny"}
+// POST /always {"host":"..."} persists Always allow.
 // POST /deny-event updates last-deny + optional toast.
 // GET /ready for readiness (tests).
 func (a *App) startControlServer(ctx context.Context) (string, error) {
@@ -62,7 +62,7 @@ func (a *App) handleControlAsk(w http.ResponseWriter, r *http.Request) {
 	}
 	if host == "" && r.Method == http.MethodPost {
 		var body struct {
-			Host   string `json:"host"`
+			Host string `json:"host"`
 			Reason string `json:"reason"`
 		}
 		_ = json.NewDecoder(r.Body).Decode(&body)
@@ -115,10 +115,10 @@ func (a *App) handleControlAlways(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) handleControlDenyEvent(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Host    string   `json:"host"`
+		Host string `json:"host"`
 		Reasons []string `json:"reasons"`
-		URL     string   `json:"url"`    // redacted
-		Notify  *bool    `json:"notify"` // default true; false when Ask dialog follows
+		URL string `json:"url"` // redacted
+		Notify *bool `json:"notify"` // default true; false when Ask dialog follows
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
 	doNotify := body.Notify == nil || *body.Notify

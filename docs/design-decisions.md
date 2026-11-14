@@ -16,18 +16,18 @@ Updated: 2026-11-13.
 | GUI stack (MVP) | **`denyout desktop`**: **Protect this computer** (transparent HTTP/HTTPS redirect + CA trust) + tray + notifications + simple settings. Advanced = protect one program. `denyout gui` = technical panel. |
 | Hostguard | Linux nftables + pkexec; macOS pf + admin Keychain; Windows WinDivert companion + UAC (`denyout hostctl`) |
 | Whole-device policy | Default **allow web** + secret/canary/SSRF hard denies + notify; optional **Ask before new sites** |
-| Platforms (MVP) | Ubuntu, macOS, Windows **desktop** (computer mode on all three; mark OS unsupported if divert missing — no fake On) |
-| Install (MVP) | Releases + SHA256SUMS; `install.sh` → `~/.local/bin` (Linux/macOS); Windows zip + short EN doc; CA installed when Protect computer is enabled; Homebrew/winget stretch — [`07-desktop.md`](07-desktop.md) §3 |
+| Platforms (MVP) | Ubuntu, macOS, Windows **desktop** (computer mode on all three; mark OS unsupported if divert missing - no fake On) |
+| Install (MVP) | Releases + SHA256SUMS; `install.sh` -> `~/.local/bin` (Linux/macOS); Windows zip + short EN doc; CA installed when Protect computer is enabled; Homebrew/winget stretch - [`07-desktop.md`](07-desktop.md) §3 |
 | Phone / mobile | Out of scope for MVP |
 | Server identity | One proxy instance = one policy (sidecar-per-workload) |
 | Release checksums | SHA256SUMS with releases; SBOM/cosign recommended when time allows |
 | Preset `models` | Versioned in-repo; changelog on host changes; no silent cloud updates |
 | GitHub canon | `nareyko/denyout` |
-| Author | Vadim Nareyko — [Arviser](https://arviser.com) |
+| Author | Vadim Nareyko - [Arviser](https://arviser.com) |
 
 ## Positioning
 
-> DenyOut is the free, local-first egress seatbelt for your laptop (Protect this computer) or a single agent process — secret-in-URL and unsafe destination blocking while On — not an enterprise SWG replacement.
+> DenyOut is the free, local-first egress seatbelt for your laptop (Protect this computer) or a single agent process - secret-in-URL and unsafe destination blocking while On - not an enterprise SWG replacement.
 
 ## Claims
 

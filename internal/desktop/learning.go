@@ -18,7 +18,7 @@ func (a *App) pinLearningUI(id string) {
 		return
 	}
 	action, ok := nativeListPick(
-		"DenyOut — Pin learning",
+		"DenyOut - Pin learning",
 		fmt.Sprintf("%s learned %d site(s). Pin permanently?", p.Name, len(p.PendingOnce)),
 		[]string{
 			"Pin all",
@@ -41,7 +41,7 @@ func (a *App) pinLearningUI(id string) {
 			return
 		}
 		a.applyPinnedLive(id, hosts)
-		notify.Info("DenyOut", fmt.Sprintf("Pinned %d site(s) for %s. Learning off — turn on again in profile if needed.", len(hosts), p.Name))
+		notify.Info("DenyOut", fmt.Sprintf("Pinned %d site(s) for %s. Learning off - turn on again in profile if needed.", len(hosts), p.Name))
 	case "Discard pending":
 		p.DiscardPending()
 		if err := SaveProfile(p); err != nil {
@@ -87,7 +87,7 @@ func (a *App) maybeLearningNudge() {
 			continue
 		}
 		notify.Info("DenyOut",
-			fmt.Sprintf("%s learning window ended — %d site(s) waiting. Open DenyOut → My agents to Pin…", p.Name, len(p.PendingOnce)))
+			fmt.Sprintf("%s learning window ended - %d site(s) waiting. Open DenyOut -> My agents to Pin...", p.Name, len(p.PendingOnce)))
 		// Nudge once: push started_at forward so we don't spam.
 		p.Learning.StartedAt = time.Now().UTC().Format(time.RFC3339)
 		_ = SaveProfile(p)

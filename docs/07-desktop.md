@@ -1,8 +1,8 @@
-# D07 — Desktop deployment
+# D07 - Desktop deployment
 
 Normative deploy/build for desktop.
 
-**User-visible surfaces (behavior):** [`07-desktop-ux.md`](07-desktop-ux.md).  
+**User-visible surfaces (behavior):** [`07-desktop-ux.md`](07-desktop-ux.md). 
 **Screens & message catalog:** [`07-desktop-ux-catalog.md`](07-desktop-ux-catalog.md).
 
 ## 1. Two binaries
@@ -22,17 +22,17 @@ cd cmd/denyout-desktop/frontend && npm ci && npm run build && cd ../../..
 CGO_ENABLED=1 go build -tags 'wails,production,webkit2_41' -ldflags "-X main.version=dev" -o denyout-desktop ./cmd/denyout-desktop
 ```
 
-Plain `go build` **must** include the `production` tag (otherwise Wails links a stub). Close the window **hides to tray**; Quit only from the tray menu — see [`07-desktop-ux.md`](07-desktop-ux.md) §§2–5.
+Plain `go build` **must** include the `production` tag (otherwise Wails links a stub). Close the window **hides to tray**; Quit only from the tray menu - see [`07-desktop-ux.md`](07-desktop-ux.md) §§2-5.
 
 ## 2. Modes (summary)
 
-Full menu and screen inventory: [`07-desktop-ux.md`](07-desktop-ux.md) §§2–5.
+Full menu and screen inventory: [`07-desktop-ux.md`](07-desktop-ux.md) §§2-5.
 
 | Mode | User expectation |
 | --- | --- |
-| Safe desktop | Web OK; clear threats → **Keep blocked** / **Allow this site** + URL |
+| Safe desktop | Web OK; clear threats -> **Keep blocked** / **Allow this site** + URL |
 | My agents (wrap) | Per-program proxy; Pre-act Ask on new hosts |
-| Agents only (whole PC) | Settings → Advanced (strong warn); allowlist; messengers may break |
+| Agents only (whole PC) | Settings -> Advanced (strong warn); allowlist; messengers may break |
 | Off | No Protect computer mediation |
 
 ## 3. Install channels (Dec 1 must)
@@ -40,7 +40,7 @@ Full menu and screen inventory: [`07-desktop-ux.md`](07-desktop-ux.md) §§2–5
 | Channel | Status |
 | --- | --- |
 | GitHub Releases + SHA256SUMS | Must |
-| `install.sh` → `~/.local/bin` (Linux/macOS) | Must |
+| `install.sh` -> `~/.local/bin` (Linux/macOS) | Must |
 | Windows zip + short EN doc | Must |
 | Homebrew / winget / apt / `go install` | Later / stretch |
 
@@ -57,4 +57,4 @@ Clear Safe threats: `secret_in_url` / header-body (when denied), `canary_detecte
 
 ## 5. Diagnostics paths
 
-User state (Linux XDG): `~/.local/state/denyout/` (`audit.jsonl`, `desktop.log`, `last-error.txt`). Opened from **Problems** and Settings → Advanced → Open diagnostics folder — see UX doc §5.3–§5.4.
+User state (Linux XDG): `~/.local/state/denyout/` (`audit.jsonl`, `desktop.log`, `last-error.txt`). Opened from **Problems** and Settings -> Advanced -> Open diagnostics folder - see UX doc §5.3-§5.4.

@@ -9,9 +9,9 @@ import (
 
 // ThreatSyncPrefs are Book C toggles exported into the sync blob (not full feed cache).
 type ThreatSyncPrefs struct {
-	BlockPhishing   bool
-	BlockMalware    bool
-	BlockStronger   bool
+	BlockPhishing bool
+	BlockMalware bool
+	BlockStronger bool
 	ThreatPollHours int
 }
 
@@ -21,23 +21,23 @@ func ExportSyncDocument(st State, threat ThreatSyncPrefs, packIDs []string) clou
 	phish, mal, strong := threat.BlockPhishing, threat.BlockMalware, threat.BlockStronger
 	return cloudsync.Document{
 		SchemaVersion: cloudsync.SchemaVersion,
-		UpdatedAt:     syncUpdatedAt(st),
+		UpdatedAt: syncUpdatedAt(st),
 		Settings: cloudsync.Settings{
-			NotifyLevel:            effectiveNotifyLevel(st),
-			DecisionTimeoutSec:     effectiveDecisionTimeoutSec(st),
-			ReaskIntervalSec:       effectiveReaskIntervalSec(st),
-			AlwaysAllowHosts:       append([]string(nil), st.AlwaysAllowHosts...),
-			RememberedKeeps:        append([]string(nil), st.RememberedKeeps...),
+			NotifyLevel: effectiveNotifyLevel(st),
+			DecisionTimeoutSec: effectiveDecisionTimeoutSec(st),
+			ReaskIntervalSec: effectiveReaskIntervalSec(st),
+			AlwaysAllowHosts: append([]string(nil), st.AlwaysAllowHosts...),
+			RememberedKeeps: append([]string(nil), st.RememberedKeeps...),
 			RememberedSignalAllows: append([]string(nil), st.RememberedSignalAllows...),
-			BlockPhishing:          &phish,
-			BlockMalware:           &mal,
-			BlockStronger:          &strong,
-			ThreatPollHours:        threat.ThreatPollHours,
-			SensitiveSinksEnabled:  cloneBoolPtr(st.SensitiveSinksEnabled),
+			BlockPhishing: &phish,
+			BlockMalware: &mal,
+			BlockStronger: &strong,
+			ThreatPollHours: threat.ThreatPollHours,
+			SensitiveSinksEnabled: cloneBoolPtr(st.SensitiveSinksEnabled),
 			SensitiveWritesEnabled: cloneBoolPtr(st.SensitiveWritesEnabled),
-			BodyPureA:              st.BodyPureA,
-			AntiChunkEnabled:       st.AntiChunkEnabled,
-			AppliedPackIDs:         append([]string(nil), packIDs...),
+			BodyPureA: st.BodyPureA,
+			AntiChunkEnabled: st.AntiChunkEnabled,
+			AppliedPackIDs: append([]string(nil), packIDs...),
 		},
 	}
 }

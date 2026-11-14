@@ -18,7 +18,7 @@ func (a *App) startSession() error {
 		a.mu.Unlock()
 		return fmt.Errorf("protection is already on")
 	}
-	a.status = "Starting…"
+	a.status = "Starting..."
 	ver := a.opts.Version
 	a.mu.Unlock()
 
@@ -39,14 +39,14 @@ func (a *App) startSession() error {
 	a.mu.Unlock()
 	threats := a.ensureThreatStore(true)
 	sess, err := run.StartSession(run.SessionOptions{
-		Config:        cfg,
-		TLSMode:       proxy.TLSIntercept,
-		Version:       ver,
-		CADir:         caDir,
-		PersistCA:     true,
+		Config: cfg,
+		TLSMode: proxy.TLSIntercept,
+		Version: ver,
+		CADir: caDir,
+		PersistCA: true,
 		PolicyProfile: profile,
-		Process:       "desktop-session",
-		Threats:       threats,
+		Process: "desktop-session",
+		Threats: threats,
 		OnDeny: func(host string, reasons []string, redactedURL string) {
 			a.onSessionDeny(host, reasons, redactedURL)
 		},
@@ -164,7 +164,7 @@ func writeSessionEnv(sess *run.Session) error {
 		return err
 	}
 	var b strings.Builder
-	b.WriteString("# DenyOut session proxy — apps that honor HTTP(S)_PROXY\n")
+	b.WriteString("# DenyOut session proxy - apps that honor HTTP(S)_PROXY\n")
 	b.WriteString("HTTP_PROXY=" + proxyURL + "\n")
 	b.WriteString("HTTPS_PROXY=" + proxyURL + "\n")
 	b.WriteString("http_proxy=" + proxyURL + "\n")
