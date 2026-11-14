@@ -4,6 +4,8 @@
 
 > First successful protected run in under five minutes. First denial is loud, clear, and actionable — not a stack trace.
 
+**Desktop GUI inventory** (install, tray, every screen): [`07-desktop-ux.md`](07-desktop-ux.md). This file remains CLI-primary.
+
 ## 2. Binary
 
 - Name: `denyout`
@@ -83,7 +85,7 @@ denyout desktop [--install] [--setup] [--no-tray] [--web-ui] [--no-open]
 ```
 
 - `--install` — Safe desktop preference + autostart + detach tray (used by `install.sh`). Admin failure stays Off.
-- Tray: Protect computer · My agents… · Agents only (whole PC)… · Off · Learning · Activity · Always-allow / Undo · Help & logs · version · Quit (leave-on).
+- Tray (compact): Status · Protect computer · My agents… · Off · Open DenyOut… · Quit. Left-click opens Activity. Agents only / lists / tips live in the window — see [`07-desktop-ux.md`](07-desktop-ux.md).
 
 `install.sh` auto-detects Desktop vs Server; force with `--desktop` / `--server`. Windows zip includes `Start-DenyOut.cmd`.
 

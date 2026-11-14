@@ -6,8 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/user"
+	"path/filepath"
+	"runtime"
 	"strconv"
+	"strings"
 )
 
 // ErrNeedsAdmin means elevation was denied or required.
@@ -89,7 +93,34 @@ func Render(spec Spec) (string, error) {
 	return renderRules(spec)
 }
 
-// SelfExe returns the path to the current denyout binary for pkexec/osascript.
+// SelfExe returns the path to the CLI `denyout` binary for pkexec/osascript/proxyd.
+// When the running process is denyout-desktop (Wails), elevation must not re-exec
+// the GUI binary (GTK init fails under pkexec) — resolve sibling/PATH `denyout`.
 func SelfExe() (string, error) {
-	return os.Executable()
+	exe, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+	return ResolveCLIExe(exe)
+}
+
+// ResolveCLIExe maps a running executable path to the CLI denyout used for hostctl.
+func ResolveCLIExe(exe string) (string, error) {
+	base := filepath.Base(exe)
+	name := strings.TrimSuffix(base, filepath.Ext(base))
+	if !strings.Contains(strings.ToLower(name), "denyout-desktop") {
+		return exe, nil
+	}
+	dir := filepath.Dir(exe)
+	cand := filepath.Join(dir, "denyout")
+	if runtime.GOOS == "windows" {
+		cand += ".exe"
+	}
+	if st, err := os.Stat(cand); err == nil && !st.IsDir() {
+		return cand, nil
+	}
+	if p, err := exec.LookPath("denyout"); err == nil {
+		return p, nil
+	}
+	return "", fmt.Errorf("denyout CLI not found beside %s (install denyout next to denyout-desktop for Protect computer)", exe)
 }

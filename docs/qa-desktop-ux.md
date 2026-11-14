@@ -1,44 +1,71 @@
-# QA — Desktop UX (Safe desktop, profiles, wrap, learning, srt)
+# QA — Desktop UX (Safe desktop, Wails shell, HITL, profiles)
+
+Normative surface inventory: [`07-desktop-ux.md`](07-desktop-ux.md).
 
 Success sentence:
 
-> Ordinary day: Protect computer does not get in the way; agent/python runs under a profile with rare clear Ask; whole-PC Agents only cannot be turned on by accident; no morning silent Session surprise.
+> Everyday Safe use stays calm; window opens when needed; My agents naming is consistent; Advanced holds dangerous/power tools; tips appear one layer at a time.
 
 ## Automated
 
 ```bash
 go test ./internal/desktop/ ./internal/run/ ./internal/notify/
-go test ./internal/policy/ ./internal/secrets/ ./internal/proxy/ ./internal/audit/
+cd cmd/denyout-desktop/frontend && npm ci && npm run build
+CGO_ENABLED=1 go build -tags 'wails webkit2_41' -o denyout-desktop ./cmd/denyout-desktop
 ```
 
-Expect: Safe desktop default (`browse`, Ask off); profile Pin/Discard; `WrapSandbox` fail-closed when `srt` missing; secret copy mentions “Blocked a link…”.
+**Last run (2026-11-14 evening):** `go test ./internal/desktop/ ./internal/notify/ ./internal/run/` PASS · frontend build PASS · Wails binary → `~/.local/bin/denyout-desktop`.
 
-## Manual matrix (rounds 1–6)
+## Threat lists / packs (TL)
 
-| # | Path | Expect |
+Normative: [`ux-iters/threat-lists-plan.md`](ux-iters/threat-lists-plan.md).  
+Evidence matrix (TL1–TL8, M1–M8): [`ux-iters/threat-lists-qa.md`](ux-iters/threat-lists-qa.md).
+
+```bash
+go test ./internal/threatlists/ ./internal/policy/ ./internal/desktop/ ./internal/notify/
+```
+
+**Last run (2026-11-14):** TL1–TL8 unit **PASS**; M1–M8 code **PASS**; live Protect dogfood **PENDING** user.
+
+## Notifications / HITL rework (NF)
+
+Normative: [`ux-iters/notifications-rework-plan.md`](ux-iters/notifications-rework-plan.md). Wave: `denyout-hq/docs/waves/2026-11-14-notifications-rework.md`.
+
+| ID | Check | Result (2026-11-14) |
 | --- | --- | --- |
-| 1 | Fresh first-run → Protect computer | Safe desktop; web/Telegram OK; rare secret toast only |
-| 2 | First-run → Protect AI agents | Wizard saves profile; Start wrap; Ask toast→dialog; default Keep blocked |
-| 3 | First-run → Not now | Off; one soft nudge later (not hourly) |
-| 4 | Tray → Agents only (whole PC) | Confirm default Keep Safe desktop; messengers warning |
-| 5 | Admin deny / restore fail | Stays Off; no Session; toast + Help & logs |
-| 6 | Legacy Session in state | Cleared on restore; toast |
-| 7 | Upgrade from Agents-only default | Migration dialog → Safe desktop or keep |
-| 8 | My agents Edit while running | Stop, save, start again? |
-| 9 | Stop one agent / many | No confirm if one; confirm if many |
-| 10 | Learning Once → Pin | Counter; Pin all → learning off; Discard |
-| 11 | Ask timeout ~2 min | Keep blocked + timed-out toast |
-| 12 | Ask storm | Pause asks offer; Resume asks menu |
-| 13 | Quit tray | Protect stays preferred; wraps may prompt leftovers on next start |
-| 14 | Off vs Stop | Off ≠ stop wraps |
-| 15 | `--sandbox=srt` without binary | Fail closed error |
-| 16 | Wrap without srt | Runs + residual stderr line |
-| 17 | Headless / no zenity | No TTY wizard; CLI / Not now path |
-| 18 | Secret block copy | “Blocked a link that looked like it contained a secret” |
+| T1 | Timeout / Decide later ≠ Keep | **PASS** unit `TestTimeoutDoesNotRememberKeep` / `TestNF_*` |
+| T2–T3 | Keep + Quiet suppress keep-repeat | **PASS** code + `TestQuietBlocksKeepRepeat` |
+| T4–T5 | Timed allow/deny + pause resume EmitAction | **PASS** unit + `timed.go` / `EmitAction` |
+| T6–T8 | Whitelist / Ask no teaser / batch ≥2 | **PASS** unit + Ask dialog-only |
+| M1–M2 | Compact dialog / in-app modal | **PASS** code (`PresentDecisionNative` / Wails `decision` event). **DE:** zenity+notify-send present; live Protect block not exercised in agent |
+| M3–M8 | later / Keep / Allow / timed | **PASS** unit `applyHardBlockDecision` |
+| M9–M11 | Agents secret + Ask | **PASS** code (`handlePostBlockDeny`; no Ask teaser) |
+| M12–M14 | Pause Off / resume Undo / fail | **PASS** code (`chooseProtectPause`, `EmitAction` Undo, `KindProtectFailed`) |
+| M15–M18 | Quiet / interval / tray / Open | **PASS** code (Settings levels, tray labels, DecisionOpen→activity) |
+| Live DE click-through | Full Protect On → real secret URL | **PENDING** user dogfood (agent has no elevated Protect session) |
 
-## Cut order (if forced)
+## Manual / evidence matrix
 
-1. First-run + Safe default + hide Session + intentional Agents-only  
-2. Profiles + wrap + same Ask  
-3. Learning Pin + counter  
-4. Real srt  
+| # | Path | Expect | Result (2026-11-14) |
+| --- | --- | --- | --- |
+| 1 | Silent install → Your setup | **Open DenyOut** + **Got it**; window not forced every login | **PASS** (code: Wails modal + native `Open DenyOut`/`Got it`; SkipNativeYourSetup on desktop) |
+| 2 | Left-click tray | Activity; right-click ≤6 menu items | **PASS** code (`OnClick`→activity; compact menu). **DE re-check:** some Linux trays may open menu on left-click (documented caveat) |
+| 3 | Tray My agents… (Wails) | Opens **My agents** screen | **PASS** (`RequestOpenUI("profiles")`) |
+| 4 | Nav label | **My agents** | **PASS** |
+| 5 | Onboarding | Checklist → glossary → screen tip; never stacked with Your setup | **PASS** (`showChecklist` / `showGlossary` / `tipsEnabled`) |
+| 6 | Activity | No checkboxes until **Select…**; Group by host under Filters; human reason labels | **PASS** |
+| 7 | Settings Basic | No Agents only; Protect / Off / notify / autostart | **PASS** |
+| 8 | Settings Advanced | Agents only warn + lists + Test; Find a setting… | **PASS** |
+| 9 | Unhealthy | Top bar “Needs attention — open Problems” + badge | **PASS** |
+| 10 | Empty Activity | “Nothing blocked yet” + Test protection CTA | **PASS** |
+| 11 | Drawer | **Allow this site** | **PASS** |
+| 12 | Ctrl+K | Always allow / Keeps / Agents only jumps | **PASS** |
+
+Static evidence script: 18/18 checks against source. Interactive toast/elevation/live tray click on a physical DE was **not** exercised in this agent environment — re-verify #2 left-click on target desktop if needed.
+
+## Cut order
+
+1. UX2-A…C — done  
+2. UX3-A docs sync — done  
+3. UX3-B reason labels — done  
+4. UX3-C QA evidence — this file

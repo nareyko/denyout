@@ -15,7 +15,8 @@ curl -fsSL https://raw.githubusercontent.com/nareyko/denyout/main/install.sh | s
 #   DENYOUT_INSTALL_MODE=desktop|server sh install.sh
 
 # Desktop: Safe desktop + tray (admin once; stays Off if admin fails — no Session fallback)
-denyout desktop                 # tray (restores Protect computer if left on)
+denyout-desktop                 # tray + Wails UI (Activity / My agents / Settings / Problems)
+denyout desktop                 # CLI fallback tray (native dialogs)
 denyout profile create --name bot -- python app.py
 denyout run --profile bot
 # denyout desktop --web-ui      # optional localhost UI for tests only
@@ -29,11 +30,8 @@ go run ./cmd/denyout version
 go run ./cmd/denyout check 'https://evil.example/x?api_key=DENYOUT_CANARY_LAB'
 ```
 
-**Tray:**
-- **Protect computer** — Safe desktop (transparent redirect + CA; admin once).
-- **My agents…** — named wrap profiles (Ask / learning / optional Stronger isolation).
-- **Agents only (whole PC)…** — intentional confirm; messengers may break.
-- **Off** — turns Protect computer off (does not stop running wrapped agents).
+**Tray (compact):** Status · **Protect computer** · **My agents…** · **Off** · **Open DenyOut…** · **Quit**.
+Left-click opens Activity. **Agents only (whole PC)** lives under Settings → Advanced (confirm). Full inventory: [`docs/07-desktop-ux.md`](docs/07-desktop-ux.md).
 
 Windows: download the zip from [Releases](https://github.com/nareyko/denyout/releases) and follow [`docs/install-windows.md`](docs/install-windows.md).
 
@@ -43,7 +41,7 @@ Windows: download the zip from [Releases](https://github.com/nareyko/denyout/rel
 
 **Language:** English only · **License:** Apache-2.0 · **Platforms:** Ubuntu, macOS, Windows.
 
-**Install:** GitHub Releases + SHA256SUMS; Linux/macOS [`install.sh`](install.sh) → `~/.local/bin`; Windows zip + [`docs/install-windows.md`](docs/install-windows.md). See [`docs/07-desktop.md`](docs/07-desktop.md).
+**Install:** GitHub Releases + SHA256SUMS; Linux/macOS [`install.sh`](install.sh) → `~/.local/bin` (`denyout` + `denyout-desktop` when published); Windows zip + [`docs/install-windows.md`](docs/install-windows.md). See [`docs/07-desktop.md`](docs/07-desktop.md).
 
 Internal Bet Tree / monetization / full decision log live in a **private HQ** sibling (`denyout-hq`), not in this repo.
 

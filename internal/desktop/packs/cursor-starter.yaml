@@ -1,0 +1,14 @@
+id: cursor-starter
+version: 1
+name: Cursor starter
+description: Recommended hosts for Cursor / VS Code agent egress (APIs, updates, GitHub).
+hosts:
+  - "*.cursor.sh"
+  - "*.cursor.com"
+  - api.anthropic.com
+  - api.openai.com
+  - github.com
+  - api.github.com
+  - raw.githubusercontent.com
+  - objects.githubusercontent.com
+  - registry.npmjs.org

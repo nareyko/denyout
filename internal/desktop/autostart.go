@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// RegisterAutostart installs login launch of `denyout desktop`.
+// RegisterAutostart installs login launch of denyout-desktop (or `denyout desktop` for CLI binary).
 func RegisterAutostart() error {
 	self, err := os.Executable()
 	if err != nil {
@@ -30,13 +30,40 @@ func RegisterAutostart() error {
 	}
 }
 
-// DetachDesktop starts `denyout desktop` in the background and returns.
+// UnregisterAutostart removes login launch entries.
+func UnregisterAutostart() error {
+	switch runtime.GOOS {
+	case "linux":
+		return unregisterAutostartLinux()
+	case "darwin":
+		return unregisterAutostartDarwin()
+	case "windows":
+		return unregisterAutostartWindows()
+	default:
+		return nil
+	}
+}
+
+// autostartExecLine returns the Exec= value for a desktop entry.
+func autostartExecLine(self string) string {
+	base := filepath.Base(self)
+	if strings.Contains(base, "denyout-desktop") {
+		return self
+	}
+	return self + " desktop"
+}
+
+// DetachDesktop starts denyout-desktop (preferred) or `denyout desktop` in the background.
 func DetachDesktop() error {
 	self, err := os.Executable()
 	if err != nil {
 		return err
 	}
-	cmd := exec.Command(self, "desktop")
+	if resolved, err := filepath.EvalSymlinks(self); err == nil {
+		self = resolved
+	}
+	bin, args := desktopLaunchArgs(self)
+	cmd := exec.Command(bin, args...)
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	cmd.Stdin = nil
@@ -44,6 +71,23 @@ func DetachDesktop() error {
 	cmd.Env = sanitizeDesktopEnv(os.Environ())
 	detachCmd(cmd)
 	return cmd.Start()
+}
+
+// desktopLaunchArgs prefers a sibling denyout-desktop binary when present.
+func desktopLaunchArgs(self string) (bin string, args []string) {
+	base := filepath.Base(self)
+	if strings.Contains(base, "denyout-desktop") {
+		return self, nil
+	}
+	dir := filepath.Dir(self)
+	cand := filepath.Join(dir, "denyout-desktop")
+	if runtime.GOOS == "windows" {
+		cand += ".exe"
+	}
+	if st, err := os.Stat(cand); err == nil && !st.IsDir() {
+		return cand, nil
+	}
+	return self, []string{"desktop"}
 }
 
 // sanitizeDesktopEnv removes XDG_STATE_HOME / XDG_CONFIG_HOME when they point

@@ -37,6 +37,7 @@ func (a *App) startSession() error {
 	a.mu.Lock()
 	profile := normalizePolicyProfile(a.state.PolicyProfile)
 	a.mu.Unlock()
+	threats := a.ensureThreatStore(true)
 	sess, err := run.StartSession(run.SessionOptions{
 		Config:        cfg,
 		TLSMode:       proxy.TLSIntercept,
@@ -45,14 +46,16 @@ func (a *App) startSession() error {
 		PersistCA:     true,
 		PolicyProfile: profile,
 		Process:       "desktop-session",
-		OnDeny: func(host string, reasons []string) {
-			a.onSessionDeny(host, reasons)
+		Threats:       threats,
+		OnDeny: func(host string, reasons []string, redactedURL string) {
+			a.onSessionDeny(host, reasons, redactedURL)
 		},
 	})
 	if err != nil {
 		a.setStatus("Error")
 		return err
 	}
+	AppendDesktopLog("INFO Book C attached (%s)", threatAttachLogSummary(threats))
 
 	if err := writeSessionEnv(sess); err != nil {
 		fmt.Fprintf(os.Stderr, "denyout desktop: session env: %v\n", err)
@@ -71,11 +74,12 @@ func (a *App) startSession() error {
 	return nil
 }
 
-func (a *App) onSessionDeny(host string, reasons []string) {
+func (a *App) onSessionDeny(host string, reasons []string, redactedURL string) {
 	a.mu.Lock()
 	a.lastDeny = host
 	a.state.LastDenyHost = host
 	a.state.LastDenySummary = notify.HumanReasons(reasons)
+	a.state.LastDenyURL = strings.TrimSpace(redactedURL)
 	ask := a.state.AskMode
 	sess := a.session
 	st := a.state
@@ -109,7 +113,14 @@ func (a *App) onSessionDeny(host string, reasons []string) {
 		}()
 		return
 	}
-	notify.Deny(host, reasons)
+	a.mu.Lock()
+	safe := normalizePolicyProfile(a.state.PolicyProfile) == PolicyProfileBrowse && !ask
+	a.mu.Unlock()
+	if safe && isClearPostBlock(reasons) {
+		go a.handlePostBlockDeny(host, reasons, redactedURL)
+		return
+	}
+	notify.Deny(host, reasons, redactedURL)
 }
 
 func (a *App) stopSession() {

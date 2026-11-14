@@ -54,6 +54,43 @@ type HTTPInfo struct {
 	QueryRedacted string `json:"query_redacted,omitempty"`
 }
 
+// DisplayURL builds a human-readable redacted URL from network + HTTP fields.
+// Secrets in query are already redacted in HTTP.QueryRedacted.
+func DisplayURL(n Network, h *HTTPInfo) string {
+	host := strings.TrimSpace(n.DestHost)
+	if host == "" {
+		return ""
+	}
+	scheme := "https"
+	if n.Protocol == "http" || n.DestPort == 80 {
+		scheme = "http"
+	}
+	hostPart := host
+	if n.DestPort > 0 && n.DestPort != 443 && n.DestPort != 80 {
+		hostPart = fmt.Sprintf("%s:%d", host, n.DestPort)
+	}
+	path := "/"
+	query := ""
+	if h != nil {
+		if h.Path != "" {
+			path = h.Path
+		}
+		if h.QueryRedacted != "" {
+			query = "?" + h.QueryRedacted
+		}
+	}
+	return scheme + "://" + hostPart + path + query
+}
+
+// TruncateMiddle shortens s for list columns while keeping start and end.
+func TruncateMiddle(s string, max int) string {
+	if max < 8 || len(s) <= max {
+		return s
+	}
+	keep := (max - 1) / 2
+	return s[:keep] + "…" + s[len(s)-keep:]
+}
+
 // DefaultMaxBytes is the audit.jsonl size before rotation (~32 MiB).
 const DefaultMaxBytes int64 = 32 << 20
 

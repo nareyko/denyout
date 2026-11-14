@@ -29,7 +29,9 @@ func Exec(opts Options) (int, error) {
 
 	onDeny := opts.OnDeny
 	if onDeny == nil && opts.Notify {
-		onDeny = notify.Deny
+		onDeny = func(host string, reasons []string, redactedURL string) {
+			notify.Deny(host, reasons, redactedURL)
+		}
 	}
 	sess, err := StartSession(SessionOptions{
 		ConfigPath: opts.ConfigPath,

@@ -7,59 +7,6 @@ import (
 	"github.com/nareyko/denyout/internal/notify"
 )
 
-// learningPendingTotal sums pending_once across profiles.
-func learningPendingTotal() (int, []AgentProfile) {
-	list, err := ListProfiles()
-	if err != nil {
-		return 0, nil
-	}
-	n := 0
-	var with []AgentProfile
-	for _, p := range list {
-		if len(p.PendingOnce) > 0 {
-			n += len(p.PendingOnce)
-			with = append(with, p)
-		}
-	}
-	return n, with
-}
-
-func (a *App) learningMenuLabel() string {
-	n, _ := learningPendingTotal()
-	if n == 0 {
-		return "Learning: none"
-	}
-	return fmt.Sprintf("Learning: %d sites — Pin…", n)
-}
-
-func (a *App) pinLearningFromTray() {
-	n, with := learningPendingTotal()
-	if n == 0 {
-		notify.Info("DenyOut", "No pending Once sites to pin.")
-		return
-	}
-	if len(with) == 1 {
-		a.pinLearningUI(with[0].ID)
-		return
-	}
-	choices := make([]string, 0, len(with))
-	ids := make([]string, 0, len(with))
-	for _, p := range with {
-		choices = append(choices, fmt.Sprintf("%s (%d)", p.Name, len(p.PendingOnce)))
-		ids = append(ids, p.ID)
-	}
-	sel, ok := nativeListPick("DenyOut — Pin learning", "Which agent?", choices)
-	if !ok {
-		return
-	}
-	for i, c := range choices {
-		if c == sel {
-			a.pinLearningUI(ids[i])
-			return
-		}
-	}
-}
-
 func (a *App) pinLearningUI(id string) {
 	p, err := LoadProfile(id)
 	if err != nil {
@@ -140,7 +87,7 @@ func (a *App) maybeLearningNudge() {
 			continue
 		}
 		notify.Info("DenyOut",
-			fmt.Sprintf("%s learning window ended — %d site(s) waiting. Tray → Learning / Pin…", p.Name, len(p.PendingOnce)))
+			fmt.Sprintf("%s learning window ended — %d site(s) waiting. Open DenyOut → My agents to Pin…", p.Name, len(p.PendingOnce)))
 		// Nudge once: push started_at forward so we don't spam.
 		p.Learning.StartedAt = time.Now().UTC().Format(time.RFC3339)
 		_ = SaveProfile(p)
@@ -163,32 +110,6 @@ func (a *App) undoLastAlwaysAllow() {
 	notify.Info("DenyOut", "Undid always-allow: "+last)
 }
 
-// helpAndLogs shows Help & logs dialog.
-func (a *App) helpAndLogs() {
-	ver := a.opts.Version
-	if ver == "" {
-		ver = "dev"
-	}
-	text := fmt.Sprintf(
-		"DenyOut %s\n\n"+
-			"Protect computer = Safe desktop (web OK, blocks suspicious links).\n"+
-			"Protect AI agents = wrap a program under an allowlist (My agents).\n"+
-			"Agents only on whole PC = intentional strict mode (messengers may break).\n\n"+
-			"Logs rotate and use disk space under your user state folder.\n"+
-			"Open diagnostics folder for audit.jsonl and desktop.log.\n\n"+
-			"Privacy: decisions stay on this computer; DenyOut does not upload your traffic.",
-		ver,
-	)
-	if dialogToolkitAvailable() {
-		if nativeConfirm("DenyOut — Help & logs", text+"\n\nOpen diagnostics folder now?", "Open diagnostics", "Close") {
-			openLogsOrPrint()
-		}
-		return
-	}
-	notify.Info("DenyOut", text)
-}
-
 func (a *App) testProtection() {
-	notify.Info("DenyOut", "Test: open a browser and visit a normal site. If Protect computer (Safe desktop) is on, it should work. Suspicious secret-in-link URLs should block.")
-	openLogsOrPrint()
+	notify.Info("DenyOut", "Test: open a browser and visit a normal site. If Protect computer is on, it should work. A clear block shows Keep blocked / Allow this site for 15 seconds.")
 }

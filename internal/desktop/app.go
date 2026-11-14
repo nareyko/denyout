@@ -17,6 +17,7 @@ import (
 
 	"github.com/nareyko/denyout/internal/notify"
 	"github.com/nareyko/denyout/internal/run"
+	"github.com/nareyko/denyout/internal/threatlists"
 )
 
 //go:embed static/*
@@ -47,6 +48,10 @@ type Options struct {
 	WebUI         bool   // optional localhost settings UI (advanced / tests only)
 	Listen        string // web UI listen when WebUI; default 127.0.0.1:0
 	ControlListen string // activity/control listen; default 127.0.0.1:0 (tests may pin)
+	// OpenUI is called when tray wants the modern window (Wails). route: home|activity|profiles|settings|problems|""
+	OpenUI func(route string)
+	// SkipNativeYourSetup skips zenity Your setup (Wails shows in-window modal instead).
+	SkipNativeYourSetup bool
 }
 
 // App is the non-technical desktop entry (tray + hostguard / session proxy).
@@ -65,27 +70,44 @@ type App struct {
 	controlURL string // Ask IPC for proxyd
 	asks       *askFlight
 	wraps      map[string]*wrapProc
+	threats    *threatlists.Store // Book C cache (shared across Protect restarts)
 }
 
-// Run starts the desktop experience and blocks until quit.
-func Run(ctx context.Context, opts Options) error {
+func applyNotifyPrefs(st State) {
+	lvl := strings.TrimSpace(st.NotifyLevel)
+	if lvl == "" {
+		if st.Notify {
+			lvl = "normal"
+		} else {
+			lvl = "quiet"
+		}
+	}
+	notify.SetLevel(lvl)
+}
+
+// NewApp constructs a desktop app from options and persisted state.
+func NewApp(opts Options) *App {
 	a := &App{opts: opts, state: LoadState(), status: "Off", wraps: map[string]*wrapProc{}, asks: newAskFlight()}
-	notify.SetEnabled(a.state.Notify)
+	applyNotifyPrefs(a.state)
 	if a.state.LastDenyHost != "" {
 		a.lastDeny = a.state.LastDenyHost
 	}
+	return a
+}
 
+// Bootstrap starts control IPC, first-run / restore. Does not block on tray.
+func (a *App) Bootstrap(ctx context.Context) error {
 	if _, err := a.startControlServer(ctx); err != nil {
 		fmt.Fprintf(os.Stderr, "denyout desktop: control IPC server: %v\n", err)
 	}
 
 	a.maybePromptCrashLeftovers()
 
-	needSetup := opts.ForceSetup || !a.state.SetupDone
-	if needSetup && opts.WebUI {
+	needSetup := a.opts.ForceSetup || !a.state.SetupDone
+	if needSetup && a.opts.WebUI {
 		// web wizard handles setup
-	} else if needSetup && !opts.WebUI {
-		if opts.ForceSetup {
+	} else if needSetup && !a.opts.WebUI {
+		if a.opts.ForceSetup {
 			a.mu.Lock()
 			a.state.SetupDone = true
 			a.state.PolicyProfile = PolicyProfileBrowse
@@ -106,8 +128,10 @@ func Run(ctx context.Context, opts Options) error {
 	a.maybeMigrateUXv2()
 	a.maybeNotNowNudge()
 	a.maybeLearningNudge()
+	a.startTimedRulesWorker(ctx)
 
-	if opts.WebUI {
+	if a.opts.WebUI {
+		opts := a.opts
 		if opts.Listen == "" {
 			opts.Listen = "127.0.0.1:0"
 		}
@@ -124,8 +148,44 @@ func Run(ctx context.Context, opts Options) error {
 	}
 
 	// Restore Computer after login; never silently fall back to Session.
-	if a.state.SetupDone && (!opts.WebUI || a.state.ProtectionOn) {
+	if a.state.SetupDone && (!a.opts.WebUI || a.state.ProtectionOn) {
 		a.restoreProtection()
+	}
+
+	// install.sh / --install skips first-run wizard; still show Your setup once (GUI tray only).
+	if a.state.SetupDone && !a.state.YourSetupShown && !a.opts.WebUI && !a.opts.NoTray && !a.opts.SkipNativeYourSetup {
+		mode := "off"
+		if a.currentMode() == ModeComputer && normalizePolicyProfile(a.state.PolicyProfile) == PolicyProfileBrowse {
+			mode = "safe"
+		}
+		a.showYourSetup(mode)
+	}
+	return nil
+}
+
+// RequestOpenUI opens the Wails (or other) window on route.
+func (a *App) RequestOpenUI(route string) {
+	if a.opts.OpenUI != nil {
+		a.opts.OpenUI(route)
+		return
+	}
+	// CLI desktop fallback: native dialogs.
+	switch route {
+	case "problems":
+		a.helpAndProblems()
+	case "home", "":
+		// Prefer activity list as native "home" stand-in when no Wails window.
+		a.nativeShowActivity()
+	default:
+		a.nativeShowActivity()
+	}
+}
+
+// Run starts the desktop experience and blocks until quit.
+func Run(ctx context.Context, opts Options) error {
+	a := NewApp(opts)
+	if err := a.Bootstrap(ctx); err != nil {
+		return err
 	}
 
 	if opts.NoTray {

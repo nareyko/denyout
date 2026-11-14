@@ -9,6 +9,8 @@ func TestIsDenyoutDesktopOrProxyd(t *testing.T) {
 	}{
 		{"/home/u/.local/bin/denyout desktop", true},
 		{"denyout desktop", true},
+		{"/home/u/.local/bin/denyout-desktop", true},
+		{"denyout-desktop", true},
 		{"/home/u/.local/bin/denyout hostctl proxyd --port 1", true},
 		{"denyout hostctl proxyd", true},
 		{"/home/u/.local/bin/denyout install", false},

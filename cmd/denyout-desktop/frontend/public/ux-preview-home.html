@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>DenyOut Home v2 — UX preview</title>
+    <link rel="stylesheet" href="/src/styles/app.css" />
+    <style>
+      body { margin: 0; background: #f4f6f8; font-family: "IBM Plex Sans", system-ui, sans-serif; }
+      .preview-grid { display: grid; gap: 1.5rem; padding: 1.5rem; max-width: 560px; }
+      .preview-label { font-size: 12px; text-transform: uppercase; color: #5c6b7a; letter-spacing: 0.04em; }
+    </style>
+  </head>
+  <body>
+    <div class="preview-grid">
+      <div>
+        <div class="preview-label">Protected + empty</div>
+        <div class="stack home">
+          <section class="home-hero card">
+            <h1 class="home-headline">You are protected</h1>
+            <p class="muted">Browse as usual. We’ll only interrupt for clear risks.</p>
+            <div class="row-actions"><button class="btn danger">Turn off</button></div>
+          </section>
+          <section class="card">
+            <h2>Nothing blocked yet — that is OK.</h2>
+            <p class="muted">When DenyOut blocks something, you’ll get a short toast — and it will show up here.</p>
+            <button class="btn">See history</button>
+          </section>
+          <nav class="home-doors">
+            <button type="button" class="linkish">Settings</button>
+            <span class="muted">·</span>
+            <button type="button" class="linkish">For AI tools</button>
+          </nav>
+        </div>
+      </div>
+
+      <div>
+        <div class="preview-label">Off + last block + blocked today</div>
+        <div class="stack home">
+          <section class="home-hero card">
+            <h1 class="home-headline">Protection is off</h1>
+            <p class="muted">Turn on Protect computer to block secret-looking links and clear threats while you browse.</p>
+            <div class="row-actions"><button class="btn primary">Turn on Protect computer</button></div>
+          </section>
+          <section class="card">
+            <h2>Last blocked</h2>
+            <p><strong>evil.example</strong></p>
+            <p class="muted">That link looked like it contained a secret.</p>
+            <div class="row-actions">
+              <button class="btn primary">Allow this site</button>
+              <button class="btn">See history</button>
+            </div>
+          </section>
+          <p class="home-quiet muted">Blocked today: 3 · <button type="button" class="linkish">See history</button></p>
+          <nav class="home-doors">
+            <button type="button" class="linkish">Settings</button>
+            <span class="muted">·</span>
+            <button type="button" class="linkish">For AI tools</button>
+          </nav>
+        </div>
+      </div>
+
+      <div>
+        <div class="preview-label">Needs help</div>
+        <div class="stack home">
+          <section class="home-hero card home-hero-alert">
+            <h1 class="home-headline">Needs your help</h1>
+            <p class="muted">Something went wrong with protection. Try again, or open Problems.</p>
+            <div class="row-actions">
+              <button class="btn primary">Try Protect computer again</button>
+              <button class="btn">Open Problems</button>
+            </div>
+          </section>
+          <section class="card">
+            <h2>Nothing blocked yet — that is OK.</h2>
+            <p class="muted">When DenyOut blocks something, you’ll get a short toast — and it will show up here.</p>
+            <button class="btn">See history</button>
+          </section>
+          <nav class="home-doors">
+            <button type="button" class="linkish">Settings</button>
+            <span class="muted">·</span>
+            <button type="button" class="linkish">For AI tools</button>
+          </nav>
+        </div>
+      </div>
+
+      <div>
+        <div class="preview-label">Agents-only (not everyday protected)</div>
+        <div class="stack home">
+          <section class="home-hero card">
+            <h1 class="home-headline">Protection isn’t set for everyday browsing</h1>
+            <p class="muted">Turn on Protect computer for normal web use. AI tools belong under My agents.</p>
+            <div class="row-actions"><button class="btn primary">Turn on Protect computer</button></div>
+          </section>
+          <nav class="home-doors">
+            <button type="button" class="linkish">Settings</button>
+            <span class="muted">·</span>
+            <button type="button" class="linkish">For AI tools</button>
+          </nav>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

@@ -16,19 +16,20 @@ import (
 
 // AgentProfile is a named wrap / optional Computer policy overlay.
 type AgentProfile struct {
-	ID               string   `yaml:"id" json:"id"`
-	Name             string   `yaml:"name" json:"name"`
-	Command          []string `yaml:"command" json:"command"`
-	WorkDir          string   `yaml:"workdir,omitempty" json:"workdir,omitempty"`
-	Preset           string   `yaml:"preset" json:"preset"` // models | agent | none
-	ExtraAllow       []string `yaml:"extra_allow,omitempty" json:"extra_allow,omitempty"`
-	PendingOnce      []string `yaml:"pending_once,omitempty" json:"pending_once,omitempty"`
-	AskMode          bool     `yaml:"ask_mode" json:"ask_mode"`
-	Notify           bool     `yaml:"notify" json:"notify"`
-	TLSMode          string   `yaml:"tls_mode,omitempty" json:"tls_mode,omitempty"`
-	RequireIsolation bool     `yaml:"require_isolation,omitempty" json:"require_isolation,omitempty"`
-	Sandbox          string   `yaml:"sandbox,omitempty" json:"sandbox,omitempty"` // srt
-	Learning         Learning `yaml:"learning" json:"learning"`
+	ID               string        `yaml:"id" json:"id"`
+	Name             string        `yaml:"name" json:"name"`
+	Command          []string      `yaml:"command" json:"command"`
+	WorkDir          string        `yaml:"workdir,omitempty" json:"workdir,omitempty"`
+	Preset           string        `yaml:"preset" json:"preset"` // models | agent | none
+	ExtraAllow       []string      `yaml:"extra_allow,omitempty" json:"extra_allow,omitempty"`
+	PendingOnce      []string      `yaml:"pending_once,omitempty" json:"pending_once,omitempty"`
+	AppliedPacks     []AppliedPack `yaml:"applied_packs,omitempty" json:"applied_packs,omitempty"`
+	AskMode          bool          `yaml:"ask_mode" json:"ask_mode"`
+	Notify           bool          `yaml:"notify" json:"notify"`
+	TLSMode          string        `yaml:"tls_mode,omitempty" json:"tls_mode,omitempty"`
+	RequireIsolation bool          `yaml:"require_isolation,omitempty" json:"require_isolation,omitempty"`
+	Sandbox          string        `yaml:"sandbox,omitempty" json:"sandbox,omitempty"` // srt
+	Learning         Learning      `yaml:"learning" json:"learning"`
 }
 
 // Learning tracks Once→Pin flow.

@@ -4,6 +4,7 @@
 /target/
 *.exe
 /denyout
+/denyout-desktop
 !docs/
 !examples/
 *.sqlite
@@ -33,3 +34,10 @@
 # Env
 .env
 .env.*
+
+# Wails / frontend
+cmd/denyout-desktop/frontend/node_modules/
+/build/bin/
+*.syso
+
+cmd/denyout-desktop/frontend/*.tsbuildinfo

@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 )
 
@@ -20,8 +21,22 @@ func registerAutostartWindows(self string) error {
 		return err
 	}
 	cmdPath := filepath.Join(startup, "DenyOut.cmd")
-	content := fmt.Sprintf("@echo off\r\nstart \"\" \"%s\" desktop\r\n", self)
+	line := fmt.Sprintf("start \"\" \"%s\" desktop", self)
+	if strings.Contains(filepath.Base(self), "denyout-desktop") {
+		line = fmt.Sprintf("start \"\" \"%s\"", self)
+	}
+	content := fmt.Sprintf("@echo off\r\n%s\r\n", line)
 	return os.WriteFile(cmdPath, []byte(content), 0o644)
+}
+
+func unregisterAutostartWindows() error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	cmdPath := filepath.Join(home, "AppData", "Roaming", "Microsoft", "Windows", "Start Menu", "Programs", "Startup", "DenyOut.cmd")
+	_ = os.Remove(cmdPath)
+	return nil
 }
 
 func writeWindowsUserProxy(proxyURL, caFile string) error {

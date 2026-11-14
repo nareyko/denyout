@@ -18,27 +18,46 @@ const (
 
 // State is persisted desktop preferences.
 type State struct {
-	SetupDone         bool     `json:"setup_done"`
-	Notify            bool     `json:"notify"`
-	AskMode           bool     `json:"ask_mode"`
-	PolicyProfile     string   `json:"policy_profile,omitempty"` // browse (Safe desktop) | agent (Agents only)
-	ActiveProfileID   string   `json:"active_profile_id,omitempty"`
-	Scope             string   `json:"scope,omitempty"`
-	ProtectionOn      bool     `json:"protection_on"`
-	ComputerEnabled   bool     `json:"computer_enabled"`
-	ComputerAvailable bool     `json:"computer_available"`
-	Autostart         bool     `json:"autostart"`
-	AutostartAsked    bool     `json:"autostart_asked"`
-	UXv2Migrated      bool     `json:"ux_v2_migrated"`
-	NotNowReminded    bool     `json:"not_now_reminded"`
-	NotNowAt          string   `json:"not_now_at,omitempty"` // RFC3339
-	PreferredAgent    string   `json:"preferred_agent,omitempty"`
-	CustomCommand     string   `json:"custom_command,omitempty"`
-	AlwaysAllowHosts  []string `json:"always_allow_hosts,omitempty"`
-	LastDenyHost      string   `json:"last_deny_host,omitempty"`
-	LastDenySummary   string   `json:"last_deny_summary,omitempty"`
-	AskPausedUntil    string   `json:"ask_paused_until,omitempty"` // RFC3339
-	WrapPIDs          []int    `json:"wrap_pids,omitempty"`        // for crash leftover detection
+	SetupDone          bool        `json:"setup_done"`
+	Notify             bool        `json:"notify"`
+	NotifyLevel        string      `json:"notify_level,omitempty"` // quiet | normal | detailed
+	AskMode            bool        `json:"ask_mode"`
+	PolicyProfile      string      `json:"policy_profile,omitempty"` // browse (Safe desktop) | agent (Agents only)
+	ActiveProfileID    string      `json:"active_profile_id,omitempty"`
+	Scope              string      `json:"scope,omitempty"`
+	ProtectionOn       bool        `json:"protection_on"`
+	ComputerEnabled    bool        `json:"computer_enabled"`
+	ComputerAvailable  bool        `json:"computer_available"`
+	Autostart          bool        `json:"autostart"`
+	AutostartAsked     bool        `json:"autostart_asked"`
+	UXv2Migrated       bool        `json:"ux_v2_migrated"`
+	NotNowReminded     bool        `json:"not_now_reminded"`
+	NotNowAt           string      `json:"not_now_at,omitempty"` // RFC3339
+	PreferredAgent     string      `json:"preferred_agent,omitempty"`
+	CustomCommand      string      `json:"custom_command,omitempty"`
+	AlwaysAllowHosts   []string    `json:"always_allow_hosts,omitempty"`
+	LastDenyHost       string      `json:"last_deny_host,omitempty"`
+	LastDenySummary    string      `json:"last_deny_summary,omitempty"`
+	LastDenyURL        string      `json:"last_deny_url,omitempty"`        // redacted
+	AskPausedUntil     string      `json:"ask_paused_until,omitempty"`     // RFC3339
+	WrapPIDs           []int       `json:"wrap_pids,omitempty"`            // for crash leftover detection
+	RememberedKeeps    []string    `json:"remembered_keeps,omitempty"`     // host|reason after Keep forever
+	TimedDenies        []TimedRule `json:"timed_denies,omitempty"`         // keep blocked until ExpiresAt
+	TimedAllows        []TimedRule `json:"timed_allows,omitempty"`         // allow until ExpiresAt
+	DecisionTimeoutSec int         `json:"decision_timeout_sec,omitempty"` // default 15
+	ReaskIntervalSec   int         `json:"reask_interval_sec,omitempty"`   // default 60
+	ProtectPausedUntil string      `json:"protect_paused_until,omitempty"` // RFC3339; empty = not paused
+	ProtectPauseLast   string      `json:"protect_pause_last,omitempty"`   // last Off duration choice
+	PostBlockTaught    bool        `json:"post_block_taught,omitempty"`
+	YourSetupShown     bool        `json:"your_setup_shown,omitempty"`
+	DismissedTips      []string    `json:"dismissed_tips,omitempty"` // tip ids closed forever
+}
+
+// TimedRule is a temporary allow or deny for a host (optional reason key).
+type TimedRule struct {
+	Host      string `json:"host"`
+	Reason    string `json:"reason,omitempty"` // for denies: post-block reason
+	ExpiresAt string `json:"expires_at"`       // RFC3339
 }
 
 var stateMu sync.Mutex

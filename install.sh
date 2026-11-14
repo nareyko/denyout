@@ -184,6 +184,23 @@ fi
 install -m 0755 "$BIN" "${INSTALL_DIR}/denyout"
 echo "denyout install: installed ${INSTALL_DIR}/denyout"
 
+# Optional second artifact: denyout-desktop (Wails UI). Best-effort; CLI still works without it.
+DESKTOP_ARCHIVE="denyout-desktop_${TAG}_${os}_${arch}.tar.gz"
+if curl -fsSL -o "${TMP}/${DESKTOP_ARCHIVE}" "${ASSET_BASE}/${DESKTOP_ARCHIVE}" 2>/dev/null; then
+  tar -xzf "${TMP}/${DESKTOP_ARCHIVE}" -C "$TMP"
+  DBIN=$(find "$TMP" -type f -name 'denyout-desktop' | head -n1 || true)
+  if [ -n "$DBIN" ] && [ -f "$DBIN" ]; then
+    if command -v pkill >/dev/null 2>&1; then
+      pkill -f '[d]enyout-desktop' 2>/dev/null || true
+      sleep 0.2 || true
+    fi
+    install -m 0755 "$DBIN" "${INSTALL_DIR}/denyout-desktop"
+    echo "denyout install: installed ${INSTALL_DIR}/denyout-desktop"
+  fi
+else
+  echo "denyout install: note — denyout-desktop asset not found for this release (CLI tray still available)" >&2
+fi
+
 case ":$PATH:" in
   *":${INSTALL_DIR}:"*) ;;
   *)
@@ -317,9 +334,15 @@ if [ "$MODE" = "server" ]; then
 fi
 
 echo ""
-echo "Desktop install — silent: autostart, try whole computer, fallback session, tray in background."
+echo "Desktop install — silent: autostart, try Protect computer, tray in background."
 echo ""
 
-# Silent register + start (does not replace this shell with tray).
+# Prefer Wails shell when installed; Install() detaches sibling denyout-desktop when present.
+if [ -x "${INSTALL_DIR}/denyout-desktop" ]; then
+  # Persist Safe desktop prefs via CLI install helper, then ensure desktop binary is what autostarts.
+  "${INSTALL_DIR}/denyout" desktop --install
+  exit $?
+fi
+
 "${INSTALL_DIR}/denyout" desktop --install
 exit $?

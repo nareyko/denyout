@@ -117,16 +117,19 @@ func (a *App) handleControlDenyEvent(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Host    string   `json:"host"`
 		Reasons []string `json:"reasons"`
+		URL     string   `json:"url"`    // redacted
 		Notify  *bool    `json:"notify"` // default true; false when Ask dialog follows
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
 	doNotify := body.Notify == nil || *body.Notify
+	redURL := strings.TrimSpace(body.URL)
 	if body.Host != "" {
 		summary := notify.HumanReasons(body.Reasons)
 		a.mu.Lock()
 		a.lastDeny = body.Host
 		a.state.LastDenyHost = body.Host
 		a.state.LastDenySummary = summary
+		a.state.LastDenyURL = redURL
 		ask := a.state.AskMode
 		st := a.state
 		a.mu.Unlock()
@@ -139,6 +142,8 @@ func (a *App) handleControlDenyEvent(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 		}
+		profile := normalizePolicyProfile(a.state.PolicyProfile)
+		safeDesktop := profile == PolicyProfileBrowse && !ask
 		if isIPLiteral(body.Host) {
 			if doNotify {
 				if a.asks == nil {
@@ -147,21 +152,13 @@ func (a *App) handleControlDenyEvent(w http.ResponseWriter, r *http.Request) {
 				a.asks.notifyIPBlocked(body.Host)
 			}
 		} else if doNotify && !(ask && hostNotAllowed) {
-			secretish := false
-			for _, rsn := range body.Reasons {
-				if strings.HasPrefix(rsn, "secret_") || rsn == "canary_detected" {
-					secretish = true
-					break
-				}
+			if safeDesktop && isClearPostBlock(body.Reasons) {
+				go a.handlePostBlockDeny(body.Host, body.Reasons, redURL)
+			} else if isClearPostBlock(body.Reasons) {
+				// Agents-only / wraps: same hard-block decision dialog as Safe desktop.
+				go a.handlePostBlockDeny(body.Host, body.Reasons, redURL)
 			}
-			if secretish {
-				if a.asks == nil {
-					a.asks = newAskFlight()
-				}
-				a.asks.notifySecretCoalesced(body.Host, body.Reasons)
-			} else {
-				notify.Deny(body.Host, body.Reasons)
-			}
+			// Non-clear denies: History / Home only (no passive OS toast).
 		}
 	}
 	w.Header().Set("Content-Type", "application/json")

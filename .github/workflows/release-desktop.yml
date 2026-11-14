@@ -1,0 +1,81 @@
+# Builds denyout-desktop (Wails + CGO) and attaches archives to the same tag release.
+name: release-desktop
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            goos: linux
+            goarch: amd64
+            tags: "wails,production,webkit2_41"
+            deps: "libgtk-3-dev libwebkit2gtk-4.1-dev"
+          - os: windows-latest
+            goos: windows
+            goarch: amd64
+            tags: "wails,production"
+            deps: ""
+          # macOS: best-effort; tray+Wails main-thread coexistence is fragile.
+          - os: macos-14
+            goos: darwin
+            goarch: arm64
+            tags: "wails,production"
+            deps: ""
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: cmd/denyout-desktop/frontend/package-lock.json
+      - name: Install Linux WebKit
+        if: matrix.deps != ''
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ${{ matrix.deps }}
+      - name: Build frontend
+        working-directory: cmd/denyout-desktop/frontend
+        run: |
+          npm ci
+          npm run build
+      - name: Build denyout-desktop
+        env:
+          CGO_ENABLED: "1"
+        run: |
+          set -e
+          EXT=""
+          if [ "${{ matrix.goos }}" = "windows" ]; then EXT=".exe"; fi
+          OUT="denyout-desktop_${{ github.ref_name }}_${{ matrix.goos }}_${{ matrix.goarch }}${EXT}"
+          go build -tags "${{ matrix.tags }}" -ldflags "-s -w -X main.version=${{ github.ref_name }}" \
+            -o "$OUT" ./cmd/denyout-desktop
+          mkdir -p dist
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            # tar.gz keeps install.sh naming consistent across platforms
+            tar -czf "dist/denyout-desktop_${{ github.ref_name }}_${{ matrix.goos }}_${{ matrix.goarch }}.tar.gz" "$OUT"
+          else
+            tar -czf "dist/${OUT}.tar.gz" "$OUT"
+          fi
+        shell: bash
+      - name: Upload release asset
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
