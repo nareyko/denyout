@@ -149,10 +149,10 @@ func installPolkitAction(exe string) error {
 	return os.WriteFile(dst, body, 0o644)
 }
 
-// UninstallHelper stops and removes the helper unit (root).
+// UninstallHelper stops and removes the helper unit (must be root).
 func UninstallHelper() error {
 	if os.Geteuid() != 0 {
-		return nil
+		return ErrNeedsAdmin
 	}
 	_ = exec.Command("systemctl", "disable", "--now", helperUnitName).Run()
 	_ = os.Remove(helperUnitPath)
@@ -220,6 +220,8 @@ func handleHelperConn(c net.Conn, ownerUID int) {
 		opErr = Remove(spec)
 	case "teardown":
 		opErr = Teardown(spec)
+	case "uninstall-helper":
+		opErr = UninstallHelper()
 	default:
 		_, _ = c.Write([]byte("ERR unknown verb\n"))
 		return
@@ -229,6 +231,11 @@ func handleHelperConn(c net.Conn, ownerUID int) {
 		return
 	}
 	_, _ = c.Write([]byte("OK\n"))
+	// After uninstall teardown, drop the systemd helper so uninstall does not
+	// leave helper-serve running with a deleted binary path.
+	if verb == "teardown" {
+		_ = UninstallHelper()
+	}
 }
 
 func peerUID(c net.Conn) int {

@@ -533,12 +533,13 @@ Profiles live in ~/.config/denyout/profiles/`)
 
 func cmdHostctl(args []string) int {
 	if len(args) == 0 || args[0] == "--help" || args[0] == "-h" {
-		fmt.Println(`Usage: denyout hostctl apply|remove|teardown|render|proxyd|helper-serve [flags]
+		fmt.Println(`Usage: denyout hostctl apply|remove|teardown|render|proxyd|helper-serve|helper-uninstall [flags]
 
   Privileged helper for Protect this computer (transparent redirect + CA trust).
   proxyd runs the transparent proxy (started after setcap so SO_MARK works).
   teardown removes redirect rules and the system CA (used by denyout uninstall).
   helper-serve runs the root unix-socket helper (systemd; Linux).
+  helper-uninstall stops/removes denyout-hostguard.service (Linux; used by uninstall).
 
 Flags:
   --port N     local DenyOut proxy port
@@ -557,6 +558,26 @@ Flags:
 	if action == "helper-serve" {
 		if err := hostguard.ServeHelper(); err != nil {
 			fmt.Fprintf(os.Stderr, "denyout hostctl helper-serve: %v\n", err)
+			return 2
+		}
+		return 0
+	}
+	if action == "helper-uninstall" {
+		noElevate := false
+		for i := 1; i < len(args); i++ {
+			if args[i] == "--no-elevate" {
+				noElevate = true
+			}
+		}
+		if !noElevate {
+			if err := hostguard.ElevateUninstallHelper(); err != nil {
+				fmt.Fprintf(os.Stderr, "denyout hostctl helper-uninstall: %v\n", err)
+				return 2
+			}
+			return 0
+		}
+		if err := hostguard.UninstallHelper(); err != nil {
+			fmt.Fprintf(os.Stderr, "denyout hostctl helper-uninstall: %v\n", err)
 			return 2
 		}
 		return 0
