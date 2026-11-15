@@ -5,14 +5,14 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BIN="${DENYOUT_BIN:-$ROOT/bin/denyout}"
+BIN="${DENYOUT_BIN:-$ROOT/bin/denyout-cli}"
 URLS="${M3_URLS:-$ROOT/examples/m3/urls.txt}"
 MAX_FALSE="${M3_MAX_FALSE:-1}"
 CONFIG="${DENYOUT_CONFIG:-}"
 
 if [[ ! -x "$BIN" ]]; then
   echo "m3: building denyout → $BIN" >&2
-  (cd "$ROOT" && go build -ldflags "-X main.version=dev" -o "$BIN" ./cmd/denyout)
+  (cd "$ROOT" && go build -ldflags "-X main.version=dev" -o "$BIN" ./cmd/denyout-cli)
 fi
 
 if [[ ! -f "$URLS" ]]; then

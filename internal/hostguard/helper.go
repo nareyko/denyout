@@ -11,22 +11,23 @@ func HelperAvailable() bool {
 }
 
 // HelperApply asks the helper to apply redirect + CA (passwordless when helper is up).
-func HelperApply(proxyPort int, caCert string, uid int) error {
-	return helperCall("apply", proxyPort, caCert, uid)
+// allowQUIC=false drops UDP/443 (default Protect path so browsers use TCP MITM).
+func HelperApply(proxyPort int, caCert string, uid int, allowQUIC bool) error {
+	return helperCall("apply", proxyPort, caCert, uid, allowQUIC)
 }
 
 // HelperRemove asks the helper to remove redirect rules.
 func HelperRemove(proxyPort int, uid int) error {
-	return helperCall("remove", proxyPort, "", uid)
+	return helperCall("remove", proxyPort, "", uid, false)
 }
 
 // HelperTeardown asks the helper to remove rules + system CA.
 // On Linux the helper also uninstalls its own systemd unit after a successful teardown.
 func HelperTeardown(proxyPort int, uid int) error {
-	return helperCall("teardown", proxyPort, "", uid)
+	return helperCall("teardown", proxyPort, "", uid, false)
 }
 
 // HelperUninstallHelper asks the running helper to stop/remove its systemd unit.
 func HelperUninstallHelper() error {
-	return helperCall("uninstall-helper", 0, "", 0)
+	return helperCall("uninstall-helper", 0, "", 0, false)
 }

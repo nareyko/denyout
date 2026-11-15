@@ -1,5 +1,5 @@
 #!/bin/sh
-# DenyOut installer (Linux / macOS) — installs to ~/.local/bin/denyout
+# DenyOut installer (Linux / macOS) — installs denyout-cli (+ denyout GUI when published) to ~/.local/bin
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/nareyko/denyout/main/install.sh | sh
 #   curl ... | sh -s -- --desktop          # force desktop
@@ -141,7 +141,7 @@ case "$TAG" in
   *) VER_NUM=$TAG ;;
 esac
 
-ARCHIVE="denyout_${VER_NUM}_${os}_${arch}.tar.gz"
+ARCHIVE="denyout-cli_${VER_NUM}_${os}_${arch}.tar.gz"
 SUMS="SHA256SUMS"
 if [ -n "$BASE_URL" ]; then
   ASSET_BASE="$BASE_URL"
@@ -202,17 +202,17 @@ echo "denyout install: checksum ok"
 
 tar -xzf "${TMP}/${ARCHIVE}" -C "$TMP"
 BIN=""
-for cand in "${TMP}/denyout" "${TMP}/bin/denyout" "${TMP}/denyout_${VER_NUM}_${os}_${arch}/denyout"; do
+for cand in "${TMP}/denyout-cli" "${TMP}/bin/denyout-cli" "${TMP}/denyout-cli_${VER_NUM}_${os}_${arch}/denyout-cli"; do
   if [ -f "$cand" ]; then
     BIN=$cand
     break
   fi
 done
 if [ -z "$BIN" ]; then
-  BIN=$(find "$TMP" -type f -name denyout | head -n1 || true)
+  BIN=$(find "$TMP" -type f -name denyout-cli | head -n1 || true)
 fi
 if [ -z "$BIN" ] || [ ! -f "$BIN" ]; then
-  echo "denyout install: denyout binary not found in archive" >&2
+  echo "denyout install: denyout-cli binary not found in archive" >&2
   exit 1
 fi
 
@@ -221,41 +221,40 @@ mkdir -p "$INSTALL_DIR"
 # Stop old tray/proxyd/desktop before overwriting binaries (ETXTBSY / duplicate trays).
 # Hostguard rules are left for the new process to Apply once (no Remove+Apply).
 if command -v pkill >/dev/null 2>&1; then
-  pkill -f '[d]enyout-desktop' 2>/dev/null || true
-  pkill -f '[d]enyout[[:space:]]+desktop' 2>/dev/null || true
-  pkill -f '[d]enyout[[:space:]]+hostctl[[:space:]]+proxyd' 2>/dev/null || true
+  pkill -x denyout 2>/dev/null || true
+  pkill -f '[d]enyout-cli[[:space:]]+desktop' 2>/dev/null || true
+  pkill -f '[d]enyout-cli[[:space:]]+hostctl[[:space:]]+proxyd' 2>/dev/null || true
   sleep 0.4 || true
 fi
 
-install -m 0755 "$BIN" "${INSTALL_DIR}/denyout"
-echo "denyout install: installed ${INSTALL_DIR}/denyout"
+install -m 0755 "$BIN" "${INSTALL_DIR}/denyout-cli"
+echo "denyout install: installed ${INSTALL_DIR}/denyout-cli"
 
-# Optional second artifact: denyout-desktop (Wails UI). Best-effort; CLI still works without it.
-# Archives may contain denyout-desktop or denyout-desktop_<tag>_<os>_<arch>[.exe].
-DESKTOP_ARCHIVE="denyout-desktop_${TAG}_${os}_${arch}.tar.gz"
-DESKTOP_DEST="${INSTALL_DIR}/denyout-desktop"
+# Optional second artifact: denyout (Wails GUI). Best-effort; CLI tray still works without it.
+# Archives may contain denyout or denyout_<tag>_<os>_<arch>[.exe].
+GUI_ARCHIVE="denyout_${TAG}_${os}_${arch}.tar.gz"
+GUI_DEST="${INSTALL_DIR}/denyout"
 if [ "$os" = "windows" ]; then
-  DESKTOP_DEST="${INSTALL_DIR}/denyout-desktop.exe"
+  GUI_DEST="${INSTALL_DIR}/denyout.exe"
 fi
-if curl_fetch "${TMP}/${DESKTOP_ARCHIVE}" "${ASSET_BASE}/${DESKTOP_ARCHIVE}"; then
-  tar -xzf "${TMP}/${DESKTOP_ARCHIVE}" -C "$TMP"
-  DBIN=$(find "$TMP" -type f \( -name 'denyout-desktop' -o -name 'denyout-desktop.exe' \) | head -n1 || true)
+if curl_fetch "${TMP}/${GUI_ARCHIVE}" "${ASSET_BASE}/${GUI_ARCHIVE}"; then
+  tar -xzf "${TMP}/${GUI_ARCHIVE}" -C "$TMP"
+  DBIN=$(find "$TMP" -type f \( -name 'denyout' -o -name 'denyout.exe' \) ! -name 'denyout-cli*' | head -n1 || true)
   if [ -z "$DBIN" ]; then
-    # release-desktop historically packed the platform-qualified OUT name
-    DBIN=$(find "$TMP" -type f \( -name "denyout-desktop_${TAG}_${os}_${arch}" -o -name "denyout-desktop_${TAG}_${os}_${arch}.exe" -o -name 'denyout-desktop_*' \) | head -n1 || true)
+    DBIN=$(find "$TMP" -type f \( -name "denyout_${TAG}_${os}_${arch}" -o -name "denyout_${TAG}_${os}_${arch}.exe" \) | head -n1 || true)
   fi
   if [ -n "$DBIN" ] && [ -f "$DBIN" ]; then
     if command -v pkill >/dev/null 2>&1; then
-      pkill -f '[d]enyout-desktop' 2>/dev/null || true
+      pkill -x denyout 2>/dev/null || true
       sleep 0.2 || true
     fi
-    install -m 0755 "$DBIN" "$DESKTOP_DEST"
-    echo "denyout install: installed ${DESKTOP_DEST}"
+    install -m 0755 "$DBIN" "$GUI_DEST"
+    echo "denyout install: installed ${GUI_DEST}"
   else
-    echo "denyout install: note - ${DESKTOP_ARCHIVE} has no denyout-desktop binary (CLI tray still available)" >&2
+    echo "denyout install: note - ${GUI_ARCHIVE} has no denyout binary (CLI tray still available)" >&2
   fi
 else
-  echo "denyout install: note - denyout-desktop still unreachable after ${FETCH_RETRIES} tries (CLI tray still available)" >&2
+  echo "denyout install: note - denyout GUI still unreachable after ${FETCH_RETRIES} tries (CLI tray still available)" >&2
 fi
 
 # Warn about other denyout binaries on PATH (do not delete system copies).
@@ -275,17 +274,20 @@ warn_stale_on_path() {
   unset IFS
 }
 warn_stale_on_path denyout
-warn_stale_on_path denyout-desktop
+warn_stale_on_path denyout-cli
 
 case ":$PATH:" in
   *":${INSTALL_DIR}:"*) ;;
   *)
-    echo "denyout install: note - add ${INSTALL_DIR} to PATH if 'denyout' is not found" >&2
+    echo "denyout install: note - add ${INSTALL_DIR} to PATH if 'denyout' / 'denyout-cli' is not found" >&2
     echo "  export PATH=\"${INSTALL_DIR}:\$PATH\"" >&2
     ;;
 esac
 
-"${INSTALL_DIR}/denyout" version || true
+"${INSTALL_DIR}/denyout-cli" version || true
+if [ -x "${INSTALL_DIR}/denyout" ]; then
+  "${INSTALL_DIR}/denyout" --version || true
+fi
 
 echo "denyout install: done"
 echo ""
@@ -402,9 +404,9 @@ echo "$MODE" >"${CONFIG_HOME}/denyout/install-mode"
 if [ "$MODE" = "server" ]; then
   echo ""
   echo "Server install — no tray, no localhost web UI."
-  echo "  denyout init"
-  echo "  denyout run -- <your-agent>"
-  echo "  denyout serve --config ~/.config/denyout/config.yaml   # optional long-running"
+  echo "  denyout-cli init"
+  echo "  denyout-cli run -- <your-agent>"
+  echo "  denyout-cli serve --config ~/.config/denyout/config.yaml   # optional long-running"
   echo ""
   exit 0
 fi
@@ -413,12 +415,6 @@ echo ""
 echo "Desktop install — no password yet. Opening DenyOut to choose protection…"
 echo ""
 
-# Prefer Wails shell when installed; Install() detaches sibling denyout-desktop when present.
-if [ -x "${INSTALL_DIR}/denyout-desktop" ]; then
-  # Persist Safe desktop prefs via CLI install helper, then ensure desktop binary is what autostarts.
-  "${INSTALL_DIR}/denyout" desktop --install
-  exit $?
-fi
-
-"${INSTALL_DIR}/denyout" desktop --install
+# Install() detaches sibling Wails `denyout` when present; else CLI tray fallback.
+"${INSTALL_DIR}/denyout-cli" desktop --install
 exit $?

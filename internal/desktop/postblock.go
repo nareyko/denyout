@@ -72,15 +72,19 @@ func (a *App) rememberKeep(host, reason string) {
 	st := a.state
 	a.mu.Unlock()
 	_ = SaveState(st)
+	LogBlock("remember_keep", map[string]any{"host": host, "reason": reason})
 }
 
 func (a *App) forgetKeep(host, reason string) {
 	key := postBlockKey(host, reason)
 	a.mu.Lock()
 	out := a.state.RememberedKeeps[:0]
+	removed := false
 	for _, k := range a.state.RememberedKeeps {
 		if k != key {
 			out = append(out, k)
+		} else {
+			removed = true
 		}
 	}
 	a.state.RememberedKeeps = out
@@ -95,6 +99,9 @@ func (a *App) forgetKeep(host, reason string) {
 	st := a.state
 	a.mu.Unlock()
 	_ = SaveState(st)
+	if removed {
+		LogBlock("forget_keep", map[string]any{"host": host, "reason": reason})
+	}
 }
 
 // forgetKeepsForHost clears all silenced Keep keys and timed denies for a host.
@@ -141,6 +148,7 @@ func (a *App) addTimedDeny(host, reason string, d time.Duration) {
 	st := a.state
 	a.mu.Unlock()
 	_ = SaveState(st)
+	LogBlock("timed_deny", map[string]any{"host": host, "reason": reason, "until": exp})
 }
 
 func (a *App) addTimedAllow(host string, d time.Duration) {
@@ -158,6 +166,7 @@ func (a *App) addTimedAllow(host string, d time.Duration) {
 	st := a.state
 	a.mu.Unlock()
 	_ = SaveState(st)
+	LogBlock("timed_allow", map[string]any{"host": host, "until": exp})
 	// Timed only — never persist into AlwaysAllowHosts (that made "15 minutes" permanent).
 	_ = a.applyLiveAllows(host)
 }
@@ -402,7 +411,7 @@ func (a *App) applyHardBlockDecisionProfile(profileID, host, reason, action stri
 			})
 			break
 		}
-		if err := a.persistAlwaysHost(host); err != nil {
+		if err := a.persistAlwaysHostFrom(host, "hardblock"); err != nil {
 			AppendDesktopLog("WARN always-allow persist %s: %v", host, err)
 			// Live session-only if possible — never claim a saved Allow when disk write failed.
 			a.mu.Lock()
@@ -410,6 +419,7 @@ func (a *App) applyHardBlockDecisionProfile(profileID, host, reason, action stri
 			a.mu.Unlock()
 			if sess != nil {
 				sess.AllowHost(host, "user_once")
+				LogBlock("allow_once", map[string]any{"host": host, "scope": "session", "source": "hardblock"})
 				a.emitAllowUndoBanner(host, "Allowed for this session only (could not save): "+host, func() {
 					a.revokeHostEverywhere(host)
 				})
@@ -419,7 +429,7 @@ func (a *App) applyHardBlockDecisionProfile(profileID, host, reason, action stri
 		} else {
 			a.allowHostOnRunningWraps(host)
 			a.emitAllowUndoBanner(host, "Allowed this site: "+host, func() {
-				_ = a.removeAlwaysHost(host)
+				_ = a.removeAlwaysHostFrom(host, "undo")
 			})
 		}
 	case strings.HasPrefix(action, DecisionAllowTimed):

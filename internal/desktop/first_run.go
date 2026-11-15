@@ -262,6 +262,7 @@ func (a *App) UIOnboardingNotNow() error {
 	st := a.state
 	a.mu.Unlock()
 	_ = SaveState(st)
+	LogEvent("setup_choice", map[string]any{"choice": "not_now"})
 	a.completeSetupSideEffects()
 	a.showYourSetup("off")
 	return nil
@@ -278,6 +279,7 @@ func (a *App) UIOnboardingAgents() error {
 	st := a.state
 	a.mu.Unlock()
 	_ = SaveState(st)
+	LogEvent("setup_choice", map[string]any{"choice": "agents"})
 	a.completeSetupSideEffects()
 	a.showYourSetup("agents")
 	go func() {
@@ -727,6 +729,7 @@ func (a *App) enableSafeDesktop() error {
 		return err
 	}
 	if needSetup {
+		LogEvent("setup_choice", map[string]any{"choice": "protect"})
 		a.completeSetupSideEffects()
 		a.showYourSetup("safe")
 	}

@@ -173,7 +173,7 @@ func buildDenyout(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "denyout")
-	cmd := exec.Command("go", "build", "-o", bin, "./cmd/denyout")
+	cmd := exec.Command("go", "build", "-o", bin, "./cmd/denyout-cli")
 	cmd.Dir = findRepoRoot(t)
 	cmd.Env = os.Environ()
 	out, err := cmd.CombinedOutput()

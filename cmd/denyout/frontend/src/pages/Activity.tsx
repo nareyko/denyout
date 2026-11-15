@@ -1,7 +1,26 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { Tip, tipGone } from "../components/Tip";
-import { api, DenialView, UISnapshot } from "../wails";
+import { api, DenialView, LocalAnalytics, UISnapshot } from "../wails";
+
+function timelineLabel(t: string): string {
+  switch (t) {
+    case "protect_on":
+      return "Protect on";
+    case "protect_off":
+      return "Protect off";
+    case "protect_pause":
+      return "Paused";
+    case "restore_skipped":
+      return "Did not restore";
+    case "launch_offer_protect":
+      return "Offered Protect";
+    case "quit":
+      return "Quit";
+    default:
+      return t.replace(/_/g, " ");
+  }
+}
 
 const REASONS: { value: string; label: string }[] = [
  { value: "", label: "All reasons" },
@@ -49,6 +68,7 @@ export function Activity({
  const [busy, setBusy] = useState(false);
  const [allowRow, setAllowRow] = useState<DenialView | null>(null);
  const [allowBusy, setAllowBusy] = useState(false);
+ const [week, setWeek] = useState<LocalAnalytics | null>(null);
 
  const dismissed = snap?.dismissed_tips;
 
@@ -56,13 +76,17 @@ export function Activity({
  setBusy(true);
  if (!opts?.preserveErr) setErr("");
  try {
- const list = await api.listDenials({
+ const [list, analytics] = await Promise.all([
+ api.listDenials({
  search: showFilters ? search : "",
  reason: showFilters ? reason : "",
  remembered_only: showFilters && rememberedOnly,
  limit: 200,
- });
+ }),
+ api.localAnalytics(7).catch(() => null),
+ ]);
  setRows(list ?? []);
+ if (analytics) setWeek(analytics);
  setSelected((prev) => {
  if (!prev) return null;
  return (list ?? []).find((r) => r.id === prev.id) ?? null;
@@ -180,6 +204,47 @@ export function Activity({
  <Tip id="activity" dismissed={tipGone(dismissed, "activity")} onDismiss={onTipDismiss}>
  This is your block history. Open a row to decide Allow this site - only when you trust it.
  </Tip>
+ )}
+
+ {week && (
+ <section className="this-week" aria-label="This week">
+ <h3>This week</h3>
+ {week.quiet_week ? (
+ <p className="muted">Quiet week — that is OK.</p>
+ ) : (
+ <p>
+ Blocked <strong>{week.blocked}</strong>
+ {" · "}
+ You allowed <strong>{week.you_allowed}</strong>
+ {" · "}
+ Asked about sites <strong>{week.asked}</strong>
+ </p>
+ )}
+ {week.protect_timeline?.length > 0 && (
+ <div className="this-week-timeline">
+ <p className="muted">Protection</p>
+ <ul>
+ {week.protect_timeline.map((ev, i) => (
+ <li key={`${ev.ts}-${i}`}>
+ {timelineLabel(ev.type)}
+ {ev.note ? ` (${ev.note})` : ""}
+ </li>
+ ))}
+ </ul>
+ </div>
+ )}
+ {(week.banners_shown > 0 || week.banners_held_back > 0) && (
+ <p className="muted">
+ System banners shown {week.banners_shown}, held back {week.banners_held_back}
+ </p>
+ )}
+ <p className="muted">{week.privacy_note}</p>
+ <div className="row-actions">
+ <button className="btn subtle" type="button" onClick={() => void api.openLogs()}>
+ Open diagnostics
+ </button>
+ </div>
+ </section>
  )}
 
  <div className="toolbar">

@@ -16,8 +16,8 @@ func TestUninstallDataDirsRespectXDG(t *testing.T) {
 	want := []string{
 		filepath.Join(tmp, "cfg", "denyout"),
 		filepath.Join(tmp, "state", "denyout"),
-		filepath.Join(tmp, "data", "denyout-desktop"),
-		filepath.Join(tmp, "cache", "denyout-desktop"),
+		filepath.Join(tmp, "data", "denyout"),
+		filepath.Join(tmp, "cache", "denyout"),
 	}
 	if len(dirs) != len(want) {
 		t.Fatalf("got %v want %v", dirs, want)

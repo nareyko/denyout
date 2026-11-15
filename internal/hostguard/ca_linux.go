@@ -21,7 +21,7 @@ func installCA(certPath string) error {
 		// Fallback: user NSS is harder; require root path.
 		return fmt.Errorf("ca certs dir: %w", err)
 	}
-	dst := filepath.Join(dstDir, "denyout-desktop.crt")
+	dst := filepath.Join(dstDir, "denyout.crt")
 	data, err := os.ReadFile(certPath)
 	if err != nil {
 		return err

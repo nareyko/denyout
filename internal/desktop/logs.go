@@ -41,9 +41,13 @@ func ReadmePath() string {
 const logsReadme = `DenyOut diagnostics - which file to send
 
 1) last-error.txt -> SEND THIS for admin / protect failures
-2) desktop.log -> send if last-error is empty or unclear
+2) desktop.log -> send if last-error is empty or unclear (also mirrors event=/block= lines)
 3) audit.jsonl -> traffic decisions (allow/deny). NOT an admin error log.
- Rotates when large (~32 MiB). Use: denyout audit tail --denials
+ Rotates when large (~32 MiB). Use: denyout-cli audit tail --denials
+4) events.jsonl -> lifecycle (protect on/off, pause, restore skip, quit, setup)
+5) blocks.jsonl -> denies + your decisions only (Ask / Keep / Allow / timed / undo).
+   Not routine traffic allows (those stay in audit.jsonl).
+6) notify.jsonl -> every OS toast attempt (shown or suppressed + reason)
 
 Left-click the tray icon (or Open DenyOut...) for Home / History.
 Settings -> Advanced for Always-allow list and diagnostics.
@@ -143,6 +147,11 @@ func OpenLogs() error {
 	}
 	if _, err := os.Stat(DesktopLogPath()); os.IsNotExist(err) {
 		_ = os.WriteFile(DesktopLogPath(), []byte(""), 0o600)
+	}
+	for _, p := range []string{EventsLogPath(), BlocksLogPath(), filepath.Join(LogDir(), "notify.jsonl")} {
+		if _, err := os.Stat(p); os.IsNotExist(err) {
+			_ = os.WriteFile(p, []byte(""), 0o600)
+		}
 	}
 	if _, err := os.Stat(LastErrorPath()); os.IsNotExist(err) {
 		_ = os.WriteFile(LastErrorPath(), []byte("No errors recorded yet.\n"), 0o600)

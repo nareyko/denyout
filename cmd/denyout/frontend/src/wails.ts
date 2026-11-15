@@ -53,6 +53,7 @@ export type UISnapshot = {
  sound_only_answer?: boolean;
  system_banners?: boolean;
  respect_fullscreen?: boolean;
+ block_browser_quic?: boolean;
  fullscreen_detect?: boolean;
  fullscreen_now?: boolean;
  fullscreen_wayland?: boolean;
@@ -215,11 +216,30 @@ export type AgentProfile = {
 
 export type ProfileView = AgentProfile & { running: boolean; pid?: number };
 
+export type AnalyticsTimeline = {
+  ts: string;
+  type: string;
+  note?: string;
+};
+
+export type LocalAnalytics = {
+  days: number;
+  blocked: number;
+  you_allowed: number;
+  asked: number;
+  quiet_week: boolean;
+  protect_timeline: AnalyticsTimeline[];
+  banners_shown: number;
+  banners_held_back: number;
+  privacy_note: string;
+};
+
 type Bridge = {
  GetUISnapshot(): Promise<UISnapshot>;
   MarkYourSetupShown(): Promise<void>;
   UIClearNotice(): Promise<void>;
  ListDenials(q: DenialQuery): Promise<DenialView[]>;
+ GetLocalAnalytics(days: number): Promise<LocalAnalytics>;
  UIAlwaysAllowHost(host: string, reason: string): Promise<void>;
  UIAlwaysAllowHostFrom(host: string, reason: string, process: string): Promise<void>;
  UIForgetKeep(host: string, reason: string): Promise<void>;
@@ -236,6 +256,7 @@ type Bridge = {
  UISetSoundOnlyAnswer(on: boolean): Promise<void>;
  UISetSystemBanners(on: boolean): Promise<void>;
  UISetRespectFullscreen(on: boolean): Promise<void>;
+ UISetBlockBrowserQUIC(on: boolean): Promise<void>;
  UISetSilentWhenOpen(on: boolean): Promise<void>;
  UISetDecisionTimeoutSec(sec: number): Promise<void>;
  UISetReaskIntervalSec(sec: number): Promise<void>;
@@ -251,6 +272,7 @@ type Bridge = {
  UIStopProtection(): Promise<void>;
  UIStopProtectionWithChoice(choice: string): Promise<void>;
  GetProblems(): Promise<ProblemsView>;
+ GetLocalAnalytics(days: number): Promise<LocalAnalytics>;
  UIOpenLogs(): Promise<void>;
  UICopyLastError(): Promise<string>;
  UIRetryProtect(): Promise<void>;
@@ -316,7 +338,7 @@ declare global {
 function bridge(): Bridge {
  const b = window.go?.main?.Bridge;
  if (!b) {
- throw new Error("Wails Bridge not available (open via denyout-desktop)");
+ throw new Error("Wails Bridge not available (open via denyout)");
  }
  return b;
 }
@@ -350,6 +372,7 @@ export const api = {
  setSoundOnlyAnswer: (on: boolean) => bridge().UISetSoundOnlyAnswer(on),
  setSystemBanners: (on: boolean) => bridge().UISetSystemBanners(on),
  setRespectFullscreen: (on: boolean) => bridge().UISetRespectFullscreen(on),
+ setBlockBrowserQUIC: (on: boolean) => bridge().UISetBlockBrowserQUIC(on),
  setSilentWhenOpen: (on: boolean) => bridge().UISetSilentWhenOpen(on),
  setDecisionTimeout: (sec: number) => bridge().UISetDecisionTimeoutSec(sec),
  setReaskInterval: (sec: number) => bridge().UISetReaskIntervalSec(sec),
@@ -365,6 +388,7 @@ export const api = {
  stopProtection: () => bridge().UIStopProtection(),
  stopProtectionWithChoice: (choice: string) => bridge().UIStopProtectionWithChoice(choice),
  problems: () => bridge().GetProblems(),
+ localAnalytics: (days = 7) => bridge().GetLocalAnalytics(days),
  openLogs: () => bridge().UIOpenLogs(),
  copyLastError: () => bridge().UICopyLastError(),
  retryProtect: () => bridge().UIRetryProtect(),

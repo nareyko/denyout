@@ -220,7 +220,8 @@ Interfaces SHOULD be defined in code as stable Go/Rust traits even if only one i
 ```text
 denyout/
  docs/ # this spec
- cmd/denyout/
+ cmd/denyout/       # Wails GUI (`denyout`)
+ cmd/denyout-cli/   # CLI / hostctl (`denyout-cli`)
  internal/proxy/
  internal/policy/
  internal/secrets/

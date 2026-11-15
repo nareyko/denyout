@@ -4,7 +4,7 @@
 # Env: DENYOUT_E2E_SKIP_ELEVATE=1 — only transparent proxy smoke (no nft).
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
-BIN="${DENYOUT_BIN:-$ROOT/bin/denyout}"
+BIN="${DENYOUT_BIN:-$ROOT/bin/denyout-cli}"
 cd "$ROOT"
 go build -o "$BIN" ./cmd/denyout
 

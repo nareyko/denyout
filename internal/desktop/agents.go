@@ -235,6 +235,7 @@ func (a *App) onWrapDeny(sess *run.Session, profileID, profileName string, ask, 
 	st := a.state
 	a.mu.Unlock()
 	_ = SaveState(st)
+	a.logPolicyDeny("wrap", host, reasons, redactedURL, "wrap:"+profileID)
 
 	// Notify off: still record Last blocked / audit; skip Ask/post-block dialogs.
 	if !notifyBlocks {
@@ -262,11 +263,17 @@ func (a *App) onWrapDeny(sess *run.Session, profileID, profileName string, ask, 
 				sess.AllowHost(host, "user_once")
 			}
 			_ = a.recordProfileOnce(profileID, host)
+			LogBlock("allow_once", map[string]any{
+				"host": host, "scope": "wrap", "profile_id": profileID, "source": "ask",
+			})
 		case "always":
 			if sess != nil {
 				sess.AllowHost(host, "user_always")
 			}
 			_ = a.recordProfileAlways(profileID, host)
+			LogBlock("always_allow_add", map[string]any{
+				"host": host, "source": "ask", "profile_id": profileID, "scope": "wrap",
+			})
 		}
 		return
 	}

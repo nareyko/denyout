@@ -45,7 +45,10 @@ func (a *App) startComputer() error {
 	caPath := caDir + "/ca.crt"
 
 	uid, _ := hostguard.CurrentUID()
-	if err := hostguard.ElevateApply(port, caPath, uid); err != nil {
+	a.mu.Lock()
+	allowQUIC := a.state.AllowBrowserQUIC
+	a.mu.Unlock()
+	if err := hostguard.ElevateApply(port, caPath, uid, allowQUIC); err != nil {
 		a.setStatus("Needs admin")
 		// Test/CI elevate skip is not a user password cancel — do not sticky Off (unavailable).
 		if !hostguard.IsElevateDisabled(err) {
@@ -57,6 +60,7 @@ func (a *App) startComputer() error {
 			RecordError("hostguard.ElevateApply", err.Error())
 		} else {
 			AppendDesktopLog("INFO ElevateApply skipped (test/CI): %v", err)
+			LogEvent("elevate_skipped", map[string]any{"reason": "test_ci", "err": err.Error()})
 		}
 		return err
 	}
@@ -260,6 +264,7 @@ func (a *App) stopProtectionErr() error {
 	st := a.state
 	a.mu.Unlock()
 	_ = SaveState(st)
+	LogEvent("protect_off", map[string]any{"source": "ui"})
 	return nil
 }
 
@@ -339,16 +344,18 @@ func (a *App) allowHostOnce(host string) error {
 	}
 	if sess != nil {
 		sess.AllowHost(host, "user_once")
+		LogBlock("allow_once", map[string]any{"host": host, "scope": "session", "source": "ui"})
 		return nil
 	}
 	// proxyd has no ephemeral AllowOnce IPC — use a 1h timed allow (not permanent Always).
 	a.addTimedAllow(host, time.Hour)
+	LogBlock("allow_once", map[string]any{"host": host, "scope": "timed_1h", "source": "ui"})
 	return nil
 }
 
 func (a *App) allowHostAlways(host string) error {
 	// persistAlwaysHost also restarts proxyd / updates session when protection is on.
-	return a.persistAlwaysHost(host)
+	return a.persistAlwaysHostFrom(host, "ui")
 }
 
 func (a *App) enableComputerFromTray() error {
@@ -388,7 +395,9 @@ func (a *App) enableComputerFromTray() error {
 		return err
 	}
 	a.clearProtectPause()
-	AppendDesktopLog("INFO computer mode on profile=%s", normalizePolicyProfile(a.state.PolicyProfile))
+	profile := normalizePolicyProfile(a.state.PolicyProfile)
+	AppendDesktopLog("INFO computer mode on profile=%s", profile)
+	LogEvent("protect_on", map[string]any{"source": "enable", "profile": profile})
 	if !certutilAvailable() {
 		AppendDesktopLog("INFO hint: install libnss3-tools (certutil) for Chrome/Chromium trust")
 	}
@@ -550,6 +559,8 @@ func (a *App) applyProtectPauseChoice(choice string) {
 	st := a.state
 	a.mu.Unlock()
 	_ = SaveState(st)
+	LogEvent("protect_pause", map[string]any{"choice": choice, "until": until})
+	LogEvent("protect_off", map[string]any{"source": "pause", "choice": choice})
 }
 
 func (a *App) restartActiveProtector() error {
@@ -602,26 +613,34 @@ func (a *App) restartActiveProtector() error {
 	}
 }
 
+// clearLegacySessionScope drops persisted ScopeSession on boot (no silent Session restore).
+func (a *App) clearLegacySessionScope() {
+	a.mu.Lock()
+	if a.state.Scope != ScopeSession {
+		a.mu.Unlock()
+		return
+	}
+	AppendDesktopLog("INFO restore: ignoring legacy session scope (no silent Session)")
+	a.state.Scope = ScopeOff
+	a.state.ProtectionOn = false
+	a.state.ComputerEnabled = false
+	a.legacySessionNote =
+		"Earlier Session mode was cleared. Turn on Protect computer from Home when you want browsing protection."
+	st := a.state
+	a.mu.Unlock()
+	_ = SaveState(st)
+	LogEvent("restore_skipped", map[string]any{"reason": "legacy_session"})
+}
+
+// restoreProtection is unused for silent leave-on; Protect is offered via UIReadyRestore / native confirm.
+// Kept for tests that still exercise elevate-skip failure paths via direct call.
 func (a *App) restoreProtection() {
+	a.clearLegacySessionScope()
 	a.mu.Lock()
 	on := a.state.ProtectionOn || a.state.ComputerEnabled
 	scope := a.state.Scope
 	a.mu.Unlock()
 	if !on {
-		return
-	}
-	// Migrate legacy session preference -> Off (no morning Session surprise).
-	if scope == ScopeSession {
-		AppendDesktopLog("INFO restore: ignoring legacy session scope (no silent Session)")
-		a.mu.Lock()
-		a.state.Scope = ScopeOff
-		a.state.ProtectionOn = false
-		a.state.ComputerEnabled = false
-		a.legacySessionNote =
-			"Earlier Session mode was cleared. Turn on Protect computer from Home when you want browsing protection."
-		st := a.state
-		a.mu.Unlock()
-		_ = SaveState(st)
 		return
 	}
 	if scope == "" {
@@ -641,6 +660,7 @@ func (a *App) restoreProtection() {
 			RecordError("restore.computer", err.Error())
 		} else {
 			AppendDesktopLog("INFO restore ElevateApply skipped (test/CI): %v", err)
+			LogEvent("elevate_skipped", map[string]any{"reason": "test_ci", "source": "restore"})
 		}
 		st := a.state
 		a.mu.Unlock()

@@ -15,7 +15,7 @@ import (
 // Also stubs notify-send (no --wait hang) and CloseAll so Undo/OpenApp tests
 // do not leave DenyOut banners in the desktop notification shade.
 func TestMain(m *testing.M) {
-	dir, err := os.MkdirTemp("", "denyout-desktop-test-xdg-*")
+	dir, err := os.MkdirTemp("", "denyout-test-xdg-*")
 	if err != nil {
 		panic(err)
 	}

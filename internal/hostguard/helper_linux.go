@@ -34,13 +34,18 @@ func helperAvailable() bool {
 	return true
 }
 
-func helperCall(verb string, proxyPort int, caCert string, uid int) error {
+func helperCall(verb string, proxyPort int, caCert string, uid int, allowQUIC bool) error {
 	c, err := net.Dial("unix", helperSockPath)
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrHelperUnavailable, err)
 	}
 	defer c.Close()
-	line := fmt.Sprintf("%s %d %d %s\n", verb, proxyPort, uid, strings.ReplaceAll(caCert, " ", ""))
+	aq := "0"
+	if allowQUIC {
+		aq = "1"
+	}
+	// apply PORT UID CA allow_quic(0|1) — older helpers ignore the 5th field.
+	line := fmt.Sprintf("%s %d %d %s %s\n", verb, proxyPort, uid, strings.ReplaceAll(caCert, " ", ""), aq)
 	if _, err := c.Write([]byte(line)); err != nil {
 		return err
 	}
@@ -50,6 +55,11 @@ func helperCall(verb string, proxyPort int, caCert string, uid int) error {
 	}
 	resp = strings.TrimSpace(resp)
 	if strings.HasPrefix(resp, "OK") {
+		// apply must understand the 5th allow_quic field + UDP/443 drop.
+		// Pre-QUIC helpers reply plain "OK" and ignore the flag — force elevate refresh.
+		if verb == "apply" && !strings.Contains(resp, "quic1") {
+			return fmt.Errorf("%w: helper lacks quic1 (plain OK)", ErrHelperUnavailable)
+		}
 		return nil
 	}
 	return fmt.Errorf("helper %s: %s", verb, resp)
@@ -211,7 +221,11 @@ func handleHelperConn(c net.Conn, ownerUID int) {
 	if len(parts) >= 4 {
 		ca = parts[3]
 	}
-	spec := Spec{ProxyPort: port, UID: uid, CACert: ca}
+	allowQUIC := false
+	if len(parts) >= 5 && (parts[4] == "1" || strings.EqualFold(parts[4], "true") || parts[4] == "allow_quic") {
+		allowQUIC = true
+	}
+	spec := Spec{ProxyPort: port, UID: uid, CACert: ca, AllowQUIC: allowQUIC}
 	var opErr error
 	switch verb {
 	case "apply":
@@ -230,7 +244,8 @@ func handleHelperConn(c net.Conn, ownerUID int) {
 		_, _ = c.Write([]byte("ERR " + opErr.Error() + "\n"))
 		return
 	}
-	_, _ = c.Write([]byte("OK\n"))
+	// Cap tag lets clients detect a pre-QUIC helper (plain "OK") and re-elevate once.
+	_, _ = c.Write([]byte("OK quic1\n"))
 	// After uninstall teardown, drop the systemd helper so uninstall does not
 	// leave helper-serve running with a deleted binary path.
 	if verb == "teardown" {

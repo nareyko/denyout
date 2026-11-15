@@ -206,13 +206,17 @@ export default function App() {
  setDeferOnboarding(true);
  // Mirror Pause / Protect: Quit must not bury Ask/block (Bridge timer keeps running).
  if (decisionRef.current) {
+ setTrayToast("Finish the block prompt first, then Quit from the tray.", false);
  return;
  }
  setQuitMsg("");
  void api
  .quitNeedsChoice()
  .then((need) => {
- if (decisionRef.current) return;
+ if (decisionRef.current) {
+ setTrayToast("Finish the block prompt first, then Quit from the tray.", false);
+ return;
+ }
  if (need) setQuitOpen(true);
  else
  void api.quit("off").catch((e) => {
@@ -221,7 +225,10 @@ export default function App() {
  });
  })
  .catch(() => {
- if (decisionRef.current) return;
+ if (decisionRef.current) {
+ setTrayToast("Finish the block prompt first, then Quit from the tray.", false);
+ return;
+ }
  setQuitOpen(true);
  });
  }
@@ -589,6 +596,7 @@ export default function App() {
  const items: JumpItem[] = [
  { label: "Home", route: "home", hint: "Protection status" },
  { label: "History", route: "activity", hint: "What was blocked" },
+ { label: "This week", route: "activity", hint: "Local summary on History" },
  { label: "My agents", route: "profiles", hint: "Wrap a program" },
  { label: "New agent", route: "profiles", hint: "Create agent", newProfile: true },
  { label: "Settings", route: "settings", hint: "Basic & Advanced", settingsTab: "basic" },
@@ -1303,6 +1311,16 @@ export default function App() {
               : snap?.mode === "agents"
                 ? "Quit turns off Agents only and stops My agents wraps. Everyday browsing was already unprotected. Cancel keeps DenyOut running."
                 : "Quit turns off protection and stops My agents wraps. Cancel keeps DenyOut running."}
+        {snap?.helper_ok &&
+        (snap?.mode === "safe" ||
+          snap?.mode === "session" ||
+          snap?.mode === "agents" ||
+          snap?.protection_on) ? (
+          <>
+            {" "}
+            No password this time — the DenyOut helper is installed.
+          </>
+        ) : null}
       </p>
  {quitMsg ? <p className="warn-box">{quitMsg}</p> : null}
  <div className="stack" style={{ gap: "0.5rem", marginTop: "0.85rem" }}>

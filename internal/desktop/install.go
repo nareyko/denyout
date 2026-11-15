@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/nareyko/denyout/internal/notify"
 )
@@ -37,9 +38,9 @@ func Install(opts Options) error {
 	}
 
 	if !desktopBinaryPresent() {
-		fmt.Fprintln(os.Stderr, "denyout install: warning - denyout-desktop not found next to denyout")
-		fmt.Fprintln(os.Stderr, "  Home window needs denyout-desktop (Wails). Without it you only get the tray + system dialogs.")
-		fmt.Fprintln(os.Stderr, "  Build: CGO_ENABLED=1 go build -tags 'wails,production,webkit2_41' -o ~/.local/bin/denyout-desktop ./cmd/denyout-desktop")
+		fmt.Fprintln(os.Stderr, "denyout install: warning - denyout (GUI) not found next to denyout-cli")
+		fmt.Fprintln(os.Stderr, "  Home window needs denyout (Wails). Without it you only get the tray + system dialogs.")
+		fmt.Fprintln(os.Stderr, "  Build: CGO_ENABLED=1 go build -tags 'wails,production,webkit2_41' -o ~/.local/bin/denyout ./cmd/denyout")
 	}
 
 	if err := DetachDesktopOpen(); err != nil {
@@ -97,8 +98,12 @@ func desktopBinaryPresent() bool {
 	if err != nil {
 		return false
 	}
-	dir := filepath.Dir(self)
-	cand := filepath.Join(dir, "denyout-desktop")
+	base := filepath.Base(self)
+	name := strings.TrimSuffix(base, filepath.Ext(base))
+	if strings.EqualFold(name, "denyout") {
+		return true
+	}
+	cand := filepath.Join(filepath.Dir(self), "denyout")
 	if st, err := os.Stat(cand); err == nil && !st.IsDir() {
 		return true
 	}

@@ -9,7 +9,8 @@ Engineering tasks for the DenyOut MVP.
 ## A. Skeleton
 
 - [x] Go module `github.com/nareyko/denyout`
-- [x] `cmd/denyout` with `version`, `help`, `check`, `policy validate`
+- [x] `cmd/denyout-cli` with `version`, `help`, `check`, `policy validate`
+- [x] `cmd/denyout` Wails tray/UI
 - [x] Layout started: `internal/policy`, `internal/secrets`, `internal/lab`, `internal/check` (`proxy` / `audit` next)
 - [x] CI on Linux: build + unit tests + canary check (`.github/workflows/ci.yml`)
 

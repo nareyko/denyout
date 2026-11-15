@@ -10,8 +10,8 @@ Index: [`SPEC.md`](SPEC.md) (D07-UX).
 
 | Shell | Binary | What the user gets |
 | --- | --- | --- |
-| **Primary** | `denyout-desktop` | System tray + Wails window (Home / History / My agents / Settings / Problems) |
-| **Fallback** | `denyout desktop` | Same compact tray. Native OS dialogs instead of the Wails window |
+| **Primary** | `denyout` | System tray + Wails window (Home / History / My agents / Settings / Problems) |
+| **Fallback** | `denyout-cli desktop` | Same compact tray. Native OS dialogs instead of the Wails window |
 
 This document is the **inventory of what the user sees**: install, tray icon, tray menu, every window screen/modal, and out-of-window toasts/dialogs.
 
@@ -29,10 +29,10 @@ Install is **terminal-first**. There is no browser installer and no multi-page G
 
 **What appears in the terminal (in order):**
 
-1. Progress lines (`version`, fetch, checksum, installed `denyout`, optional `denyout-desktop`, `done`, `version` output).
+1. Progress lines (`version`, fetch, checksum, installed `denyout-cli`, optional `denyout` GUI, `done`, `version` output).
 2. Mode line: `denyout install: mode=desktop (...)`.
 3. Banner: `Desktop install — no password yet. Opening DenyOut to choose protection…`
-4. `denyout desktop --install`: Off prefs, stop previous instances, detach tray/UI (**no** Protect, **no** elevate). Autostart after mode choice.
+4. `denyout-cli desktop --install`: Off prefs, stop previous instances, detach tray/UI (**no** Protect, **no** elevate). Autostart after mode choice.
 
 **Outside the terminal after install:**
 
@@ -59,7 +59,25 @@ Desktop vs Server choice on TTY when `--prompt` / forced ask.
 Controls: Protect computer - Protect AI agents - Not now. 
 Then optional autostart. Then **Your setup** once. Protect AI agents + Wails -> My agents / New agent flow.
 
+### 1.5 Every later launch (Protect offer) — **locked**
+
+On **every** `denyout` start after setup:
+
+1. The window **always opens** (not tray-only / StartHidden).
+2. If Protect is **Off** and not paused → existing **Protect confirm** (`enable-protect` / Continue → elevate).
+3. If Protect is **already live** → Home only.
+4. **Pause forever** / active timed pause → Home; no enable offer.
+5. First-run (`!setup_done`) → mode-choice only; do not stack enable-protect.
+
+**Locked product rule:** never silent auto-Protect without that confirm. Helper may skip the OS password after Continue, but Continue itself is required.
+
+### 1.6 History — This week (local analytics)
+
+On **History**, a short **This week** summary (counts + Protect timeline + one quieting line). Data stays on this computer (`blocks.jsonl` / `events.jsonl`). No charts on Home; no cloud upload.
+
 ---
+
+
 
 ## 2. System tray icon
 

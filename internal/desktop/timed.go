@@ -29,6 +29,7 @@ func (a *App) sweepTimedRules() {
 	now := time.Now()
 	a.mu.Lock()
 	var expiredAllows []TimedRule
+	var expiredDenies []TimedRule
 	aliveAllows := a.state.TimedAllows[:0]
 	for _, r := range a.state.TimedAllows {
 		exp, err := time.Parse(time.RFC3339, r.ExpiresAt)
@@ -45,6 +46,7 @@ func (a *App) sweepTimedRules() {
 		exp, err := time.Parse(time.RFC3339, r.ExpiresAt)
 		if err != nil || !now.Before(exp) {
 			// Timed deny ended -> silent back to policy (no dialog).
+			expiredDenies = append(expiredDenies, r)
 			continue
 		}
 		aliveDenies = append(aliveDenies, r)
@@ -55,6 +57,13 @@ func (a *App) sweepTimedRules() {
 	st := a.state
 	a.mu.Unlock()
 	_ = SaveState(st)
+
+	for _, r := range expiredAllows {
+		LogBlock("timed_allow_expire", map[string]any{"host": r.Host, "until": r.ExpiresAt})
+	}
+	for _, r := range expiredDenies {
+		LogBlock("timed_deny_expire", map[string]any{"host": r.Host, "reason": r.Reason, "until": r.ExpiresAt})
+	}
 
 	if len(expiredAllows) > 0 {
 		// Drop temporary allows from proxyd + in-process session + wraps.

@@ -88,7 +88,7 @@ func (a *App) handleControlAsk(w http.ResponseWriter, r *http.Request) {
 	case "once":
 		_ = a.allowHostOnce(host)
 	case "always":
-		_ = a.persistAlwaysHost(host)
+		_ = a.persistAlwaysHostFrom(host, "ask")
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]string{"action": action, "host": host})
@@ -106,7 +106,7 @@ func (a *App) handleControlAlways(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 400)
 		return
 	}
-	if err := a.persistAlwaysHost(body.Host); err != nil {
+	if err := a.persistAlwaysHostFrom(body.Host, "control"); err != nil {
 		http.Error(w, err.Error(), 500)
 		return
 	}
@@ -137,7 +137,7 @@ func (a *App) handleControlDenyEvent(w http.ResponseWriter, r *http.Request) {
 		st := a.state
 		a.mu.Unlock()
 		_ = SaveState(st)
-
+		a.logPolicyDeny("proxyd", body.Host, body.Reasons, redURL, "")
 		hostNotAllowed := false
 		for _, rsn := range body.Reasons {
 			if rsn == "host_not_allowed" {
@@ -168,6 +168,10 @@ func (a *App) handleControlDenyEvent(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) persistAlwaysHost(host string) error {
+	return a.persistAlwaysHostFrom(host, "")
+}
+
+func (a *App) persistAlwaysHostFrom(host, source string) error {
 	host = strings.TrimSpace(host)
 	if host == "" {
 		return fmt.Errorf("empty host")
@@ -183,6 +187,7 @@ func (a *App) persistAlwaysHost(host string) error {
 			break
 		}
 	}
+	added := !found
 	if !found {
 		a.state.AlwaysAllowHosts = append(a.state.AlwaysAllowHosts, host)
 	}
@@ -192,6 +197,13 @@ func (a *App) persistAlwaysHost(host string) error {
 	a.mu.Unlock()
 	if err := SaveState(st); err != nil {
 		return err
+	}
+	if added {
+		fields := map[string]any{"host": host}
+		if s := strings.TrimSpace(source); s != "" {
+			fields["source"] = s
+		}
+		LogBlock("always_allow_add", fields)
 	}
 	if sess != nil {
 		sess.AllowHost(host, "user_always")
@@ -206,6 +218,10 @@ func (a *App) persistAlwaysHost(host string) error {
 }
 
 func (a *App) removeAlwaysHost(host string) error {
+	return a.removeAlwaysHostFrom(host, "")
+}
+
+func (a *App) removeAlwaysHostFrom(host, source string) error {
 	host = strings.TrimSpace(host)
 	a.mu.Lock()
 	out := a.state.AlwaysAllowHosts[:0]
@@ -218,6 +234,11 @@ func (a *App) removeAlwaysHost(host string) error {
 	st := a.state
 	wasOn := a.proxyd != nil || a.session != nil
 	a.mu.Unlock()
+	fields := map[string]any{"host": host}
+	if s := strings.TrimSpace(source); s != "" {
+		fields["source"] = s
+	}
+	LogBlock("always_allow_remove", fields)
 	if err := SaveState(st); err != nil {
 		return err
 	}

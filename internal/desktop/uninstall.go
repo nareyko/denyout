@@ -76,7 +76,7 @@ func Uninstall(opts UninstallOptions) error {
 
 	dir := DefaultInstallDir()
 	fmt.Fprintf(os.Stderr, "denyout uninstall: removing binaries in %s...\n", dir)
-	for _, name := range []string{"denyout", "denyout-desktop"} {
+	for _, name := range []string{"denyout", "denyout-cli"} {
 		if runtime.GOOS == "windows" {
 			name += ".exe"
 		}
@@ -121,10 +121,10 @@ func uninstallDataDirs() []string {
 		out = append(out, filepath.Join(state, "denyout"))
 	}
 	if data != "" {
-		out = append(out, filepath.Join(data, "denyout-desktop"))
+		out = append(out, filepath.Join(data, "denyout"))
 	}
 	if cache != "" {
-		out = append(out, filepath.Join(cache, "denyout-desktop"))
+		out = append(out, filepath.Join(cache, "denyout"))
 	}
 	return out
 }
@@ -142,10 +142,10 @@ func cleanupExtraAutostartArtifacts() {
 		cfg = filepath.Join(home, ".config")
 	}
 	unitDir := filepath.Join(cfg, "systemd", "user")
-	_ = os.Remove(filepath.Join(unitDir, "denyout-desktop.service"))
-	_ = os.Remove(filepath.Join(unitDir, "denyout-desktop.service.off"))
+	_ = os.Remove(filepath.Join(unitDir, "denyout.service"))
+	_ = os.Remove(filepath.Join(unitDir, "denyout.service.off"))
 	// Masked unit may be a symlink to /dev/null.
-	mask := filepath.Join(unitDir, "denyout-desktop.service")
+	mask := filepath.Join(unitDir, "denyout.service")
 	if fi, err := os.Lstat(mask); err == nil && fi.Mode()&os.ModeSymlink != 0 {
 		_ = os.Remove(mask)
 	}
@@ -172,7 +172,7 @@ func printUninstallVerification(keepConfig bool) {
 		_, err = os.Stat(hostguard.LinuxSystemCACert)
 		check(os.IsNotExist(err), "no system CA crt")
 		_, err = os.Stat(hostguard.LinuxSystemCAHashLink)
-		check(os.IsNotExist(err), "no /etc/ssl/certs/denyout-desktop.pem")
+		check(os.IsNotExist(err), "no /etc/ssl/certs/denyout.pem")
 		_, err = os.Stat("/etc/systemd/system/denyout-hostguard.service")
 		check(os.IsNotExist(err), "no denyout-hostguard.service unit")
 	}

@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// RegisterAutostart installs login launch of denyout-desktop (or `denyout desktop` for CLI binary).
+// RegisterAutostart installs login launch of `denyout` (or `denyout-cli desktop` for CLI-only).
 func RegisterAutostart() error {
 	self, err := os.Executable()
 	if err != nil {
@@ -43,15 +43,15 @@ func preferStableDesktopBinary(self string) string {
 	if !unstable {
 		return self
 	}
-	// Prefer installed denyout-desktop on PATH or under ~/.local/bin.
-	if p, err := exec.LookPath("denyout-desktop"); err == nil {
+	// Prefer installed Wails `denyout` on PATH or under ~/.local/bin.
+	if p, err := exec.LookPath("denyout"); err == nil {
 		if resolved, err2 := filepath.EvalSymlinks(p); err2 == nil {
 			return resolved
 		}
 		return p
 	}
 	if home, err := os.UserHomeDir(); err == nil {
-		cand := filepath.Join(home, ".local", "bin", "denyout-desktop")
+		cand := filepath.Join(home, ".local", "bin", "denyout")
 		if runtime.GOOS == "windows" {
 			cand += ".exe"
 		}
@@ -92,7 +92,7 @@ func AutostartRegistered() bool {
 }
 
 // autostartExecLine returns the Exec=/ExecStart= value for login launch.
-// Prefers sibling denyout-desktop when present (same rule as DetachDesktop).
+// Prefers sibling Wails `denyout` when present (same rule as DetachDesktop).
 func autostartExecLine(self string) string {
 	bin, args := desktopLaunchArgs(self)
 	if len(args) == 0 {
@@ -101,7 +101,7 @@ func autostartExecLine(self string) string {
 	return bin + " " + strings.Join(args, " ")
 }
 
-// DetachDesktop starts denyout-desktop (preferred) or `denyout desktop` in the background.
+// DetachDesktop starts `denyout` (preferred) or `denyout-cli desktop` in the background.
 func DetachDesktop() error {
 	return detachDesktop(false)
 }
@@ -122,7 +122,8 @@ func detachDesktop(openUI bool) error {
 	bin, args := desktopLaunchArgs(self)
 	if openUI {
 		base := filepath.Base(bin)
-		if strings.Contains(base, "denyout-desktop") {
+		name := strings.TrimSuffix(base, filepath.Ext(base))
+		if strings.EqualFold(name, "denyout") {
 			args = append(args, "--open")
 		}
 	}
@@ -140,14 +141,16 @@ func detachDesktop(openUI bool) error {
 	return cmd.Start()
 }
 
-// desktopLaunchArgs prefers a sibling denyout-desktop binary when present.
+// desktopLaunchArgs prefers a sibling Wails `denyout` binary when present.
+// The GUI binary is named exactly "denyout"; the CLI is "denyout-cli".
 func desktopLaunchArgs(self string) (bin string, args []string) {
 	base := filepath.Base(self)
-	if strings.Contains(base, "denyout-desktop") {
+	name := strings.TrimSuffix(base, filepath.Ext(base))
+	if strings.EqualFold(name, "denyout") {
 		return self, nil
 	}
 	dir := filepath.Dir(self)
-	cand := filepath.Join(dir, "denyout-desktop")
+	cand := filepath.Join(dir, "denyout")
 	if runtime.GOOS == "windows" {
 		cand += ".exe"
 	}

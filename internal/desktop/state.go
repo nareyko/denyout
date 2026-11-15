@@ -42,6 +42,9 @@ type State struct {
 	RespectFullscreenOff bool `json:"respect_fullscreen_off,omitempty"`
 	// SilentWhenOpenOff: default false = stay silent in the system when DenyOut is open.
 	SilentWhenOpenOff bool `json:"silent_when_open_off,omitempty"`
+	// AllowBrowserQUIC: when true, Protect does not drop UDP/443 (HTTP/3 may bypass MITM).
+	// Default false = block QUIC so browsers fall back to TCP that DenyOut can inspect.
+	AllowBrowserQUIC bool `json:"allow_browser_quic,omitempty"`
 	AskMode          bool     `json:"ask_mode"`
 	PolicyProfile      string      `json:"policy_profile,omitempty"` // browse (Safe desktop) | agent (Agents only)
 	ActiveProfileID    string      `json:"active_profile_id,omitempty"`
@@ -123,7 +126,7 @@ func StatePath() string {
 	if cfg == "" {
 		home, err := os.UserHomeDir()
 		if err != nil {
-			return "denyout-desktop.json"
+			return "denyout.json"
 		}
 		cfg = filepath.Join(home, ".config")
 	}

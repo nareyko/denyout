@@ -39,7 +39,10 @@ func TestOpenLogsWritesReadme(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(b), "last-error.txt") || !strings.Contains(string(b), "audit.jsonl") {
-		t.Fatalf("README=%s", b)
+	s := string(b)
+	for _, want := range []string{"last-error.txt", "audit.jsonl", "events.jsonl", "blocks.jsonl", "notify.jsonl"} {
+		if !strings.Contains(s, want) {
+			t.Fatalf("README missing %s: %s", want, s)
+		}
 	}
 }

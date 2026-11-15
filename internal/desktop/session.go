@@ -86,6 +86,7 @@ func (a *App) onSessionDeny(host string, reasons []string, redactedURL string) {
 	st := a.state
 	a.mu.Unlock()
 	_ = SaveState(st)
+	a.logPolicyDeny("session", host, reasons, redactedURL, "")
 
 	hostNotAllowed := false
 	for _, r := range reasons {
@@ -107,9 +108,10 @@ func (a *App) onSessionDeny(host string, reasons []string, redactedURL string) {
 			case "once":
 				if sess != nil {
 					sess.AllowHost(host, "user_once")
+					LogBlock("allow_once", map[string]any{"host": host, "scope": "session", "source": "ask"})
 				}
 			case "always":
-				_ = a.persistAlwaysHost(host)
+				_ = a.persistAlwaysHostFrom(host, "ask")
 			}
 		}()
 		return

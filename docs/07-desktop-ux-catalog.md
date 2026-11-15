@@ -3,7 +3,7 @@
 **English product copy only.** Companion to the normative behavior inventory [`07-desktop-ux.md`](07-desktop-ux.md). 
 This file lists **what the user can see**: screens, chrome, tips, dialogs, toasts, and terminal install lines.
 
-Shells: **`denyout-desktop`** (tray + Wails window) - **`denyout desktop`** (tray + native dialogs).
+Shells: **`denyout`** (tray + Wails window) - **`denyout-cli desktop`** (tray + native dialogs).
 
 ---
 
@@ -17,7 +17,7 @@ Typical desktop install lines the user may see:
 | `denyout install: fetching ...` |
 | `denyout install: checksum ok` |
 | `denyout install: installed .../denyout` |
-| `denyout install: installed .../denyout-desktop` **or** note that desktop asset is missing |
+| `denyout install: installed .../denyout` **or** note that GUI asset is missing |
 | `denyout install: done` |
 | `denyout version` output |
 | `denyout install: mode=desktop (...)` / `mode=server (...)` |

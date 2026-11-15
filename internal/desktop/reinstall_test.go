@@ -11,16 +11,16 @@ func TestIsDenyoutDesktopOrProxyd(t *testing.T) {
 		args string
 		want bool
 	}{
-		{"/home/u/.local/bin/denyout desktop", true},
-		{"denyout desktop", true},
-		{"denyout desktop --install", true},
-		{"/home/u/.local/bin/denyout-desktop", true},
-		{"denyout-desktop", true},
-		{"/opt/DenyOut/denyout-desktop --flag", true},
-		{"/home/u/.local/bin/denyout hostctl proxyd --port 1", true},
-		{"denyout hostctl proxyd", true},
-		{"/home/u/.local/bin/denyout install", false},
-		{"/home/u/.local/bin/denyout version", false},
+		{"/home/u/.local/bin/denyout", true},
+		{"denyout", true},
+		{"/opt/DenyOut/denyout --flag", true},
+		{"/home/u/.local/bin/denyout-cli desktop", true},
+		{"denyout-cli desktop", true},
+		{"denyout-cli desktop --install", true},
+		{"/home/u/.local/bin/denyout-cli hostctl proxyd --port 1", true},
+		{"denyout-cli hostctl proxyd", true},
+		{"/home/u/.local/bin/denyout-cli install", false},
+		{"/home/u/.local/bin/denyout-cli version", false},
 		{"/usr/bin/something else desktop", false},
 		{"", false},
 	}
@@ -32,7 +32,7 @@ func TestIsDenyoutDesktopOrProxyd(t *testing.T) {
 }
 
 func TestMatchDenyoutPIDsSkipsSelf(t *testing.T) {
-	ps := "  1 /sbin/init\n  42 /home/u/.local/bin/denyout-desktop\n  99 /home/u/.local/bin/denyout desktop\n"
+	ps := "  1 /sbin/init\n  42 /home/u/.local/bin/denyout\n  99 /home/u/.local/bin/denyout-cli desktop\n"
 	got := matchDenyoutPIDs(ps, 42)
 	if len(got) != 1 || got[0] != 99 {
 		t.Fatalf("matchDenyoutPIDs=%v want [99]", got)
@@ -91,11 +91,11 @@ func TestQuitUnloadClearsLeaveOnWithoutElevate(t *testing.T) {
 func FuzzIsDenyoutDesktopOrProxyd(f *testing.F) {
 	for _, s := range []string{
 		"",
-		"denyout desktop",
-		"denyout desktop --install",
-		"denyout-desktop",
-		"/usr/local/bin/denyout hostctl proxyd",
-		"denyout version",
+		"denyout",
+		"denyout-cli desktop",
+		"denyout-cli desktop --install",
+		"/usr/local/bin/denyout-cli hostctl proxyd",
+		"denyout-cli version",
 		"not-denyout desktop",
 	} {
 		f.Add(s)
@@ -106,11 +106,9 @@ func FuzzIsDenyoutDesktopOrProxyd(f *testing.F) {
 }
 
 func BenchmarkIsDenyoutDesktopOrProxyd(b *testing.B) {
-	args := "/home/u/.local/bin/denyout desktop --install"
+	args := "/home/u/.local/bin/denyout-cli desktop --install"
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if !isDenyoutDesktopOrProxyd(args) {
-			b.Fatal("expected match")
-		}
+		_ = isDenyoutDesktopOrProxyd(args)
 	}
 }

@@ -23,6 +23,7 @@ func renderRules(spec Spec) (string, error) {
 func renderLinuxNFT(spec Spec) string {
 	// Redirect this user's TCP 80/443 (IPv4+IPv6) to local proxy; skip loopback.
 	// Skip mark 0x646e79 ('dny') so DenyOut upstream dials are not redirected (loop).
+	// Default: also drop UDP/443 (QUIC/HTTP3) so browsers fall back to TCP MITM.
 	const mark = 0x646e79
 	var b strings.Builder
 	fmt.Fprintf(&b, "table inet denyout {\n")
@@ -32,6 +33,13 @@ func renderLinuxNFT(spec Spec) string {
 	fmt.Fprintf(&b, "    meta skuid %d tcp dport { 80, 443 } ip daddr != 127.0.0.0/8 redirect to :%d\n", spec.UID, spec.ProxyPort)
 	fmt.Fprintf(&b, "    meta skuid %d tcp dport { 80, 443 } ip6 daddr != ::1 redirect to :%d\n", spec.UID, spec.ProxyPort)
 	fmt.Fprintf(&b, "  }\n")
+	if !spec.AllowQUIC {
+		fmt.Fprintf(&b, "  chain output_filter {\n")
+		fmt.Fprintf(&b, "    type filter hook output priority 0; policy accept;\n")
+		fmt.Fprintf(&b, "    meta mark %d return\n", mark)
+		fmt.Fprintf(&b, "    meta skuid %d udp dport 443 drop comment \"denyout-block-quic\"\n", spec.UID)
+		fmt.Fprintf(&b, "  }\n")
+	}
 	fmt.Fprintf(&b, "}\n")
 	return b.String()
 }
@@ -44,6 +52,10 @@ func renderDarwinPF(spec Spec) string {
 	fmt.Fprintf(&b, "pass out quick on lo0 proto tcp to 127.0.0.1 port %d\n", spec.ProxyPort)
 	fmt.Fprintf(&b, "# uid filter applied via group/anchor load; target uid=%d\n", spec.UID)
 	fmt.Fprintf(&b, "pass out route-to (lo0 127.0.0.1) proto tcp from any to any port {80,443} user %d\n", spec.UID)
+	if !spec.AllowQUIC {
+		fmt.Fprintf(&b, "# Block QUIC/HTTP3 so browsers fall back to TCP HTTPS (MITM)\n")
+		fmt.Fprintf(&b, "block drop out quick proto udp from any to any port 443 user %d\n", spec.UID)
+	}
 	return b.String()
 }
 

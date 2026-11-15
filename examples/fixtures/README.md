@@ -5,11 +5,11 @@ SQLite lab DB is created/seeded by `denyout test` (or `internal/lab.OpenSeeded`)
 YAML under `suites/` mirrors the seeded cases for human review (SoT remains `internal/lab/seed.go`).
 
 ```bash
-go run ./cmd/denyout test --db examples/fixtures/denyout-lab.sqlite --suite r20_url
-go run ./cmd/denyout test --db examples/fixtures/denyout-lab.sqlite --suite fp_signed
-go run ./cmd/denyout test --db examples/fixtures/denyout-lab.sqlite --suite agent_egress
-go run ./cmd/denyout test --db examples/fixtures/denyout-lab.sqlite --suite redirect_policy
-go run ./cmd/denyout test --db examples/fixtures/denyout-lab.sqlite
+go run ./cmd/denyout-cli test --db examples/fixtures/denyout-lab.sqlite --suite r20_url
+go run ./cmd/denyout-cli test --db examples/fixtures/denyout-lab.sqlite --suite fp_signed
+go run ./cmd/denyout-cli test --db examples/fixtures/denyout-lab.sqlite --suite agent_egress
+go run ./cmd/denyout-cli test --db examples/fixtures/denyout-lab.sqlite --suite redirect_policy
+go run ./cmd/denyout-cli test --db examples/fixtures/denyout-lab.sqlite
 ```
 
 ## Suites

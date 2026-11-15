@@ -4,11 +4,12 @@ package hostguard
 
 func helperAvailable() bool { return false }
 
-func helperCall(verb string, proxyPort int, caCert string, uid int) error {
+func helperCall(verb string, proxyPort int, caCert string, uid int, allowQUIC bool) error {
 	_ = verb
 	_ = proxyPort
 	_ = caCert
 	_ = uid
+	_ = allowQUIC
 	return ErrHelperUnavailable
 }
 

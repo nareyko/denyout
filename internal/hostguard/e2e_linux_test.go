@@ -48,7 +48,7 @@ func TestLinuxProtectE2E(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Logf("elevating hostctl apply port=%d ca=%s uid=%d — approve pkexec", port, ca, uid)
-	if err := hostguard.ElevateApply(port, ca, uid); err != nil {
+	if err := hostguard.ElevateApply(port, ca, uid, false); err != nil {
 		t.Fatalf("elevate apply: %v", err)
 	}
 	defer func() {

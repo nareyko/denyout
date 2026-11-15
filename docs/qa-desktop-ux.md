@@ -10,11 +10,11 @@ Success sentence:
 
 ```bash
 go test ./internal/desktop/ ./internal/run/ ./internal/notify/
-cd cmd/denyout-desktop/frontend && npm ci && npm run build
-CGO_ENABLED=1 go build -tags 'wails webkit2_41' -o denyout-desktop ./cmd/denyout-desktop
+cd cmd/denyout/frontend && npm ci && npm run build
+CGO_ENABLED=1 go build -tags 'wails webkit2_41' -o denyout ./cmd/denyout
 ```
 
-**Last run (2026-11-14 evening):** `go test ./internal/desktop/ ./internal/notify/ ./internal/run/` PASS - frontend build PASS - Wails binary -> `~/.local/bin/denyout-desktop`.
+**Last run (2026-11-14 evening):** `go test ./internal/desktop/ ./internal/notify/ ./internal/run/` PASS - frontend build PASS - Wails binary -> `~/.local/bin/denyout`.
 
 ## Threat lists / packs (TL)
 

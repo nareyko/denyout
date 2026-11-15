@@ -43,6 +43,9 @@ type Spec struct {
 	UID       int    // desktop user uid (Unix); ignored on Windows
 	CACert    string // path to DenyOut CA PEM
 	DryRun    bool   // render only; do not apply
+	// AllowQUIC: when true, do not drop UDP/443 (Chrome HTTP/3 may bypass MITM).
+	// Default false = block QUIC so browsers fall back to TCP HTTPS that Protect inspects.
+	AllowQUIC bool
 }
 
 // Status is a short machine-readable state for the tray/UI.
@@ -119,9 +122,9 @@ func Render(spec Spec) (string, error) {
 	return renderRules(spec)
 }
 
-// SelfExe returns the path to the CLI `denyout` binary for pkexec/osascript/proxyd.
-// When the running process is denyout-desktop (Wails), elevation must not re-exec
-// the GUI binary (GTK init fails under pkexec) — resolve sibling/PATH `denyout`.
+// SelfExe returns the path to the CLI `denyout-cli` binary for pkexec/osascript/proxyd.
+// When the running process is the Wails GUI (`denyout`), elevation must not re-exec
+// the GUI binary (GTK init fails under pkexec) — resolve sibling/PATH `denyout-cli`.
 func SelfExe() (string, error) {
 	exe, err := os.Executable()
 	if err != nil {
@@ -130,23 +133,24 @@ func SelfExe() (string, error) {
 	return ResolveCLIExe(exe)
 }
 
-// ResolveCLIExe maps a running executable path to the CLI denyout used for hostctl.
+// ResolveCLIExe maps a running executable path to the CLI denyout-cli used for hostctl.
 func ResolveCLIExe(exe string) (string, error) {
 	base := filepath.Base(exe)
 	name := strings.TrimSuffix(base, filepath.Ext(base))
-	if !strings.Contains(strings.ToLower(name), "denyout-desktop") {
+	low := strings.ToLower(name)
+	if low == "denyout-cli" {
 		return exe, nil
 	}
 	dir := filepath.Dir(exe)
-	cand := filepath.Join(dir, "denyout")
+	cand := filepath.Join(dir, "denyout-cli")
 	if runtime.GOOS == "windows" {
 		cand += ".exe"
 	}
 	if st, err := os.Stat(cand); err == nil && !st.IsDir() {
 		return cand, nil
 	}
-	if p, err := exec.LookPath("denyout"); err == nil {
+	if p, err := exec.LookPath("denyout-cli"); err == nil {
 		return p, nil
 	}
-	return "", fmt.Errorf("denyout CLI not found beside %s (install denyout next to denyout-desktop for Protect computer)", exe)
+	return "", fmt.Errorf("denyout-cli not found beside %s (install denyout-cli next to denyout for Protect computer)", exe)
 }

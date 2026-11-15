@@ -12,8 +12,13 @@ import (
 
 // ElevateApply re-executes `denyout hostctl apply` with admin rights.
 // Tries the privileged helper first (no password) when available.
-func ElevateApply(proxyPort int, caCert string, uid int) error {
-	if err := HelperApply(proxyPort, caCert, uid); err == nil {
+// allowQUIC=false (default product path) drops UDP/443 so browsers use TCP MITM.
+func ElevateApply(proxyPort int, caCert string, uid int, allowQUIC bool) error {
+	// Test/CI: skip helper too so suites never mutate live hostguard.
+	if ElevateDisabledByEnv() {
+		return fmt.Errorf("%w: %w", ErrNeedsAdmin, ErrElevateDisabled)
+	}
+	if err := HelperApply(proxyPort, caCert, uid, allowQUIC); err == nil {
 		return nil
 	}
 	exe, err := SelfExe()
@@ -26,11 +31,17 @@ func ElevateApply(proxyPort int, caCert string, uid int) error {
 		"--uid", strconv.Itoa(uid),
 		"--no-elevate",
 	}
+	if allowQUIC {
+		args = append(args, "--allow-quic")
+	}
 	return elevate(exe, args)
 }
 
 // ElevateRemove re-executes hostctl remove with admin rights.
 func ElevateRemove(proxyPort int, uid int) error {
+	if ElevateDisabledByEnv() {
+		return fmt.Errorf("%w: %w", ErrNeedsAdmin, ErrElevateDisabled)
+	}
 	if err := HelperRemove(proxyPort, uid); err == nil {
 		return nil
 	}
