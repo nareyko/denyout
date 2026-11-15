@@ -1372,14 +1372,23 @@ func (a *App) UIPinLearning(id string) error {
 	return nil
 }
 
-// UIDiscardLearning discards pending once hosts.
+// UIDiscardLearning discards pending once hosts and revokes them on a live wrap.
 func (a *App) UIDiscardLearning(id string) error {
 	p, err := LoadProfile(id)
 	if err != nil {
 		return err
 	}
+	hosts := append([]string{}, p.PendingOnce...)
 	p.DiscardPending()
-	return SaveProfile(p)
+	if err := SaveProfile(p); err != nil {
+		return err
+	}
+	// Allow-once was applied live on the wrap session; revoke so Discard's
+	// "stay blocked" promise holds for this run too.
+	for _, h := range hosts {
+		a.revokeWrapHostLive(id, h, false)
+	}
+	return nil
 }
 
 // enableAgentsOnlyWholePC is the confirmed path (UI already confirmed).

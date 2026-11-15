@@ -249,7 +249,7 @@ export function Profiles({
  const n = p.pending_once?.length || 0;
  setConfirm({
  title: `Discard pending for ${p.name}?`,
- body: `Discard ${n} pending site${n === 1 ? "" : "s"}?\n\nThey stay blocked for this agent.`,
+ body: `Discard ${n} pending site${n === 1 ? "" : "s"}?\n\nThey stay blocked for this agent — including this run if the agent is running.`,
  danger: true,
  confirmLabel: "Discard",
  run: async () => {
@@ -360,7 +360,7 @@ export function Profiles({
  const n = p.pending_once?.length || 0;
  setConfirm({
  title: `Discard pending for ${p.name}?`,
- body: `Discard ${n} pending site${n === 1 ? "" : "s"}?\n\nThey stay blocked for this agent.`,
+ body: `Discard ${n} pending site${n === 1 ? "" : "s"}?\n\nThey stay blocked for this agent — including this run if the agent is running.`,
  danger: true,
  confirmLabel: "Discard",
  run: async () => {

@@ -653,9 +653,11 @@ export function Settings({
  <section className="card" id="settings-notifications">
  <h2>Notifications</h2>
  <p className="muted">
- Blocks always go to History. The tray shows a count. With Stay quiet while away
- on, DenyOut shows one summary when you return. Ask and Keep blocked / Allow this
- site stay inside DenyOut.
+ Blocks always go to History. The tray shows a count.{" "}
+ {snap.quiet_while_away === false
+  ? "Stay quiet while away is off — Ask and block dialogs can still appear while locked or idle."
+  : "With Stay quiet while away on, DenyOut shows one summary when you return."}{" "}
+ Ask and Keep blocked / Allow this site stay inside DenyOut.
  </p>
           {(snap.notify_snooze_active ||
             snap.system_banners === false ||
