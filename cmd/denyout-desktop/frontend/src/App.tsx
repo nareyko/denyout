@@ -1647,8 +1647,10 @@ export default function App() {
  <p>
  - When something is blocked while you are here: Keep blocked or Allow this site in
  DenyOut.
- <br />- While you are away, DenyOut stays quiet and shows one summary when you
- return. Everything is in History.
+ <br />
+ {snap.quiet_while_away === false
+  ? "- Stay quiet while away is off — Ask and block dialogs can still appear while locked or idle. Everything is in History."
+  : "- While you are away, DenyOut stays quiet and shows one summary when you return. Everything is in History."}
  <br />- Open Home to see if you are protected. If Protect failed, open Problems.
  </p>
  </>

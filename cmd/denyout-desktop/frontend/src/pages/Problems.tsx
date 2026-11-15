@@ -93,9 +93,13 @@ export function Problems({
   const agentsRunning = p.agents_running || 0;
   let summary = p.protection_on
     ? agentsOnly
-      ? "Agents only is on."
+      ? p.threat_lists_warn
+        ? "Agents only is on; threat lists need attention."
+        : "Agents only is on."
       : sessionOn
-        ? "Session protection is on."
+        ? p.threat_lists_warn
+          ? "Session protection is on; threat lists need attention."
+          : "Session protection is on."
         : p.threat_lists_warn
           ? "Protect is on; threat lists need attention."
           : "Everything looks fine."
@@ -119,9 +123,13 @@ export function Problems({
   const pauseNoun = intentAgents ? "Agents only" : "Protect";
   let support = p.protection_on
     ? agentsOnly
-      ? "Whole-PC allowlist mode. Everyday browsing is not covered — turn on Protect computer from Home for that."
+      ? p.threat_lists_warn
+        ? "Whole-PC allowlist mode. Everyday browsing is not covered. Threat lists need a refresh (below)."
+        : "Whole-PC allowlist mode. Everyday browsing is not covered — turn on Protect computer from Home for that."
       : sessionOn
-        ? "This is a limited session proxy — prefer Protect computer for everyday browsing."
+        ? p.threat_lists_warn
+          ? "Limited session proxy — prefer Protect computer for everyday browsing. Threat lists need a refresh (below)."
+          : "This is a limited session proxy — prefer Protect computer for everyday browsing."
         : p.threat_lists_warn
           ? "Protect is running; threat lists need a refresh (below)."
           : "Protect is running. Open History if something was blocked."

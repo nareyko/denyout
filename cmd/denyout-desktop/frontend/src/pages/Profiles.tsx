@@ -219,7 +219,8 @@ export function Profiles({
  <h2>Learning</h2>
  <p className="muted">
  {pendingTotal} pending Allow once host{pendingTotal === 1 ? "" : "s"}. Pin adds them to
- the agent allowlist; Discard clears them.
+ the agent allowlist; Discard clears them and keeps them blocked for this agent —
+ including this run if the agent is running.
  </p>
  <div className="row-actions" style={{ marginTop: "0.55rem" }}>
  {list
