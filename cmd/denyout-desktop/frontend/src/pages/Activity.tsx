@@ -234,14 +234,13 @@ export function Activity({
 
  {err && <p className="warn-box">{err}</p>}
  {info && !err ? <p className="muted">{info}</p> : null}
- {snap &&
- !snap.problems_alert &&
- snap.mode !== "safe" &&
- snap.mode !== "agents" &&
- snap.mode !== "session" && (
+ {snap && !snap.problems_alert && snap.mode !== "safe" && (
  <p className="notice-box">
- Everyday browsing is not protected right now. History may be empty or only show My
- agents blocks. Turn on Protect computer from Home when you want that.
+ {snap.mode === "agents"
+ ? "Agents only is on — everyday browsing is not protected like Protect computer. History may show agent blocks. Switch from Home when you want Protect computer."
+ : snap.mode === "session"
+   ? "Session protection is limited. Switch to Protect computer from Home for everyday browsing."
+   : "Everyday browsing is not protected right now. History may be empty or only show My agents blocks. Turn on Protect computer from Home when you want that."}
  </p>
  )}
  {displayRows.length === 0 ? (
