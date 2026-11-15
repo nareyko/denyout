@@ -457,6 +457,10 @@ export function Profiles({
  />{" "}
  Show Ask and block dialogs for this agent
  </label>
+ <p className="muted" style={{ marginTop: 4 }}>
+ When on, prompts appear while you are at the computer. With Stay quiet while away
+ (Settings), they stay quiet while you are away and show in the return summary.
+ </p>
  <label style={{ display: "block", marginTop: 8 }}>
  <input
  type="checkbox"

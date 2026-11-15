@@ -621,6 +621,12 @@ export function Settings({
                 {snap.system_banners === false
                   ? "System banners off (Protect failed can still show). "
                   : ""}
+                {snap.silent_when_open === false
+                  ? "OS can speak while DenyOut is open. "
+                  : ""}
+                {snap.respect_fullscreen === false
+                  ? "Fullscreen respect off. "
+                  : ""}
                 {snap.away ? "Away right now. " : ""}
                 {typeof snap.away_unread === "number" && snap.away_unread > 0
                   ? `${snap.away_unread} quiet while away (summary when you return). `
@@ -761,7 +767,7 @@ export function Settings({
                     .catch((err) => fail(err))
                 }
               >
-                Until tomorrow
+                Until tomorrow morning (8am)
               </button>
               {snap.notify_snooze_active ? (
                 <button

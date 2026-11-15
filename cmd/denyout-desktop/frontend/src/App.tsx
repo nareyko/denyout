@@ -1568,9 +1568,11 @@ export default function App() {
  You are on <strong>{snap.mode_label}</strong>.
  </p>
  <p>
- - When something is blocked: Keep blocked or Allow this site.
- <br />- Open DenyOut (Home) to see if you are protected and what was blocked.
- <br />- If Protect failed, open Problems.
+ - When something is blocked while you are here: Keep blocked or Allow this site in
+ DenyOut.
+ <br />- While you are away, DenyOut stays quiet and shows one summary when you
+ return. Everything is in History.
+ <br />- Open Home to see if you are protected. If Protect failed, open Problems.
  </p>
  </>
  )}

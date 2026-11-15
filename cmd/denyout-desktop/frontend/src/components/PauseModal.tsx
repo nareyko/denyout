@@ -16,7 +16,7 @@ type Props = {
 const CHOICES: { id: string; label: string; hint: string }[] = [
   { id: "15m", label: "15 minutes", hint: "Short break" },
   { id: "1h", label: "1 hour", hint: "Default" },
-  { id: "tomorrow", label: "Until tomorrow", hint: "About 24 hours" },
+  { id: "tomorrow", label: "About 24 hours", hint: "Rolling day — not calendar tomorrow morning" },
   { id: "forever", label: "Until I turn it on", hint: "Stay off" },
 ];
 
