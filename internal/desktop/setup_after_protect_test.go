@@ -54,9 +54,15 @@ func TestYourSetupTextQuietWhileAway(t *testing.T) {
 	if !strings.Contains(on, "Respect fullscreen") {
 		t.Fatalf("want separate fullscreen line: %q", on)
 	}
+	if !strings.Contains(on, "tray-hidden") {
+		t.Fatalf("quiet on should name tray-hidden: %q", on)
+	}
 	off := YourSetupText("safe", false, false, false)
 	if !strings.Contains(off, "Stay quiet while away is off") {
 		t.Fatalf("quiet off: %q", off)
+	}
+	if !strings.Contains(off, "tray-hidden") {
+		t.Fatalf("quiet off should name tray-hidden: %q", off)
 	}
 }
 

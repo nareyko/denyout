@@ -110,6 +110,11 @@ const ADVANCED_FIND_KEYS = [
   "notification",
   "notify",
   "advanced",
+  "tray",
+  "tray-hidden",
+  "tray hidden",
+  "hidden",
+  "window close",
 ];
 
 function findKeysMatch(keys: string[], findQ: string): boolean {
@@ -418,6 +423,9 @@ export function Settings({
           q.includes("system banner") ||
           q.includes("system banners") ||
           (q.includes("banner") && !q.includes("notification")) ||
+          q.includes("tray") ||
+          q.includes("window close") ||
+          q === "hidden" ||
           q === "log" ||
           q.includes("logs") ||
           q.includes("allowlist") ||
@@ -689,7 +697,7 @@ export function Settings({
  Blocks always go to History. The tray shows a count.{" "}
  {snap.quiet_while_away === false
   ? "Stay quiet while away is off — Ask/block dialogs can still appear while locked or idle (about 5 minutes). Soft OS banners still follow How chatty / System banners (Quiet keeps them off except Protect failed and the tray-hidden hint). Fullscreen quiet stays separate (Advanced → Respect fullscreen)."
-  : "With Stay quiet while away on, Ask and block dialogs stay off while locked or idle (about 5 minutes); soft OS banners stay off (Protect failed and tray-hidden on window close can still show). Tray count grows. One summary when you return. Fullscreen quiet stays separate (Advanced → Respect fullscreen)."}{" "}
+              : "With Stay quiet while away on, Ask and block dialogs stay off while locked or idle (about 5 minutes); soft OS banners stay off while away (Protect failed and tray-hidden on window close can still show). Tray count grows. One summary when you return. Fullscreen quiet stays separate (Advanced → Respect fullscreen)."}{" "}
  Ask and Keep blocked / Allow this site stay inside DenyOut.
  </p>
           {(snap.notify_snooze_active ||
@@ -840,7 +848,7 @@ export function Settings({
           <p className="muted" style={{ marginTop: "0.25rem" }}>
             {snap.quiet_while_away === false
               ? "Off: Ask/block dialogs can appear while locked or idle (about 5 minutes). Soft OS banners still follow How chatty / System banners (Quiet keeps them off except Protect failed and tray-hidden). Fullscreen quiet stays separate (Advanced → Respect fullscreen)."
-              : "When on: no Ask or block dialogs while locked or idle (about 5 minutes); soft OS banners stay off (Protect failed and tray-hidden on window close can still show). Tray count grows. One summary when you return. Fullscreen quiet stays separate (Advanced → Respect fullscreen). Live Away / quiet count stay in the notice above when active."}
+              : "When on: no Ask or block dialogs while locked or idle (about 5 minutes); soft OS banners stay off while away (Protect failed and tray-hidden on window close can still show). Tray count grows. One summary when you return. Fullscreen quiet stays separate (Advanced → Respect fullscreen). Live Away / quiet count stay in the notice above when active."}
           </p>
           <div style={{ marginTop: "0.65rem" }}>
             <div style={{ fontWeight: 500, marginBottom: "0.35rem" }}>Snooze</div>

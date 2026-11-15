@@ -302,7 +302,7 @@ func (a *App) trayQuitChoice() string {
 		body = "Quit stops My agents wraps.\n\nCancel keeps DenyOut running."
 		primary = "Stop agents and quit"
 	case mode == ModeComputer && agentsIntent:
-		body = "Quit turns off Agents only and stops My agents wraps.\n\nCancel keeps DenyOut running."
+		body = "Quit turns off Agents only and stops My agents wraps. Everyday browsing was already unprotected.\n\nCancel keeps DenyOut running."
 		primary = "Turn off Agents only and quit"
 	case hasSession && !hasProxyd:
 		body = "Quit turns off Session protection and stops My agents wraps.\n\nCancel keeps DenyOut running."
