@@ -281,7 +281,9 @@ export function Activity({
  {snap?.problems_alert
  ? " Fix Needs attention from Home or Problems first — until then, DenyOut may not be asking about blocks as usual."
  : snap?.mode === "safe" || snap?.mode === "agents" || snap?.mode === "session"
-   ? " When you are at the computer, DenyOut asks Keep blocked / Allow this site in the app. With Stay quiet while away on (default), it stays quiet while you are away and shows one summary when you return."
+   ? snap?.quiet_while_away === false
+     ? " When you are at the computer, DenyOut asks Keep blocked / Allow this site in the app. Stay quiet while away is off — Ask and block dialogs can still appear while locked or idle."
+     : " When you are at the computer, DenyOut asks Keep blocked / Allow this site in the app. With Stay quiet while away on, it stays quiet while you are away and shows one summary when you return."
    : (snap?.policy_profile || "").toLowerCase() === "agent"
      ? " Last mode was Agents only. Turn it on from Home (or run My agents) to start recording blocks here."
      : " Turn on Protect computer (or run My agents) to start recording blocks here."}

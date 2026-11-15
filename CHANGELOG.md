@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Uninstall:** always stop/remove Linux `denyout-hostguard.service` (helper-serve). Previously, if the helper was up, teardown could leave the unit running after binaries were deleted.
+
 ## 0.4.0 - Quiet while away + honest desktop (2026-11-15)
 
 ### Added

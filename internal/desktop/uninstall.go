@@ -30,12 +30,23 @@ func Uninstall(opts UninstallOptions) error {
 	var tearErr error
 	if opts.SkipElevate || os.Getenv("DENYOUT_UNINSTALL_NO_ELEVATE") == "1" {
 		tearErr = hostguard.Teardown(hostguard.Spec{ProxyPort: 0, UID: uid})
+		_ = hostguard.UninstallHelper() // no-op unless already root
 	} else {
 		tearErr = hostguard.ElevateTeardown(0, uid)
 	}
 	if tearErr != nil {
 		fmt.Fprintf(os.Stderr, "denyout uninstall: warning: elevated teardown: %v\n", tearErr)
 		fmt.Fprintln(os.Stderr, "  (continue with user-space cleanup; re-run with sudo/pkexec if rules/CA remain)")
+	}
+	// Belt-and-suspenders: helper teardown should remove the unit, but if
+	// ElevateTeardown used a live helper that only tore down rules/CA, or pkexec
+	// was cancelled mid-way, stop/disable denyout-hostguard.service explicitly.
+	fmt.Fprintln(os.Stderr, "denyout uninstall: removing hostguard helper unit (if any)...")
+	if opts.SkipElevate || os.Getenv("DENYOUT_UNINSTALL_NO_ELEVATE") == "1" {
+		_ = hostguard.UninstallHelper()
+	} else if err := hostguard.ElevateUninstallHelper(); err != nil {
+		fmt.Fprintf(os.Stderr, "denyout uninstall: warning: helper unit: %v\n", err)
+		fmt.Fprintln(os.Stderr, "  (if denyout-hostguard.service is still active: sudo systemctl disable --now denyout-hostguard.service)")
 	}
 
 	fmt.Fprintln(os.Stderr, "denyout uninstall: removing browser NSS CA (if any)...")
@@ -158,6 +169,8 @@ func printUninstallVerification(keepConfig bool) {
 		check(os.IsNotExist(err), "no system CA crt")
 		_, err = os.Stat(hostguard.LinuxSystemCAHashLink)
 		check(os.IsNotExist(err), "no /etc/ssl/certs/denyout-desktop.pem")
+		_, err = os.Stat("/etc/systemd/system/denyout-hostguard.service")
+		check(os.IsNotExist(err), "no denyout-hostguard.service unit")
 	}
 	if !keepConfig {
 		cfg := filepath.Dir(StatePath())

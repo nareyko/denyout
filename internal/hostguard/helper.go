@@ -21,6 +21,12 @@ func HelperRemove(proxyPort int, uid int) error {
 }
 
 // HelperTeardown asks the helper to remove rules + system CA.
+// On Linux the helper also uninstalls its own systemd unit after a successful teardown.
 func HelperTeardown(proxyPort int, uid int) error {
 	return helperCall("teardown", proxyPort, "", uid)
+}
+
+// HelperUninstallHelper asks the running helper to stop/remove its systemd unit.
+func HelperUninstallHelper() error {
+	return helperCall("uninstall-helper", 0, "", 0)
 }

@@ -47,6 +47,7 @@ func ElevateRemove(proxyPort int, uid int) error {
 }
 
 // ElevateTeardown re-executes hostctl teardown (redirect Remove + system CA uninstall).
+// Prefer the helper when available; helper teardown also removes the helper unit.
 func ElevateTeardown(proxyPort int, uid int) error {
 	if err := HelperTeardown(proxyPort, uid); err == nil {
 		return nil
@@ -60,6 +61,31 @@ func ElevateTeardown(proxyPort int, uid int) error {
 		"--uid", strconv.Itoa(uid),
 		"--no-elevate",
 	}
+	return elevate(exe, args)
+}
+
+// ElevateUninstallHelper stops/removes denyout-hostguard.service (Linux).
+// Used as a belt-and-suspenders step after uninstall teardown.
+func ElevateUninstallHelper() error {
+	if runtime.GOOS != "linux" {
+		return UninstallHelper()
+	}
+	if _, err := os.Stat("/etc/systemd/system/denyout-hostguard.service"); os.IsNotExist(err) {
+		// Unit already gone — best-effort socket/state cleanup if root.
+		_ = UninstallHelper()
+		return nil
+	}
+	if err := HelperUninstallHelper(); err == nil {
+		return nil
+	}
+	if os.Geteuid() == 0 {
+		return UninstallHelper()
+	}
+	exe, err := SelfExe()
+	if err != nil {
+		return err
+	}
+	args := []string{"hostctl", "helper-uninstall", "--no-elevate"}
 	return elevate(exe, args)
 }
 
