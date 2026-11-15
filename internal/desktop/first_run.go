@@ -201,7 +201,7 @@ func YourSetupText(mode string, autostart bool, unhealthy bool, quietWhileAway b
 	} else {
 		blockBullet += "- Stay quiet while away is off — Ask/block dialogs can still appear while locked or idle (about 5 minutes). Soft OS banners still follow How chatty (Quiet keeps them off except Protect failed and the tray-hidden hint). Everything is in History.\n"
 	}
-	blockBullet += "- Respect fullscreen (Settings → Advanced) separately avoids dialogs while a fullscreen app is in front.\n"
+	blockBullet += "- Respect fullscreen (Settings → Advanced) separately avoids Ask/block dialogs and soft OS banners while a fullscreen app is in front (Protect failed and tray-hidden on window close can still show).\n"
 	body := status + "\n\n" +
 		blockBullet +
 		homeBullet +

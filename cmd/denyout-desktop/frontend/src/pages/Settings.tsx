@@ -847,7 +847,7 @@ export function Settings({
           </label>
           <p className="muted" style={{ marginTop: "0.25rem" }}>
             {snap.quiet_while_away === false
-              ? "Off: Ask/block dialogs can appear while locked or idle (about 5 minutes). Soft OS banners still follow How chatty / System banners (Quiet keeps them off except Protect failed and tray-hidden). Fullscreen quiet stays separate (Advanced → Respect fullscreen)."
+              ? "Off: Ask/block dialogs can appear while locked or idle (about 5 minutes). Soft OS banners still follow How chatty / System banners (Quiet keeps them off except Protect failed and the tray-hidden hint). Fullscreen quiet stays separate (Advanced → Respect fullscreen)."
               : "When on: no Ask or block dialogs while locked or idle (about 5 minutes); soft OS banners stay off while away (Protect failed and tray-hidden on window close can still show). Tray count grows. One summary when you return. Fullscreen quiet stays separate (Advanced → Respect fullscreen). Live Away / quiet count stay in the notice above when active."}
           </p>
           <div style={{ marginTop: "0.65rem" }}>
@@ -931,7 +931,8 @@ export function Settings({
             Sound only when you must answer
           </label>
           <p className="muted" style={{ marginTop: "0.25rem" }}>
-            Passive OS banners stay silent. Protect failed may still sound.
+            Soft OS banners (Open / Undo / resumed / tray-hidden) stay silent. Protect failed
+            may still sound.
           </p>
             <label style={{ display: "block", marginTop: "0.5rem" }}>
               Protect block timeout (seconds){" "}
@@ -1319,7 +1320,8 @@ export function Settings({
  <h2>System banners</h2>
  <p className="muted">
  How DenyOut may talk through the operating system. Decisions stay inside DenyOut.
- The OS may show Open DenyOut, Undo, Protect/Agents resumed, or Protect failed.
+ The OS may show Open DenyOut, Undo, Protect/Agents resumed, Protect failed, or the
+ tray-hidden hint (window close).
  </p>
  <label style={{ display: "block" }}>
  <input
@@ -1363,7 +1365,8 @@ export function Settings({
  <p className="muted" style={{ marginTop: "0.25rem" }}>
  Detailed adds the auto-resume OS banner (Protect computer or Agents only). A bit more
  skips that banner. Quiet still limits to Protect failed (and the tray-hidden hint when
- you close the window). Soft Open (~12s) needs A bit more or Detailed.
+ you close the window). Soft Open (~12s) needs Allow system banners on plus A bit more
+ or Detailed.
  </p>
  <label style={{ display: "block", marginTop: "0.65rem" }}>
  <input
@@ -1380,7 +1383,9 @@ export function Settings({
  </label>
  <p className="muted" style={{ marginTop: "0.25rem" }}>
  Avoid Ask/block dialogs, soft OS banners, and steal-focus while a fullscreen app is in front.
- Quiet items still add to the tray/chrome count; when fullscreen ends (or you return from Away), a summary is ready to review or clear under Notifications.
+ Soft banners stay off in fullscreen (Protect failed and tray-hidden on window close can
+ still show). Quiet items still add to the tray/chrome count; when fullscreen ends (or
+ you return from Away), a summary is ready to review or clear under Notifications.
  </p>
  <label style={{ display: "block", marginTop: "0.5rem" }}>
  <input
@@ -1396,8 +1401,9 @@ export function Settings({
  If DenyOut is focused, stay silent in the system
  </label>
  <p className="muted" style={{ marginTop: "0.25rem" }}>
- Soft OS banners stay off while DenyOut is in front (focused and visible). An open
- but background window does not count as focused.
+ Soft OS banners stay off while DenyOut is in front (focused and visible). Protect failed
+ and tray-hidden on window close can still show. An open but background window does not
+ count as focused.
  </p>
  <p className="muted" style={{ marginTop: "0.65rem" }}>
  <strong style={{ fontWeight: 500, color: "inherit" }}>

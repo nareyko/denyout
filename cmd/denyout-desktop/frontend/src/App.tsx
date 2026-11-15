@@ -525,15 +525,19 @@ export default function App() {
  ? `${modeStatusText} · Threat lists need a refresh`
  : "Threat lists need a refresh"
  : modeStatusText;
+ // Match pill + tray: Needs attention drops snooze/quiet extras.
+ const statusExtras = snap?.problems_alert ? "" : `${snoozeSuffix}${unreadSuffix}`;
  const statusText = statusTextBase
- ? `${statusTextBase}${snoozeSuffix}${unreadSuffix}`
- : unreadAway
-   ? unreadAway === 1
-     ? `1 quiet${snoozeSuffix}`
-     : `${unreadAway} quiet${snoozeSuffix}`
-   : snoozeSuffix
-     ? "Snoozed"
-     : "";
+ ? `${statusTextBase}${statusExtras}`
+ : snap?.problems_alert
+   ? ""
+   : unreadAway
+     ? unreadAway === 1
+       ? `1 quiet${snoozeSuffix}`
+       : `${unreadAway} quiet${snoozeSuffix}`
+     : snoozeSuffix
+       ? "Snoozed"
+       : "";
  const pillLabelBase = !snap
  ? "Setup pending"
  : snap.problems_alert
@@ -1665,7 +1669,7 @@ export default function App() {
   ? "- Stay quiet while away is off — Ask/block dialogs can still appear while locked or idle (about 5 minutes). Soft OS banners still follow How chatty (Quiet keeps them off except Protect failed and the tray-hidden hint). Everything is in History."
   : "- Stay quiet while away is on: Ask and block dialogs stay off while locked or idle (about 5 minutes); soft OS banners stay off while away (Protect failed and tray-hidden on window close can still show). One summary when you return. Everything is in History."}
 
- <br />- Respect fullscreen (Settings → Advanced) separately avoids dialogs while a fullscreen app is in front.
+ <br />- Respect fullscreen (Settings → Advanced) separately avoids Ask/block dialogs and soft OS banners while a fullscreen app is in front (Protect failed and tray-hidden on window close can still show).
  <br />- Open Home to see if you are protected. If Protect failed, open Problems.
  </p>
  </>
