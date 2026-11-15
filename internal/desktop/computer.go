@@ -47,12 +47,17 @@ func (a *App) startComputer() error {
 	uid, _ := hostguard.CurrentUID()
 	if err := hostguard.ElevateApply(port, caPath, uid); err != nil {
 		a.setStatus("Needs admin")
-		a.mu.Lock()
-		a.state.ComputerAvailable = false
-		st := a.state
-		a.mu.Unlock()
-		_ = SaveState(st)
-		RecordError("hostguard.ElevateApply", err.Error())
+		// Test/CI elevate skip is not a user password cancel — do not sticky Off (unavailable).
+		if !hostguard.IsElevateDisabled(err) {
+			a.mu.Lock()
+			a.state.ComputerAvailable = false
+			st := a.state
+			a.mu.Unlock()
+			_ = SaveState(st)
+			RecordError("hostguard.ElevateApply", err.Error())
+		} else {
+			AppendDesktopLog("INFO ElevateApply skipped (test/CI): %v", err)
+		}
 		return err
 	}
 	// Chrome/Electron use NSS, not only the system trust store.
@@ -369,13 +374,17 @@ func (a *App) enableComputerFromTray() error {
 		fmt.Fprintf(os.Stderr, "denyout desktop: %v\n", err)
 		a.setStatus("Needs admin")
 		a.mu.Lock()
-		a.state.ComputerAvailable = false
+		if !hostguard.IsElevateDisabled(err) {
+			a.state.ComputerAvailable = false
+		}
 		a.state.ProtectionOn = false
 		a.state.Scope = ScopeOff
 		stFail := a.state
 		a.mu.Unlock()
 		_ = SaveState(stFail)
-		notify.Emit(notify.KindProtectFailed, "DenyOut", "A password window should have appeared. If you cancelled it, protection stayed Off. Open DenyOut -> Problems, or try Protect computer again.")
+		if !hostguard.IsElevateDisabled(err) {
+			notify.Emit(notify.KindProtectFailed, "DenyOut", "A password window should have appeared. If you cancelled it, protection stayed Off. Open DenyOut -> Problems, or try Protect computer again.")
+		}
 		return err
 	}
 	a.clearProtectPause()
@@ -624,14 +633,20 @@ func (a *App) restoreProtection() {
 	}
 	if err := a.startComputer(); err != nil {
 		fmt.Fprintf(os.Stderr, "denyout desktop: restore computer failed: %v - staying Off\n", err)
-		RecordError("restore.computer", err.Error())
 		a.mu.Lock()
-		a.state.ComputerAvailable = false
 		a.state.ProtectionOn = false
 		a.state.Scope = ScopeOff
+		if !hostguard.IsElevateDisabled(err) {
+			a.state.ComputerAvailable = false
+			RecordError("restore.computer", err.Error())
+		} else {
+			AppendDesktopLog("INFO restore ElevateApply skipped (test/CI): %v", err)
+		}
 		st := a.state
 		a.mu.Unlock()
 		_ = SaveState(st)
-		notify.Emit(notify.KindProtectFailed, "DenyOut", "A password window should have appeared. If you cancelled it, protection stayed Off. Try Protect computer again from Open DenyOut or the tray.")
+		if !hostguard.IsElevateDisabled(err) {
+			notify.Emit(notify.KindProtectFailed, "DenyOut", "A password window should have appeared. If you cancelled it, protection stayed Off. Try Protect computer again from Open DenyOut or the tray.")
+		}
 	}
 }

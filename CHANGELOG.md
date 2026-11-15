@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **Test/CI elevate skip** (`DENYOUT_TEST_NO_ELEVATE` / `GITHUB_ACTIONS`) no longer sticky **Off (unavailable)** or claim a password window appeared — that path never shows pkexec.
+
 ## 0.4.2 - Quit unload, in-app Undo, quiet phrase (2026-11-15)
 
 ### Added
