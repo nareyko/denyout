@@ -37,6 +37,11 @@ jobs:
           set -euo pipefail
           chmod +x scripts/m3-false-deny.sh
           DENYOUT_BIN=./bin/denyout-cli ./scripts/m3-false-deny.sh
+      - name: Closed-loop release smoke (TUN stubs, no elevate)
+        run: |
+          set -euo pipefail
+          chmod +x scripts/closed-loop-release-smoke.sh
+          DENYOUT_BIN=./bin/denyout-cli ./scripts/closed-loop-release-smoke.sh
       - name: govulncheck
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 

@@ -2,11 +2,18 @@
 # Verify a DenyOut release tree in a closed loop (no ~/.local, no Protect elevate).
 # Usage:
 #   scripts/closed-loop-release-smoke.sh /tmp/denyout-v048-XXXX
+#   DENYOUT_BIN=./bin/denyout-cli scripts/closed-loop-release-smoke.sh
 #   scripts/closed-loop-release-smoke.sh   # builds ./bin/denyout-cli from this repo
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 DIR="${1:-}"
-if [ -n "$DIR" ]; then
+if [ -n "${DENYOUT_BIN:-}" ]; then
+  CLI="$DENYOUT_BIN"
+  if [ ! -x "$CLI" ]; then
+    echo "closed-loop-release-smoke: DENYOUT_BIN not executable: $CLI" >&2
+    exit 2
+  fi
+elif [ -n "$DIR" ]; then
   CLI=$(find "$DIR" -type f -name denyout-cli | head -n 1)
   if [ -z "$CLI" ] || [ ! -x "$CLI" ]; then
     echo "closed-loop-release-smoke: no denyout-cli under $DIR" >&2
@@ -23,8 +30,14 @@ echo "== version =="
 
 echo "== tun stubs (must stay disabled) =="
 "$CLI" hostctl tun-stats | grep -E 'present=false|source=tun'
-"$CLI" hostctl tun-start | grep 'enabled=false'
-"$CLI" hostctl tun-stop | grep 'enabled=false'
+start_out=$("$CLI" hostctl tun-start)
+echo "$start_out" | grep 'enabled=false'
+stop_out=$("$CLI" hostctl tun-stop)
+echo "$stop_out" | grep 'enabled=false'
+# 0.4.9+: reason= is required on local/CI builds; older release trees may omit it.
+if echo "$start_out" | grep -q 'reason='; then
+  echo "$start_out" | grep -E 'reason=(flag_off|stub_no_device)'
+fi
 
 echo "== render --tun (T0 + T1 preview, not applied) =="
 "$CLI" hostctl render --port 18080 --uid 1000 --tun | grep -E 'denyout-block-quic|denyout-tun-quic|T1 TUN'
