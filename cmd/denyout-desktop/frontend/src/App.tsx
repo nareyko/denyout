@@ -615,7 +615,7 @@ export default function App() {
  {
  label: "Notifications",
  route: "settings",
- hint: "Quiet, Stay quiet, snooze, timeouts",
+ hint: "Quiet, Stay quiet, snooze, sound, overnight, timeouts",
  settingsTab: "basic",
  focus: "notifications",
  },
@@ -1666,7 +1666,7 @@ export default function App() {
  DenyOut.
  <br />
  {snap.quiet_while_away === false
-  ? "- Stay quiet while away is off — Ask/block dialogs can still appear while locked or idle (about 5 minutes). Soft OS banners still follow How chatty (Quiet keeps them off except Protect failed and the tray-hidden hint). Everything is in History."
+  ? "- Stay quiet while away is off — Ask/block dialogs can still appear while locked or idle (about 5 minutes). Soft OS banners still follow How chatty / System banners (Quiet keeps them off except Protect failed and the tray-hidden hint). Everything is in History."
   : "- Stay quiet while away is on: Ask and block dialogs stay off while locked or idle (about 5 minutes); soft OS banners stay off while away (Protect failed and tray-hidden on window close can still show). One summary when you return. Everything is in History."}
 
  <br />- Respect fullscreen (Settings → Advanced) separately avoids Ask/block dialogs and soft OS banners while a fullscreen app is in front (Protect failed and tray-hidden on window close can still show).

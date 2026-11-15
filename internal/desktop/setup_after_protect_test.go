@@ -67,6 +67,9 @@ func TestYourSetupTextQuietWhileAway(t *testing.T) {
 	if !strings.Contains(off, "tray-hidden") {
 		t.Fatalf("quiet off should name tray-hidden: %q", off)
 	}
+	if !strings.Contains(off, "System banners") {
+		t.Fatalf("quiet off should name System banners: %q", off)
+	}
 }
 
 func TestPendingYourSetupModeAgentsOnly(t *testing.T) {

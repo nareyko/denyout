@@ -210,8 +210,12 @@ export function Home({
  (typeof snap?.away_unread === "number" && snap.away_unread > 0) ||
  snap?.system_banners === false) && (
  <p className="notice-box" style={{ marginTop: "0.35rem" }}>
- {snap?.notify_snooze_active ? "Notifications snoozed. " : ""}
- {snap?.away ? "Away — quiet for now. " : ""}
+ {snap?.notify_snooze_active
+ ? "Notifications snoozed (Protect failed and tray-hidden on window close can still show). "
+ : ""}
+ {snap?.away
+ ? "Away — soft banners and Ask/block dialogs quiet for now (Protect failed and tray-hidden on window close can still show). "
+ : ""}
  {typeof snap?.away_unread === "number" && snap.away_unread > 0
  ? `${snap.away_unread} quiet. `
  : ""}

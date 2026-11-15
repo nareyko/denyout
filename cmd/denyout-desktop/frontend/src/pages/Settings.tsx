@@ -115,6 +115,13 @@ const ADVANCED_FIND_KEYS = [
   "tray hidden",
   "hidden",
   "window close",
+  "soft",
+  "soft open",
+  "open denyout",
+  "resumed",
+  "auto-resume",
+  "protect resumed",
+  "agents resumed",
 ];
 
 function findKeysMatch(keys: string[], findQ: string): boolean {
@@ -418,14 +425,22 @@ export function Settings({
         if (q === "advanced" || q.includes("advanced")) {
           setTab("advanced");
         } else if (
-          /\basks?\b/.test(q) ||
-          q.includes("resume") ||
+          q.includes("resumed") ||
+          q.includes("auto-resume") ||
+          q.includes("soft open") ||
+          (q.includes("soft") && q.includes("open")) ||
+          q.includes("open denyout") ||
           q.includes("system banner") ||
           q.includes("system banners") ||
           (q.includes("banner") && !q.includes("notification")) ||
           q.includes("tray") ||
           q.includes("window close") ||
           q === "hidden" ||
+          /\basks?\b/.test(q) ||
+          q.includes("resume ask") ||
+          (q.includes("resume") &&
+            !q.includes("resumed") &&
+            !q.includes("auto-resume")) ||
           q === "log" ||
           q.includes("logs") ||
           q.includes("allowlist") ||
@@ -716,7 +731,7 @@ export function Settings({
                       snap.notify_snooze_until
                         ? ` until ${new Date(snap.notify_snooze_until).toLocaleString()}`
                         : ""
-                    }. `
+                    } (Protect failed and tray-hidden on window close can still show). `
                   : ""}
                 {snap.system_banners === false
                   ? "System banners off (Protect failed and tray-hidden on window close can still show) — change under Advanced → System banners. "
@@ -729,9 +744,13 @@ export function Settings({
                   : ""}
                 {snap.quiet_overnight === false ? "Night quiet sound off. " : ""}
                 {snap.sound_only_answer === false
-                  ? "Sound may play for soft OS banners (Undo / Open / Protect or Agents resumed). "
+                  ? "Sound may play for soft OS banners (Undo / Open / Protect or Agents resumed / tray-hidden) and Protect failed. "
                   : ""}
-                {snap.away ? "Away right now. " : ""}
+                {snap.notify_snooze_active
+                  ? ""
+                  : snap.away
+                    ? "Away right now (Protect failed and tray-hidden on window close can still show). "
+                    : ""}
                 {typeof snap.away_unread === "number" && snap.away_unread > 0
                   ? `${snap.away_unread} quiet. `
                   : ""}
@@ -1313,6 +1332,13 @@ export function Settings({
  "silent",
  "system banners",
  "level",
+ "soft",
+ "soft open",
+ "open denyout",
+ "resumed",
+ "auto-resume",
+ "protect resumed",
+ "agents resumed",
  ],
  "system-banners",
  ) && (
@@ -1366,7 +1392,8 @@ export function Settings({
  Detailed adds the auto-resume OS banner (Protect computer or Agents only). A bit more
  skips that banner. Quiet still limits to Protect failed (and the tray-hidden hint when
  you close the window). Soft Open (~12s) needs Allow system banners on plus A bit more
- or Detailed.
+ or Detailed — and skips while snoozed, while DenyOut is focused, or while fullscreen
+ quiet is active.
  </p>
  <label style={{ display: "block", marginTop: "0.65rem" }}>
  <input
@@ -1413,8 +1440,9 @@ export function Settings({
  Undo / Protect or Agents resumed / Protect failed / tray-hidden.
  </p>
  <p className="muted" style={{ marginTop: "0.35rem" }}>
- How long banners live: Protect failed stays · soft Open ~12s (A bit more+) ·
- Protect/Agents resumed ~5s (Detailed) · Undo ~10s · tray-hidden ~8s.
+ How long banners live: Protect failed stays · soft Open ~12s (banners on + A bit
+ more+; not while snoozed/focused/fullscreen quiet) · Protect/Agents resumed ~5s
+ (Detailed) · Undo ~10s · tray-hidden ~8s.
  </p>
  </section>
  )}
@@ -2050,7 +2078,7 @@ export function Settings({
  </section>
  )}
 
-        {showSection(["ask", "resume"], "asks") && (
+        {showSection(["ask", "asks", "pause ask", "resume ask"], "asks") && (
           <section className="card" id="settings-asks">
             <h2>Asks</h2>
             <p className="muted">
