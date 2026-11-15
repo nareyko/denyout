@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- **Google browser API keys:** `AIza...` in query on first-party Google hosts (`*.google.com`, `*.googleapis.com`, `*.gstatic.com`, ...) no longer trips `secret_in_url`. Same key on a non-Google host still denies.
+
 ## 0.4.6 - Block browser QUIC + diagnostics (2026-11-15)
 
 ### Added
