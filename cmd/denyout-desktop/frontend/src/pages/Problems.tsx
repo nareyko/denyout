@@ -100,9 +100,13 @@ export function Problems({
           ? "Protect is on; threat lists need attention."
           : "Everything looks fine."
     : pausedUntil
-      ? "Protection is paused."
+      ? intentAgents
+        ? "Agents only is paused."
+        : "Protection is paused."
       : foreverOff
-        ? "Protection is off until you turn it on."
+        ? intentAgents
+          ? "Agents only is off until you turn it on."
+          : "Protection is off until you turn it on."
         : p.computer_available === false
           ? agentsRunning > 0
             ? "Protection is off (unavailable) — My agents still running."
@@ -112,6 +116,7 @@ export function Problems({
             : p.threat_lists_warn
               ? "Threat lists need a refresh."
               : "Protection is off — that is OK.";
+  const pauseNoun = intentAgents ? "Agents only" : "Protect";
   let support = p.protection_on
     ? agentsOnly
       ? "Whole-PC allowlist mode. Everyday browsing is not covered — turn on Protect computer from Home for that."
@@ -121,9 +126,9 @@ export function Problems({
           ? "Protect is running; threat lists need a refresh (below)."
           : "Protect is running. Open History if something was blocked."
     : pausedUntil
-      ? "Protect stays off for now. Turn on anytime, or change how long."
+      ? `${pauseNoun} stays off for now. Turn on anytime, or change how long.`
       : foreverOff
-        ? "You chose to leave Protect off. Turn on anytime from here or Home."
+        ? `You chose to leave ${pauseNoun} off. Turn on anytime from here or Home.`
         : p.computer_available === false
           ? agentsRunning > 0
             ? "Protect computer was unavailable last time (password cancelled or setup failed). My agents are still running — try Protect again when ready."

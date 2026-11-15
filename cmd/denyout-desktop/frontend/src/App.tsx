@@ -469,6 +469,8 @@ export default function App() {
  !snap?.protection_on &&
  (snap?.mode === "off" || !snap?.mode) &&
  (snap?.protect_pause_last || "") === "forever";
+ const intentAgents = (snap?.policy_profile || "").toLowerCase() === "agent";
+ const pauseNoun = intentAgents ? "Agents only" : "Protect";
  const agentsOnlyOff =
  !snap?.problems_alert &&
  !snap?.protection_on &&
@@ -493,10 +495,12 @@ export default function App() {
        ? "Session"
        : pausedUntil
          ? pausedUntilShort
-           ? `Paused until ${pausedUntilShort}`
-           : "Paused"
+           ? `${pauseNoun} paused until ${pausedUntilShort}`
+           : `${pauseNoun} paused`
          : foreverOff
-           ? "Off until you turn it on"
+           ? intentAgents
+             ? "Agents only off until you turn it on"
+             : "Off until you turn it on"
            : unavailableOff
              ? (snap?.agents_running || 0) > 0
                ? "Off (unavailable) · agents running"
@@ -538,10 +542,12 @@ export default function App() {
          ? "Setup pending"
          : pausedUntil
            ? pausedUntilShort
-             ? `Paused until ${pausedUntilShort}`
-             : "Paused"
+             ? `${pauseNoun} paused until ${pausedUntilShort}`
+             : `${pauseNoun} paused`
            : foreverOff
-             ? "Off until you turn it on"
+             ? intentAgents
+               ? "Agents only off until you turn it on"
+               : "Off until you turn it on"
              : unavailableOff
                ? (snap.agents_running || 0) > 0
                  ? "Off (unavailable) · agents running"
