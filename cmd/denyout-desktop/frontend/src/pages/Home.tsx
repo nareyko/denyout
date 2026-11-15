@@ -15,6 +15,7 @@ export function Home({
  onOpenThreatSettings,
  onOpenAgents,
  onOpenSettingsDiagnostics,
+ onOpenSystemBanners,
  onBeforeProtect,
 }: {
  snap: UISnapshot | null;
@@ -30,6 +31,8 @@ export function Home({
  onOpenThreatSettings?: () => void;
  onOpenAgents?: () => void;
  onOpenSettingsDiagnostics?: () => void;
+ /** Advanced → System banners (master + fullscreen / silent). */
+ onOpenSystemBanners?: () => void;
 }) {
  const [msg, setMsg] = useState("");
  const [err, setErr] = useState("");
@@ -210,12 +213,30 @@ export function Home({
  {snap?.notify_snooze_active ? "Notifications snoozed. " : ""}
  {snap?.away ? "Away — quiet for now. " : ""}
  {typeof snap?.away_unread === "number" && snap.away_unread > 0
- ? `${snap.away_unread} quiet while away. `
+ ? `${snap.away_unread} quiet (locked, idle, or fullscreen). `
  : ""}
  {snap?.system_banners === false
  ? "System banners off (Protect failed can still show). "
  : ""}
- Open Settings → Notifications to change.
+ {(snap?.notify_snooze_active ||
+ snap?.away ||
+ (typeof snap?.away_unread === "number" && snap.away_unread > 0)) && (
+ <>
+ <button type="button" className="linkish" onClick={() => onOpenSettings?.()}>
+ Open Settings → Notifications
+ </button>
+ {snap?.system_banners === false ? " · " : ""}
+ </>
+ )}
+ {snap?.system_banners === false ? (
+ <button
+ type="button"
+ className="linkish"
+ onClick={() => (onOpenSystemBanners || onOpenSettings)?.()}
+ >
+ Open Settings → Advanced → System banners
+ </button>
+ ) : null}
  </p>
  )}
  <div className="row-actions">
@@ -389,7 +410,9 @@ export function Home({
  <h2>Nothing blocked yet - that is OK.</h2>
  <p className="muted">
  {protectedOn || agentsOnly || sessionOn
- ? "When DenyOut blocks something while you are here, you get an in-app Keep blocked / Allow this site prompt — and it shows up in History. While you are away (if Stay quiet while away is on), it stays quiet and shows one summary when you return."
+ ? snap?.quiet_while_away === false
+   ? "When DenyOut blocks something while you are here, you get an in-app Keep blocked / Allow this site prompt — and it shows up in History. Stay quiet while away is off — Ask and block dialogs can still appear while locked or idle."
+   : "When DenyOut blocks something while you are here, you get an in-app Keep blocked / Allow this site prompt — and it shows up in History. With Stay quiet while away on, locked, idle (~5 min), or respected fullscreen stays quiet and shows one summary when you return."
  : intentAgents
    ? "Last mode was Agents only. Turn it on again from here (or run My agents) to start recording blocks. Everyday browsing stays unprotected until you switch to Protect computer."
    : "Turn on Protect computer (or run My agents) to start recording blocks here. Everyday browsing stays unprotected until then."}

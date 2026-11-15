@@ -279,7 +279,7 @@ func (a *App) GetUISnapshot() UISnapshot {
 		AskPaused:          a.state.AskPaused() || (a.asks != nil && a.asks.Paused()),
 		AskPausedUntil:     strings.TrimSpace(a.state.AskPausedUntil),
 		ProblemsAlert:      problemsUnhealthyLocked(a),
-		YourSetupText:      YourSetupText(pendingYourSetupModeLocked(a, mode), a.state.Autostart, problemsUnhealthyLocked(a)),
+		YourSetupText:      YourSetupText(pendingYourSetupModeLocked(a, mode), a.state.Autostart, problemsUnhealthyLocked(a), !a.state.QuietWhileAwayOff),
 		ChecklistDone:      tipDismissedLocked(a, "checklist"),
 		NeedsUXv2Migration: a.state.NeedsUXv2Migration(),
 		ComputerAvailable:  a.state.ComputerAvailable,

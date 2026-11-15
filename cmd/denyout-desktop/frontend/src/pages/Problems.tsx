@@ -289,6 +289,11 @@ export function Problems({
             >
               Pause / turn off…
             </button>
+            {p.threat_lists_warn && onOpenThreatSettings ? (
+              <button className="btn" onClick={() => onOpenThreatSettings()}>
+                Open Threat lists
+              </button>
+            ) : null}
           </div>
         ) : (
           <div className="row-actions">

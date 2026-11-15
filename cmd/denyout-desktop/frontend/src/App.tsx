@@ -1080,6 +1080,13 @@ export default function App() {
  setSettingsFocusNonce((n) => n + 1);
  setRoute("settings");
  }}
+ onOpenSystemBanners={() => {
+ setDeferOnboarding(true);
+ setSettingsTab("advanced");
+ setSettingsFocus("system-banners");
+ setSettingsFocusNonce((n) => n + 1);
+ setRoute("settings");
+ }}
  onOpenAgents={() => {
  setDeferOnboarding(true);
  setRoute("profiles");

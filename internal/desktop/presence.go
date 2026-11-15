@@ -113,12 +113,18 @@ func (a *App) syncAwayNotify() {
 		return
 	}
 	// Away → Present: arm return digest if something waited.
-	if a.awayUnreadCount() > 0 {
-		a.presence.mu.Lock()
-		a.presence.digestPending = true
-		a.presence.mu.Unlock()
-		a.maybeSoftOpenReturn()
+	a.armQuietReturnDigest()
+}
+
+// armQuietReturnDigest marks a return summary when quiet items waited (Away or fullscreen).
+func (a *App) armQuietReturnDigest() {
+	if a.awayUnreadCount() <= 0 {
+		return
 	}
+	a.presence.mu.Lock()
+	a.presence.digestPending = true
+	a.presence.mu.Unlock()
+	a.maybeSoftOpenReturn()
 }
 
 func (a *App) maybeSoftOpenReturn() {
@@ -228,9 +234,14 @@ func (a *App) pollPresenceOnce() {
 }
 
 // pollFullscreenOnce updates notify.Fullscreen when a detector is available.
+// Leaving fullscreen with quiet unread arms the same return digest as Away→Present.
 func (a *App) pollFullscreenOnce() {
 	if fs, ok := probeFullscreen(); ok {
+		was := notify.Fullscreen()
 		notify.SetFullscreen(fs)
+		if was && !fs {
+			a.armQuietReturnDigest()
+		}
 	}
 }
 

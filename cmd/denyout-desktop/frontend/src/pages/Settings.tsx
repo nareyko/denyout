@@ -488,6 +488,32 @@ export function Settings({
  </button>
  </p>
  ) : findQ &&
+   tab === "basic" &&
+   findHitsBasic &&
+   findHitsAdvanced &&
+   (findQ.includes("notification") ||
+     findQ.includes("notify") ||
+     findQ.includes("toast") ||
+     findQ === "banner" ||
+     findQ.includes("banners")) ? (
+ <p className="muted">
+ Also under Advanced → System banners.{" "}
+ <button
+ type="button"
+ className="linkish"
+ onClick={() => {
+ setTab("advanced");
+ window.setTimeout(() => {
+ document
+ .getElementById("settings-system-banners")
+ ?.scrollIntoView({ behavior: "smooth", block: "start" });
+ }, 50);
+ }}
+ >
+ Open System banners
+ </button>
+ </p>
+ ) : findQ &&
    (findQ.includes("wrap") || findQ === "agent" || findQ === "agents") &&
    tab === "advanced" &&
    findHitsAdvanced ? (
@@ -655,8 +681,8 @@ export function Settings({
  <p className="muted">
  Blocks always go to History. The tray shows a count.{" "}
  {snap.quiet_while_away === false
-  ? "Stay quiet while away is off — Ask and block dialogs can still appear while locked or idle."
-  : "With Stay quiet while away on, DenyOut shows one summary when you return."}{" "}
+  ? "Stay quiet while away is off — Ask and block dialogs can still appear while locked or idle (about 5 minutes)."
+  : "With Stay quiet while away on, Ask and block dialogs stay off while locked or idle (about 5 minutes); soft OS banners stay off (Protect failed can still show). Tray count grows. One summary when you return."}{" "}
  Ask and Keep blocked / Allow this site stay inside DenyOut.
  </p>
           {(snap.notify_snooze_active ||
@@ -678,13 +704,13 @@ export function Settings({
                     }. `
                   : ""}
                 {snap.system_banners === false
-                  ? "System banners off (Protect failed can still show). "
+                  ? "System banners off (Protect failed can still show) — change under Advanced → System banners. "
                   : ""}
                 {snap.silent_when_open === false
-                  ? "OS can speak while DenyOut is focused. "
+                  ? "OS can speak while DenyOut is focused — Advanced → System banners. "
                   : ""}
                 {snap.respect_fullscreen === false
-                  ? "Fullscreen respect off. "
+                  ? "Fullscreen respect off — Advanced → System banners. "
                   : ""}
                 {snap.quiet_overnight === false ? "Night quiet sound off. " : ""}
                 {snap.sound_only_answer === false
@@ -692,12 +718,33 @@ export function Settings({
                   : ""}
                 {snap.away ? "Away right now. " : ""}
                 {typeof snap.away_unread === "number" && snap.away_unread > 0
-                  ? `${snap.away_unread} quiet while away (summary when you return). `
+                  ? `${snap.away_unread} quiet (locked, idle, or fullscreen). `
                   : ""}
                 {snap.away_digest?.pending ? "Return summary is ready. " : ""}
                 {protectionContinuityNow(snap)}
               </p>
-              {snap.away_digest?.pending ? (
+              {(snap.system_banners === false ||
+                snap.silent_when_open === false ||
+                snap.respect_fullscreen === false) && (
+                <div className="row-actions" style={{ marginTop: "0.5rem", gap: "0.4rem" }}>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => {
+                      setTab("advanced");
+                      window.setTimeout(() => {
+                        document
+                          .getElementById("settings-system-banners")
+                          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                      }, 50);
+                    }}
+                  >
+                    Open Advanced → System banners
+                  </button>
+                </div>
+              )}
+              {snap.away_digest?.pending ||
+              (typeof snap.away_unread === "number" && snap.away_unread > 0) ? (
                 <div className="row-actions" style={{ marginTop: "0.5rem", gap: "0.4rem" }}>
                   <button
                     type="button"
@@ -724,7 +771,7 @@ export function Settings({
                         .catch((err) => fail(err))
                     }
                   >
-                    Dismiss summary
+                    {snap.away_digest?.pending ? "Dismiss summary" : "Clear quiet count"}
                   </button>
                 </div>
               ) : null}
@@ -785,8 +832,8 @@ export function Settings({
           </label>
           <p className="muted" style={{ marginTop: "0.25rem" }}>
             {snap.quiet_while_away === false
-              ? "Off: Ask and block dialogs can appear while the screen is locked or idle."
-              : "When on: no Ask or block dialogs while locked or idle; soft OS banners stay off. Tray count grows. One summary when you return. Live Away / quiet count stay in the notice above when active."}
+              ? "Off: Ask and block dialogs can appear while the screen is locked or idle (about 5 minutes)."
+              : "When on: no Ask or block dialogs while locked or idle (about 5 minutes); soft OS banners stay off (Protect failed can still show). Tray count grows. One summary when you return. Live Away / quiet count stay in the notice above when active."}
           </p>
           <div style={{ marginTop: "0.65rem" }}>
             <div style={{ fontWeight: 500, marginBottom: "0.35rem" }}>Snooze</div>
@@ -821,7 +868,7 @@ export function Settings({
                     .catch((err) => fail(err))
                 }
               >
-                Until tomorrow morning (8am)
+                Until 8:00 tomorrow
               </button>
               {snap.notify_snooze_active ? (
                 <button
@@ -1316,6 +1363,7 @@ export function Settings({
  </label>
  <p className="muted" style={{ marginTop: "0.25rem" }}>
  Avoid Ask/block dialogs, soft OS banners, and steal-focus while a fullscreen app is in front.
+ Quiet items still add to the tray/chrome count; when fullscreen ends (or you return from Away), a summary is ready to review or clear under Notifications.
  </p>
  <label style={{ display: "block", marginTop: "0.5rem" }}>
  <input
@@ -1986,13 +2034,21 @@ export function Settings({
               For My agents / Agents only: pause new-host Ask dialogs for 15 minutes when prompts
               pile up. New sites stay blocked until the pause ends or you resume.
             </p>
-            {snap.mode !== "agents" &&
+            {!snap.ask_paused &&
+            snap.mode !== "agents" &&
             !intentAgents &&
-            (snap.agents_running || 0) === 0 &&
-            !snap.ask_paused ? (
+            (snap.agents_running || 0) === 0 ? (
               <p className="muted" style={{ marginBottom: "0.5rem" }}>
                 No agent asks right now — this applies when My agents or Agents only is in use.
                 Pause stays available here once an agent is running.
+              </p>
+            ) : !snap.ask_paused &&
+              (snap.mode === "agents" ||
+                intentAgents ||
+                (snap.agents_running || 0) > 0) ? (
+              <p className="muted" style={{ marginBottom: "0.5rem" }}>
+                No Ask prompts right now. Pause still applies the next time My agents or Agents
+                only asks about a new host.
               </p>
             ) : null}
             {snap.ask_paused ? (

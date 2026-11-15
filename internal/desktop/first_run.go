@@ -126,7 +126,8 @@ func (a *App) showYourSetup(mode string) {
 		return
 	}
 	autostartOn := a.state.Autostart
-	text := YourSetupText(mode, autostartOn, false)
+	quietAway := !a.state.QuietWhileAwayOff
+	text := YourSetupText(mode, autostartOn, false, quietAway)
 	if a.opts.SkipNativeYourSetup {
 		// Wails shows Your setup when setup_done && !your_setup_shown.
 		// Do not mark shown here — MarkYourSetupShown runs on dismiss.
@@ -159,7 +160,8 @@ func (a *App) showYourSetup(mode string) {
 // YourSetupText is shared EN copy for native + Wails Your setup (Q6).
 // autostart must reflect the real login-launch preference after RegisterAutostart.
 // unhealthy: Protect intent is broken — never claim "You are protected."
-func YourSetupText(mode string, autostart bool, unhealthy bool) string {
+// quietWhileAway: Stay quiet while away preference (default on).
+func YourSetupText(mode string, autostart bool, unhealthy bool, quietWhileAway bool) string {
 	var status string
 	if unhealthy {
 		switch mode {
@@ -193,8 +195,14 @@ func YourSetupText(mode string, autostart bool, unhealthy bool) string {
 	case "agents", "off":
 		homeBullet = "- Open DenyOut (Home) for mode status and what was blocked.\n"
 	}
+	blockBullet := "- When something is blocked while you are here: Keep blocked or Allow this site.\n"
+	if quietWhileAway {
+		blockBullet += "- Stay quiet while away is on: Ask and block dialogs stay off while locked or idle (about 5 minutes), and while a respected fullscreen app is in front. One summary when you return. Everything is in History.\n"
+	} else {
+		blockBullet += "- Stay quiet while away is off — Ask and block dialogs can still appear while locked or idle. Everything is in History.\n"
+	}
 	body := status + "\n\n" +
-		"- When something is blocked: Keep blocked or Allow this site.\n" +
+		blockBullet +
 		homeBullet +
 		"- If Protect or Agents only failed, open Problems.\n\n"
 	if autostart {
