@@ -17,8 +17,22 @@ import (
 // ErrNeedsAdmin means elevation was denied or required.
 var ErrNeedsAdmin = errors.New("denyout hostguard: administrator privileges required")
 
+// ErrElevateDisabled means pkexec/sudo was skipped (DENYOUT_TEST_NO_ELEVATE or GITHUB_ACTIONS).
+// Not a user password cancel — desktop must not sticky "Off (unavailable)" or claim a password window appeared.
+var ErrElevateDisabled = errors.New("elevate disabled in test/CI")
+
 // ErrUnsupported is returned when Protect computer cannot be enabled on this OS build.
 var ErrUnsupported = errors.New("denyout hostguard: Protect this computer is not available on this platform build")
+
+// ElevateDisabledByEnv reports whether elevation is short-circuited for tests/CI.
+func ElevateDisabledByEnv() bool {
+	return os.Getenv("DENYOUT_TEST_NO_ELEVATE") == "1" || os.Getenv("GITHUB_ACTIONS") == "true"
+}
+
+// IsElevateDisabled reports whether err is the test/CI elevate skip (possibly wrapped).
+func IsElevateDisabled(err error) bool {
+	return err != nil && errors.Is(err, ErrElevateDisabled)
+}
 
 // ErrDriverMissing means Windows WinDivert driver/DLL is not beside the binary.
 var ErrDriverMissing = errors.New("denyout hostguard: WinDivert driver not found (required on Windows)")

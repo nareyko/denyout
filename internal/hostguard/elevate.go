@@ -104,8 +104,8 @@ func elevate(exe string, args []string) error {
 
 func elevateLinux(exe string, args []string) error {
 	// Unit tests / CI: never block on a pkexec GUI (hangs headless runners).
-	if os.Getenv("DENYOUT_TEST_NO_ELEVATE") == "1" || os.Getenv("GITHUB_ACTIONS") == "true" {
-		return fmt.Errorf("%w (linux): elevate disabled in test/CI", ErrNeedsAdmin)
+	if ElevateDisabledByEnv() {
+		return fmt.Errorf("%w (linux): %w", ErrNeedsAdmin, ErrElevateDisabled)
 	}
 	var cmd *exec.Cmd
 	if _, err := exec.LookPath("pkexec"); err == nil {
