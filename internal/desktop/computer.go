@@ -287,8 +287,8 @@ func (a *App) trayQuitChoice() string {
 	if !on && !wrapsRunning {
 		return "off" // nothing live — exit
 	}
-	body := "Turn off protection and quit?\n\nCancel keeps DenyOut running."
-	primary := "Turn off and quit"
+	body := "Quit turns off protection and stops My agents wraps.\n\nCancel keeps DenyOut running."
+	primary := "Turn off protection and quit"
 	switch {
 	case unhealthy && mode == ModeOff:
 		if agentsIntent {
@@ -305,8 +305,8 @@ func (a *App) trayQuitChoice() string {
 		body = "Quit turns off Agents only and stops My agents wraps.\n\nCancel keeps DenyOut running."
 		primary = "Turn off Agents only and quit"
 	case hasSession && !hasProxyd:
-		body = "Session protection stops when you quit. Quit and turn off?\n\nCancel keeps DenyOut running."
-		primary = "Quit and turn off"
+		body = "Quit turns off Session protection and stops My agents wraps.\n\nCancel keeps DenyOut running."
+		primary = "Turn off Session protection and quit"
 	}
 	if !nativeConfirm("Quit DenyOut?", body, primary, "Cancel") {
 		return ""

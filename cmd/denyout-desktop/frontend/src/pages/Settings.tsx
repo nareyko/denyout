@@ -688,8 +688,8 @@ export function Settings({
  <p className="muted">
  Blocks always go to History. The tray shows a count.{" "}
  {snap.quiet_while_away === false
-  ? "Stay quiet while away is off — Ask/block dialogs and soft OS banners can still appear while locked or idle (about 5 minutes). Fullscreen quiet stays separate (Advanced → Respect fullscreen)."
-  : "With Stay quiet while away on, Ask and block dialogs stay off while locked or idle (about 5 minutes); soft OS banners stay off (Protect failed can still show). Tray count grows. One summary when you return. Fullscreen quiet stays separate (Advanced → Respect fullscreen)."}{" "}
+  ? "Stay quiet while away is off — Ask/block dialogs can still appear while locked or idle (about 5 minutes). Soft OS banners still follow How chatty / System banners (Quiet keeps them off except Protect failed and the tray-hidden hint). Fullscreen quiet stays separate (Advanced → Respect fullscreen)."
+  : "With Stay quiet while away on, Ask and block dialogs stay off while locked or idle (about 5 minutes); soft OS banners stay off (Protect failed and tray-hidden on window close can still show). Tray count grows. One summary when you return. Fullscreen quiet stays separate (Advanced → Respect fullscreen)."}{" "}
  Ask and Keep blocked / Allow this site stay inside DenyOut.
  </p>
           {(snap.notify_snooze_active ||
@@ -711,7 +711,7 @@ export function Settings({
                     }. `
                   : ""}
                 {snap.system_banners === false
-                  ? "System banners off (Protect failed can still show) — change under Advanced → System banners. "
+                  ? "System banners off (Protect failed and tray-hidden on window close can still show) — change under Advanced → System banners. "
                   : ""}
                 {snap.silent_when_open === false
                   ? "OS can speak while DenyOut is focused — Advanced → System banners. "
@@ -721,7 +721,7 @@ export function Settings({
                   : ""}
                 {snap.quiet_overnight === false ? "Night quiet sound off. " : ""}
                 {snap.sound_only_answer === false
-                  ? "Sound may play for soft OS banners (Undo / Open / status). "
+                  ? "Sound may play for soft OS banners (Undo / Open / Protect or Agents resumed). "
                   : ""}
                 {snap.away ? "Away right now. " : ""}
                 {typeof snap.away_unread === "number" && snap.away_unread > 0
@@ -821,8 +821,8 @@ export function Settings({
           </label>
           <p className="muted" style={{ marginTop: "0.25rem" }}>
             {snap.notify_level === "detailed"
-              ? "Detailed is on (Advanced → System banners). It adds the Protect resumed OS banner after auto-resume — pick Quiet or A bit more here to leave Detailed."
-              : "Detailed lives under Advanced → System banners. It adds the Protect resumed banner; A bit more skips that one."}
+              ? "Detailed is on (Advanced → System banners). It adds the auto-resume OS banner (Protect or Agents only) — pick Quiet or A bit more here to leave Detailed."
+              : "Detailed lives under Advanced → System banners. It adds the auto-resume banner (Protect or Agents only); A bit more skips that one."}
           </p>
           <label style={{ display: "block", marginTop: "0.65rem" }}>
             <input
@@ -839,8 +839,8 @@ export function Settings({
           </label>
           <p className="muted" style={{ marginTop: "0.25rem" }}>
             {snap.quiet_while_away === false
-              ? "Off: Ask/block dialogs and soft OS banners can appear while locked or idle (about 5 minutes). Fullscreen quiet stays separate (Advanced → Respect fullscreen)."
-              : "When on: no Ask or block dialogs while locked or idle (about 5 minutes); soft OS banners stay off (Protect failed can still show). Tray count grows. One summary when you return. Fullscreen quiet stays separate (Advanced → Respect fullscreen). Live Away / quiet count stay in the notice above when active."}
+              ? "Off: Ask/block dialogs can appear while locked or idle (about 5 minutes). Soft OS banners still follow How chatty / System banners (Quiet keeps them off except Protect failed and tray-hidden). Fullscreen quiet stays separate (Advanced → Respect fullscreen)."
+              : "When on: no Ask or block dialogs while locked or idle (about 5 minutes); soft OS banners stay off (Protect failed and tray-hidden on window close can still show). Tray count grows. One summary when you return. Fullscreen quiet stays separate (Advanced → Respect fullscreen). Live Away / quiet count stay in the notice above when active."}
           </p>
           <div style={{ marginTop: "0.65rem" }}>
             <div style={{ fontWeight: 500, marginBottom: "0.35rem" }}>Snooze</div>
@@ -850,8 +850,8 @@ export function Settings({
                     snap.notify_snooze_until
                       ? ` until ${new Date(snap.notify_snooze_until).toLocaleString()}`
                       : ""
-                  }. Soft OS banners stay off until then (Protect failed can still show). Clear below or see the notice at the top.`
-                : "Temporarily quiet OS banners without changing How chatty (Protect failed can still show). Continuity (what stays on) is in the notice above when snooze or Away is active."}
+                  }. Soft OS banners stay off until then (Protect failed and tray-hidden on window close can still show). Clear below or see the notice at the top.`
+                : "Temporarily quiet OS banners without changing How chatty (Protect failed and tray-hidden on window close can still show). Continuity (what stays on) is in the notice above when snooze or Away is active."}
             </p>
             <div className="row-actions" style={{ gap: "0.4rem", flexWrap: "wrap" }}>
               <button
@@ -1311,7 +1311,7 @@ export function Settings({
  <h2>System banners</h2>
  <p className="muted">
  How DenyOut may talk through the operating system. Decisions stay inside DenyOut.
- The OS may show Open DenyOut, Undo, status, or Protect failed.
+ The OS may show Open DenyOut, Undo, Protect/Agents resumed, or Protect failed.
  </p>
  <label style={{ display: "block" }}>
  <input
@@ -1327,7 +1327,8 @@ export function Settings({
  Allow system banners
  </label>
  <p className="muted" style={{ marginTop: "0.25rem" }}>
- When off, only Protect failed can still appear so a broken Protect is not silent.
+ When off, only Protect failed and the tray-hidden hint (window close) can still
+ appear so a broken Protect is not silent.
  </p>
  <label style={{ display: "block", marginTop: "0.65rem" }}>
  Level{" "}
@@ -1348,13 +1349,13 @@ export function Settings({
  >
  <option value="quiet">Quiet</option>
  <option value="normal">A bit more (Normal)</option>
- <option value="detailed">Detailed (adds Protect resumed banner)</option>
+ <option value="detailed">Detailed (adds auto-resume banner)</option>
  </select>
  </label>
  <p className="muted" style={{ marginTop: "0.25rem" }}>
- Detailed adds the Protect resumed OS banner after an auto-resume. A bit more skips
- that banner. Quiet still limits to Protect failed (and the tray-hidden hint when you
- close the window).
+ Detailed adds the auto-resume OS banner (Protect computer or Agents only). A bit more
+ skips that banner. Quiet still limits to Protect failed (and the tray-hidden hint when
+ you close the window). Soft Open (~12s) needs A bit more or Detailed.
  </p>
  <label style={{ display: "block", marginTop: "0.65rem" }}>
  <input
@@ -1395,11 +1396,11 @@ export function Settings({
  Decisions only inside DenyOut
  </strong>{" "}
  — always on. Allow / Keep / timed choices are in-app. The OS may still show Open /
- Undo / status / Protect failed.
+ Undo / Protect or Agents resumed / Protect failed / tray-hidden.
  </p>
  <p className="muted" style={{ marginTop: "0.35rem" }}>
- How long banners live: Protect failed stays · soft Open short (~12s) · status
- quick · Undo ~10s once.
+ How long banners live: Protect failed stays · soft Open ~12s (A bit more+) ·
+ Protect/Agents resumed ~5s (Detailed) · Undo ~10s · tray-hidden ~8s.
  </p>
  </section>
  )}

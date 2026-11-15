@@ -197,9 +197,9 @@ func YourSetupText(mode string, autostart bool, unhealthy bool, quietWhileAway b
 	}
 	blockBullet := "- When something is blocked while you are here: Keep blocked or Allow this site.\n"
 	if quietWhileAway {
-		blockBullet += "- Stay quiet while away is on: Ask and block dialogs stay off while locked or idle (about 5 minutes). One summary when you return. Everything is in History.\n"
+		blockBullet += "- Stay quiet while away is on: Ask and block dialogs stay off while locked or idle (about 5 minutes); soft OS banners stay off (Protect failed can still show). One summary when you return. Everything is in History.\n"
 	} else {
-		blockBullet += "- Stay quiet while away is off — Ask/block dialogs and soft OS banners can still appear while locked or idle (about 5 minutes). Everything is in History.\n"
+		blockBullet += "- Stay quiet while away is off — Ask/block dialogs can still appear while locked or idle (about 5 minutes). Soft OS banners still follow How chatty (Quiet keeps them off except Protect failed). Everything is in History.\n"
 	}
 	blockBullet += "- Respect fullscreen (Settings → Advanced) separately avoids dialogs while a fullscreen app is in front.\n"
 	body := status + "\n\n" +

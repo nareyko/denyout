@@ -211,22 +211,24 @@ func (a *App) runTray(ctx context.Context) error {
 
 				tooltip := "DenyOut - " + label
 				statusExtra := ""
-				if snoozeUntil != "" {
-					tooltip += " · snoozed"
-					statusExtra += " · snoozed"
-				}
-				if unread > 0 {
-					if unread == 1 {
-						tooltip += " · 1 quiet"
-						statusExtra += " · 1 quiet"
-					} else {
-						tooltip += fmt.Sprintf(" · %d quiet", unread)
-						statusExtra += fmt.Sprintf(" · %d quiet", unread)
+				// Mirror chrome: Needs attention pill drops snooze/quiet extras.
+				if !needsAttention {
+					if snoozeUntil != "" {
+						tooltip += " · snoozed"
+						statusExtra += " · snoozed"
 					}
-				}
-				// Mirror chrome mode pill: keep both snoozed and quiet when both apply.
-				if !needsAttention && statusExtra != "" {
-					statusItem.SetLabel(label + statusExtra)
+					if unread > 0 {
+						if unread == 1 {
+							tooltip += " · 1 quiet"
+							statusExtra += " · 1 quiet"
+						} else {
+							tooltip += fmt.Sprintf(" · %d quiet", unread)
+							statusExtra += fmt.Sprintf(" · %d quiet", unread)
+						}
+					}
+					if statusExtra != "" {
+						statusItem.SetLabel(label + statusExtra)
+					}
 				}
 				tray.SetTooltip(tooltip)
 

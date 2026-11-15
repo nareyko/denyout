@@ -109,7 +109,7 @@ func SnoozeUntil() time.Time {
 }
 
 // SetBannersAllowed is the Advanced "Allow system banners" master.
-// When off, only protect_failed may still reach the OS (L7).
+// When off, only protect_failed and tray_hidden may still reach the OS.
 func SetBannersAllowed(on bool) {
 	mu.Lock()
 	bannersAllowed = on

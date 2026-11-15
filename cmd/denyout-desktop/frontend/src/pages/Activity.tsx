@@ -282,8 +282,8 @@ export function Activity({
  ? " Fix Needs attention from Home or Problems first — until then, DenyOut may not be asking about blocks as usual."
  : snap?.mode === "safe" || snap?.mode === "agents" || snap?.mode === "session"
    ? snap?.quiet_while_away === false
-     ? " When you are at the computer, DenyOut asks Keep blocked / Allow this site in the app. Stay quiet while away is off — Ask/block dialogs and soft OS banners can still appear while locked or idle (~5 min). Fullscreen quiet is separate (Advanced → Respect fullscreen)."
-     : " When you are at the computer, DenyOut asks Keep blocked / Allow this site in the app. With Stay quiet while away on, locked or idle (~5 min) stays quiet and shows one summary when you return. Fullscreen quiet is separate (Advanced → Respect fullscreen)."
+     ? " When you are at the computer, DenyOut asks Keep blocked / Allow this site in the app. Stay quiet while away is off — Ask/block dialogs can still appear while locked or idle (~5 min). Soft OS banners still follow How chatty / System banners (Quiet keeps them off except Protect failed). Fullscreen quiet is separate (Advanced → Respect fullscreen)."
+     : " When you are at the computer, DenyOut asks Keep blocked / Allow this site in the app. With Stay quiet while away on, locked or idle (~5 min) stays quiet and shows one summary when you return. Soft OS banners stay off too (Protect failed can still show). Fullscreen quiet is separate (Advanced → Respect fullscreen)."
    : (snap?.policy_profile || "").toLowerCase() === "agent"
      ? " Last mode was Agents only. Turn it on from Home (or run My agents) to start recording blocks here."
      : " Turn on Protect computer (or run My agents) to start recording blocks here."}
