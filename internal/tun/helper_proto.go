@@ -25,15 +25,19 @@ func HelperReply(verb string) (string, error) {
 	if !IsHelperVerb(v) {
 		return "", fmt.Errorf("tun: unknown helper verb %q", verb)
 	}
+	reason := "stub_no_device"
+	if !WantDevice() {
+		reason = "flag_off"
+	}
 	switch v {
 	case "tun-stats":
 		return "OK " + CapTag + " " + FormatDropStatsLine(DropStats{
 			Present: false,
 			Source:  SourceTUN,
-		}), nil
+		}) + " reason=" + reason, nil
 	default:
 		// tun-start / tun-stop: acknowledge protocol, refuse kernel work.
-		return fmt.Sprintf("OK %s enabled=false verb=%s", CapTag, v), nil
+		return fmt.Sprintf("OK %s enabled=false verb=%s reason=%s", CapTag, v, reason), nil
 	}
 }
 
@@ -41,6 +45,7 @@ func HelperReply(verb string) (string, error) {
 type HelperStatus struct {
 	Enabled bool
 	Verb    string
+	Reason  string
 	Stats   DropStats
 	RawOK   bool
 }
@@ -63,6 +68,8 @@ func ParseHelperReply(resp string) (HelperStatus, error) {
 			st.Enabled = v == "true" || v == "1"
 		case strings.HasPrefix(f, "verb="):
 			st.Verb = strings.TrimPrefix(f, "verb=")
+		case strings.HasPrefix(f, "reason="):
+			st.Reason = strings.TrimPrefix(f, "reason=")
 		case strings.HasPrefix(f, "packets="), strings.HasPrefix(f, "bytes="),
 			strings.HasPrefix(f, "present="), strings.HasPrefix(f, "source="):
 			// filled via ParseDropStatsLine below
