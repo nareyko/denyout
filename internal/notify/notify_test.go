@@ -118,6 +118,18 @@ func TestQuietSuppressesOpenApp(t *testing.T) {
 	notify.Emit(notify.KindOpenApp, "DenyOut", "ok in Normal when unfocused")
 }
 
+func TestProtectResumedDetailedOnly(t *testing.T) {
+	notify.SetUIFocused(false)
+	notify.SetAway(false)
+	notify.SetBannersAllowed(true)
+	notify.SetFullscreen(false)
+	notify.SetLevel("normal")
+	notify.Emit(notify.KindProtectResumed, "DenyOut", "must stay off in Normal")
+	notify.SetLevel("detailed")
+	notify.Emit(notify.KindProtectResumed, "DenyOut", "ok in Detailed")
+	notify.SetLevel("normal")
+}
+
 func TestTrayHiddenAllowedOnQuietAndFocused(t *testing.T) {
 	notify.SetLevel("quiet")
 	notify.SetUIFocused(true)

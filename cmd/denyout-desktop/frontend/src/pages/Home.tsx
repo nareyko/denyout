@@ -213,9 +213,7 @@ export function Home({
  {snap?.notify_snooze_active ? "Notifications snoozed. " : ""}
  {snap?.away ? "Away — quiet for now. " : ""}
  {typeof snap?.away_unread === "number" && snap.away_unread > 0
- ? snap.quiet_while_away === false
-   ? `${snap.away_unread} quiet (fullscreen). `
-   : `${snap.away_unread} quiet (locked, idle, or fullscreen). `
+ ? `${snap.away_unread} quiet. `
  : ""}
  {snap?.system_banners === false
  ? "System banners off (Protect failed can still show). "
@@ -413,7 +411,7 @@ export function Home({
  <p className="muted">
  {protectedOn || agentsOnly || sessionOn
  ? snap?.quiet_while_away === false
-   ? "When DenyOut blocks something while you are here, you get an in-app Keep blocked / Allow this site prompt — and it shows up in History. Stay quiet while away is off — Ask and block dialogs can still appear while locked or idle (~5 min). Fullscreen quiet is a separate Advanced setting (Respect fullscreen)."
+   ? "When DenyOut blocks something while you are here, you get an in-app Keep blocked / Allow this site prompt — and it shows up in History. Stay quiet while away is off — Ask/block dialogs and soft OS banners can still appear while locked or idle (~5 min). Fullscreen quiet is a separate Advanced setting (Respect fullscreen)."
    : "When DenyOut blocks something while you are here, you get an in-app Keep blocked / Allow this site prompt — and it shows up in History. With Stay quiet while away on, locked or idle (~5 min) stays quiet and shows one summary when you return. Fullscreen quiet is separate (Advanced → Respect fullscreen)."
  : intentAgents
    ? "Last mode was Agents only. Turn it on again from here (or run My agents) to start recording blocks. Everyday browsing stays unprotected until you switch to Protect computer."

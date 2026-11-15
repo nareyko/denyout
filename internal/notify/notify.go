@@ -311,7 +311,10 @@ func levelAllows(kind Kind) bool {
 	switch level {
 	case "quiet":
 		return kind == KindProtectFailed || kind == KindTrayHidden
-	default: // normal, detailed
+	case "normal":
+		// Protect-resumed OS banner is Detailed-only so the level is not a no-op vs Normal.
+		return kind != KindProtectResumed
+	default: // detailed
 		return true
 	}
 }

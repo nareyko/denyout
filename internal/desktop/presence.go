@@ -144,11 +144,11 @@ func (a *App) maybeSoftOpenReturn() {
 	if n <= 0 {
 		return
 	}
-	body := "Quiet items waiting — open DenyOut to review."
+	body := "Quiet items waiting — switch to DenyOut to review."
 	if n == 1 {
-		body = "1 quiet item waiting. Open DenyOut."
+		body = "1 quiet item waiting. Switch to DenyOut."
 	} else if n > 1 {
-		body = fmt.Sprintf("%d quiet items waiting. Open DenyOut.", n)
+		body = fmt.Sprintf("%d quiet items waiting. Switch to DenyOut.", n)
 	}
 	notify.EmitAction(notify.KindOpenApp, "DenyOut", body, 12*time.Second,
 		[]notify.Action{{ID: "open", Label: "Open"}},

@@ -269,6 +269,7 @@ func (a *App) quitUnload() error {
 // trayQuitChoice confirms full unload when quitting the tray.
 // Returns "off" or "" (cancel). Keep-protection-on was removed (Quit always unloads).
 func (a *App) trayQuitChoice() string {
+	wrapsRunning := a.runningWrapCount() > 0
 	a.mu.Lock()
 	hasProxyd := a.proxyd != nil
 	hasSession := a.session != nil
@@ -283,7 +284,7 @@ func (a *App) trayQuitChoice() string {
 	agentsIntent := normalizePolicyProfile(a.state.PolicyProfile) == PolicyProfileAgent
 	on := hasProxyd || hasSession || a.state.ProtectionOn || a.state.ComputerEnabled || unhealthy
 	a.mu.Unlock()
-	if !on {
+	if !on && !wrapsRunning {
 		return "off" // nothing live — exit
 	}
 	body := "Turn off protection and quit?\n\nCancel keeps DenyOut running."
@@ -297,6 +298,9 @@ func (a *App) trayQuitChoice() string {
 			body = "Protect is not running. Quit clears restore intent.\n\nCancel keeps DenyOut open."
 			primary = "Clear intent and quit"
 		}
+	case !on && wrapsRunning:
+		body = "Quit stops My agents wraps.\n\nCancel keeps DenyOut running."
+		primary = "Stop agents and quit"
 	case mode == ModeComputer && agentsIntent:
 		body = "Quit turns off Agents only and stops My agents wraps.\n\nCancel keeps DenyOut running."
 		primary = "Turn off Agents only and quit"

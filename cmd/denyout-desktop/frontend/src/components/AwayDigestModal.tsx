@@ -65,7 +65,7 @@ export function AwayDigestModal({
             {waiting === 1
               ? "1 decision was waiting"
               : `${waiting} decisions were waiting`}
-            {hostSpan(waitHosts)}. Review History to Allow or Keep blocked.
+            {hostSpan(waitHosts)}. Review History to Allow this site, or leave it blocked.
           </p>
         ) : null}
         {!hasBlocks && !hasWaiting ? (

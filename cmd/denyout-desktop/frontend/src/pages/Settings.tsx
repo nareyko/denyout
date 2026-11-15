@@ -688,7 +688,7 @@ export function Settings({
  <p className="muted">
  Blocks always go to History. The tray shows a count.{" "}
  {snap.quiet_while_away === false
-  ? "Stay quiet while away is off — Ask and block dialogs can still appear while locked or idle (about 5 minutes). Fullscreen quiet stays separate (Advanced → Respect fullscreen)."
+  ? "Stay quiet while away is off — Ask/block dialogs and soft OS banners can still appear while locked or idle (about 5 minutes). Fullscreen quiet stays separate (Advanced → Respect fullscreen)."
   : "With Stay quiet while away on, Ask and block dialogs stay off while locked or idle (about 5 minutes); soft OS banners stay off (Protect failed can still show). Tray count grows. One summary when you return. Fullscreen quiet stays separate (Advanced → Respect fullscreen)."}{" "}
  Ask and Keep blocked / Allow this site stay inside DenyOut.
  </p>
@@ -725,9 +725,7 @@ export function Settings({
                   : ""}
                 {snap.away ? "Away right now. " : ""}
                 {typeof snap.away_unread === "number" && snap.away_unread > 0
-                  ? snap.quiet_while_away === false
-                    ? `${snap.away_unread} quiet (fullscreen). `
-                    : `${snap.away_unread} quiet (locked, idle, or fullscreen). `
+                  ? `${snap.away_unread} quiet. `
                   : ""}
                 {snap.away_digest?.pending ? "Return summary is ready. " : ""}
                 {protectionContinuityNow(snap)}
@@ -823,8 +821,8 @@ export function Settings({
           </label>
           <p className="muted" style={{ marginTop: "0.25rem" }}>
             {snap.notify_level === "detailed"
-              ? "Detailed is on (Advanced → System banners). Today it uses the same OS banner kinds as A bit more — pick Quiet or A bit more here to leave Detailed."
-              : "Detailed lives under Advanced → System banners. Today it matches A bit more for OS banner kinds."}
+              ? "Detailed is on (Advanced → System banners). It adds the Protect resumed OS banner after auto-resume — pick Quiet or A bit more here to leave Detailed."
+              : "Detailed lives under Advanced → System banners. It adds the Protect resumed banner; A bit more skips that one."}
           </p>
           <label style={{ display: "block", marginTop: "0.65rem" }}>
             <input
@@ -841,7 +839,7 @@ export function Settings({
           </label>
           <p className="muted" style={{ marginTop: "0.25rem" }}>
             {snap.quiet_while_away === false
-              ? "Off: Ask and block dialogs can appear while the screen is locked or idle (about 5 minutes). Fullscreen quiet stays separate (Advanced → Respect fullscreen)."
+              ? "Off: Ask/block dialogs and soft OS banners can appear while locked or idle (about 5 minutes). Fullscreen quiet stays separate (Advanced → Respect fullscreen)."
               : "When on: no Ask or block dialogs while locked or idle (about 5 minutes); soft OS banners stay off (Protect failed can still show). Tray count grows. One summary when you return. Fullscreen quiet stays separate (Advanced → Respect fullscreen). Live Away / quiet count stay in the notice above when active."}
           </p>
           <div style={{ marginTop: "0.65rem" }}>
@@ -1350,13 +1348,13 @@ export function Settings({
  >
  <option value="quiet">Quiet</option>
  <option value="normal">A bit more (Normal)</option>
- <option value="detailed">Detailed (same banners as A bit more today)</option>
+ <option value="detailed">Detailed (adds Protect resumed banner)</option>
  </select>
  </label>
  <p className="muted" style={{ marginTop: "0.25rem" }}>
- Detailed today matches A bit more for which OS banner kinds appear — it is not a
- louder third mode yet. Quiet still limits to Protect failed (and the tray-hidden
- hint when you close the window).
+ Detailed adds the Protect resumed OS banner after an auto-resume. A bit more skips
+ that banner. Quiet still limits to Protect failed (and the tray-hidden hint when you
+ close the window).
  </p>
  <label style={{ display: "block", marginTop: "0.65rem" }}>
  <input

@@ -105,8 +105,15 @@ func (a *App) sweepTimedRules() {
 			"Could not resume Protect automatically. Turn on from Home when ready.")
 		return
 	}
+	a.mu.Lock()
+	agents := normalizePolicyProfile(a.state.PolicyProfile) == PolicyProfileAgent
+	a.mu.Unlock()
+	resumed := "Protect computer is on again.\nUndo to pause again."
+	if agents {
+		resumed = "Agents only is on again.\nUndo to pause again."
+	}
 	notify.EmitAction(notify.KindProtectResumed, "DenyOut",
-		"Protection is on again.\nUndo to pause again.", notify.ExpireFor(notify.KindProtectResumed),
+		resumed, notify.ExpireFor(notify.KindProtectResumed),
 		[]notify.Action{{ID: "undo", Label: "Undo"}},
 		func(id string) {
 			if id != "undo" {
