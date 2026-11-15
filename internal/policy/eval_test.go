@@ -131,7 +131,7 @@ func TestIPLiteralsHardDeny(t *testing.T) {
 		DestPort: 443,
 		RawURL:   "https://149.154.167.41/",
 	})
-	if d.Verdict != "deny" || len(d.Reasons) == 0 || d.Reasons[0] != policy.ReasonHostNotAllowed {
+	if d.Verdict != "deny" || len(d.Reasons) == 0 || d.Reasons[0] != policy.ReasonIPLiteral {
 		t.Fatalf("literal deny: %+v", d)
 	}
 	eng.AllowHost("149.154.167.41", "user_always")
@@ -154,6 +154,33 @@ func TestIPLiteralsHardDeny(t *testing.T) {
 	})
 	if d3.Verdict != "allow" {
 		t.Fatalf("literal allow when flag true: %+v", d3)
+	}
+}
+
+func TestBrowseAllowsPublicIPLiteral(t *testing.T) {
+	cfg, err := policy.DefaultWholeDeviceBrowse()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.AllowIPLiterals {
+		t.Fatal("Safe browse should allow public IP literals")
+	}
+	eng := policy.NewEngine(cfg)
+	d := eng.Evaluate(policy.RequestView{
+		DestHost: "149.154.167.41",
+		DestPort: 80,
+		RawURL:   "http://149.154.167.41:80/api",
+	})
+	if d.Verdict != "allow" {
+		t.Fatalf("Telegram-style public IP should allow on browse: %+v", d)
+	}
+	dPriv := eng.Evaluate(policy.RequestView{
+		DestHost: "169.254.169.254",
+		DestPort: 80,
+		RawURL:   "http://169.254.169.254/",
+	})
+	if dPriv.Verdict != "deny" {
+		t.Fatalf("metadata IP must still deny: %+v", dPriv)
 	}
 }
 

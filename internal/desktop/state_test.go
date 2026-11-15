@@ -54,7 +54,7 @@ func TestLoadStateRespectsComputerUnavailable(t *testing.T) {
 
 func TestDefaultState(t *testing.T) {
 	st := desktop.DefaultState()
-	if !st.Notify || st.AskMode || !st.ComputerAvailable || st.PolicyProfile != desktop.PolicyProfileBrowse {
+	if st.Notify || st.NotifyLevel != "quiet" || st.AskMode || !st.ComputerAvailable || st.PolicyProfile != desktop.PolicyProfileBrowse {
 		t.Fatalf("%+v", st)
 	}
 }

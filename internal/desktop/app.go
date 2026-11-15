@@ -58,21 +58,25 @@ type Options struct {
 type App struct {
 	opts Options
 
-	mu          sync.Mutex
-	state       State
-	lastDeny    string
-	status      string
-	protect     *exec.Cmd    // advanced process wrap
-	session     *run.Session // session-mode in-process proxy
-	proxyd      *exec.Cmd    // computer-mode transparent proxy subprocess
-	proxyPort   int
-	wizardURL   string // only set when WebUI is enabled
-	controlURL  string // Ask IPC for proxyd
-	asks        *askFlight
-	wraps       map[string]*wrapProc
-	threats     *threatlists.Store // Book C cache (shared across Protect restarts)
-	updateHTTP  *http.Client       // optional; tests inject; nil -> default
-	accountHTTP *http.Client       // optional; tests inject for account API
+	mu                 sync.Mutex
+	state              State
+	lastDeny           string
+	status             string
+	protect            *exec.Cmd    // advanced process wrap
+	session            *run.Session // session-mode in-process proxy
+	proxyd             *exec.Cmd    // computer-mode transparent proxy subprocess
+	proxyPort          int
+	wizardURL          string // only set when WebUI is enabled
+	controlURL         string // Ask IPC for proxyd
+	asks               *askFlight
+	wraps              map[string]*wrapProc
+	threats            *threatlists.Store // Book C cache (shared across Protect restarts)
+	updateHTTP         *http.Client       // optional; tests inject; nil -> default
+	accountHTTP        *http.Client       // optional; tests inject for account API
+	uiReadyOnce        sync.Once          // Wails: catch-up Protect restore after decision UI mounts
+	lastAutostartCheck time.Time          // throttle login-entry repair while UI polls
+	legacySessionNote  string             // one-shot Home notice after clearing ScopeSession on restore
+	presence           presence           // Away / idle / lock (notify-presence wave)
 }
 
 func applyNotifyPrefs(st State) {
@@ -85,12 +89,27 @@ func applyNotifyPrefs(st State) {
 		}
 	}
 	notify.SetLevel(lvl)
+	notify.SetBannersAllowed(!st.SystemBannersOff)
+	notify.SetSilentWhenOpen(!st.SilentWhenOpenOff)
+	notify.SetRespectFullscreen(!st.RespectFullscreenOff)
+	notify.SetQuietOvernight(!st.QuietOvernightOff)
+	notify.SetSoundOnlyWhenAnswer(!st.SoundOnlyAnswerOff)
+	if until := strings.TrimSpace(st.NotifySnoozeUntil); until != "" {
+		if t, err := time.Parse(time.RFC3339, until); err == nil && time.Now().Before(t) {
+			notify.SetSnoozeUntil(t)
+		} else {
+			notify.SetSnoozeUntil(time.Time{})
+		}
+	} else {
+		notify.SetSnoozeUntil(time.Time{})
+	}
 }
 
 // NewApp constructs a desktop app from options and persisted state.
 func NewApp(opts Options) *App {
 	a := &App{opts: opts, state: LoadState(), status: "Off", wraps: map[string]*wrapProc{}, asks: newAskFlight()}
 	applyNotifyPrefs(a.state)
+	a.initPresence()
 	if a.state.LastDenyHost != "" {
 		a.lastDeny = a.state.LastDenyHost
 	}
@@ -104,6 +123,8 @@ func (a *App) Bootstrap(ctx context.Context) error {
 	}
 
 	a.maybePromptCrashLeftovers()
+	a.normalizePersistedState()
+	a.reconcileAutostart()
 
 	needSetup := a.opts.ForceSetup || !a.state.SetupDone
 	if needSetup && a.opts.WebUI {
@@ -122,6 +143,9 @@ func (a *App) Bootstrap(ctx context.Context) error {
 			a.mu.Unlock()
 			_ = SaveState(st)
 			notify.SetEnabled(true)
+		} else if a.opts.OpenUI != nil {
+			// Wails owns the Home mode-choice modal; do not run native wizard.
+			go a.RequestOpenUI("home")
 		} else {
 			a.runFirstRunWizard()
 		}
@@ -130,7 +154,9 @@ func (a *App) Bootstrap(ctx context.Context) error {
 	a.maybeMigrateUXv2()
 	a.maybeNotNowNudge()
 	a.maybeLearningNudge()
+	a.restoreAskPause()
 	a.startTimedRulesWorker(ctx)
+	a.startThreatPollWorker(ctx)
 
 	if a.opts.WebUI {
 		opts := a.opts
@@ -150,8 +176,14 @@ func (a *App) Bootstrap(ctx context.Context) error {
 	}
 
 	// Restore Computer after login; never silently fall back to Session.
+	// Wails: always defer until UIReady so SetDecisionPresenter is registered
+	// (and the window can show before elevate). Non-Wails restores here.
 	if a.state.SetupDone && (!a.opts.WebUI || a.state.ProtectionOn) {
-		a.restoreProtection()
+		if a.opts.OpenUI != nil {
+			// UIReadyRestore starts Protect once the shell + decision UI are up.
+		} else {
+			a.restoreProtection()
+		}
 	}
 
 	// install.sh / --install skips first-run wizard; still show Your setup once (GUI tray only).
@@ -165,19 +197,104 @@ func (a *App) Bootstrap(ctx context.Context) error {
 	return nil
 }
 
+// UIReadyRestore runs after the Wails shell mounts (decision presenter registered).
+// Restores Protect deferred from Bootstrap so first blocks use the in-app modal.
+func (a *App) UIReadyRestore() {
+	a.uiReadyOnce.Do(func() {
+		if a.opts.OpenUI == nil {
+			return
+		}
+		a.mu.Lock()
+		want := a.state.SetupDone && (a.state.ProtectionOn || a.state.ComputerEnabled)
+		live := a.proxyd != nil || a.session != nil
+		// Respect an explicit pause / forever-off — do not surprise-elevate.
+		paused := activeProtectPausedUntil(a.state.ProtectPausedUntil) != "" ||
+			strings.TrimSpace(a.state.ProtectPauseLast) == "forever"
+		a.mu.Unlock()
+		if want && !live && !paused {
+			// Show window before elevate so a password prompt is not a mystery.
+			if !hostguardHelperOK() {
+				a.RequestOpenUI("home")
+			}
+			a.restoreProtection()
+		}
+	})
+}
+
+// UIQuitNeedsChoice reports whether Quit should ask keep-vs-off.
+// True for live proxyd/session, or broken leave-on (explicit Off vs Cancel).
+func (a *App) UIQuitNeedsChoice() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.proxyd != nil || a.session != nil {
+		return true
+	}
+	return problemsUnhealthyLocked(a)
+}
+
+// UIQuit finishes the tray Quit flow. choice: "off" | "keep".
+func (a *App) UIQuit(choice string) error {
+	choice = strings.TrimSpace(strings.ToLower(choice))
+	a.mu.Lock()
+	hasProxyd := a.proxyd != nil
+	hasSession := a.session != nil
+	live := hasProxyd || hasSession
+	a.mu.Unlock()
+	if choice == "keep" {
+		// Session lives in-process — Exit always tears it down. Refuse a false promise.
+		if hasSession && !hasProxyd {
+			return fmt.Errorf("Session protection cannot stay on after Quit. Choose Turn off and quit, or Cancel.")
+		}
+		if hasProxyd {
+			a.quitLeaveProtectionOn()
+		}
+		// Unhealthy leave-on with no live proxyd: Keep leaves intent for next restore.
+		a.stopAllWrapsOpts("Quit", true)
+		a.stopProtect()
+		return nil
+	}
+	// Default / "off": unload protection then quit.
+	if live {
+		if err := a.quitUnload(); err != nil {
+			return err
+		}
+	} else {
+		// Clear stale leave-on so next login does not surprise-restore.
+		a.mu.Lock()
+		a.state.ProtectionOn = false
+		a.state.ComputerEnabled = false
+		a.state.Scope = ScopeOff
+		st := a.state
+		a.mu.Unlock()
+		_ = SaveState(st)
+	}
+	a.stopAllWrapsOpts("Quit", true)
+	a.stopProtect()
+	return nil
+}
+
 // RequestOpenUI opens the Wails (or other) window on route.
 func (a *App) RequestOpenUI(route string) {
 	if a.opts.OpenUI != nil {
 		a.opts.OpenUI(route)
 		return
 	}
-	// CLI desktop fallback: native dialogs.
+	// CLI desktop fallback: native dialogs (no Wails Home window).
+	a.mu.Lock()
+	setupDone := a.state.SetupDone
+	a.mu.Unlock()
 	switch route {
 	case "problems":
 		a.helpAndProblems()
 	case "home", "":
-		// Prefer activity list as native "home" stand-in when no Wails window.
-		a.nativeShowActivity()
+		if !setupDone {
+			// Do not dump "What was blocked" during onboarding.
+			a.runFirstRunWizard()
+			return
+		}
+		a.nativeShowHome()
+	case "profiles", "profiles-new":
+		a.myAgentsMenu()
 	default:
 		a.nativeShowActivity()
 	}

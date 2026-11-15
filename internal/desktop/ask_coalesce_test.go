@@ -16,7 +16,7 @@ func TestAskFlightCoalesce(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			results[i] = f.Do("evil.example", func() string {
+			results[i], _ = f.Do("evil.example", func() string {
 				calls.Add(1)
 				time.Sleep(40 * time.Millisecond)
 				return "once"
@@ -37,14 +37,14 @@ func TestAskFlightCoalesce(t *testing.T) {
 func TestAskFlightSuppressAfterDeny(t *testing.T) {
 	f := newAskFlight()
 	var calls atomic.Int32
-	a1 := f.Do("nope.example", func() string {
+	a1, _ := f.Do("nope.example", func() string {
 		calls.Add(1)
 		return "deny"
 	})
 	if a1 != "deny" {
 		t.Fatalf("a1=%s", a1)
 	}
-	a2 := f.Do("nope.example", func() string {
+	a2, _ := f.Do("nope.example", func() string {
 		calls.Add(1)
 		return "once"
 	})

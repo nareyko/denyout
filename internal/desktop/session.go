@@ -80,6 +80,7 @@ func (a *App) onSessionDeny(host string, reasons []string, redactedURL string) {
 	a.state.LastDenyHost = host
 	a.state.LastDenySummary = notify.HumanReasons(reasons)
 	a.state.LastDenyURL = strings.TrimSpace(redactedURL)
+	a.state.LastDenyProcess = ""
 	ask := a.state.AskMode
 	sess := a.session
 	st := a.state

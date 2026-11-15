@@ -112,6 +112,10 @@ textarea {
  vertical-align: middle;
 }
 
+.nav-badge.warn {
+ background: #f79009;
+}
+
 .main {
  display: flex;
  flex-direction: column;
@@ -151,9 +155,29 @@ textarea {
  color: var(--muted);
 }
 
-.pill.agents {
+.pill.alert {
+ background: #fdecea;
+ color: var(--danger);
+}
+
+.pill.warn {
  background: #fff4e5;
  color: var(--warn);
+}
+
+.pill.agents {
+ background: #e6f0f7;
+ color: #2a5a7a;
+}
+
+.card.agents-card {
+ border-color: #b8d0e0;
+ background: #f3f8fb;
+}
+
+.pill.session {
+ background: #e8eef8;
+ color: #345;
 }
 
 .content {
@@ -434,6 +458,10 @@ button.linkish:hover {
  color: var(--muted);
 }
 
+.modal .warn-box {
+ color: var(--danger);
+}
+
 .decision-modal {
  width: min(520px, calc(100% - 2rem));
 }
@@ -452,7 +480,17 @@ button.linkish:hover {
 }
 
 .decision-backdrop {
- z-index: 50;
+ /* Above Pause/Confirm/Quit (55) so Ask/block stays the top surface. */
+ z-index: 60;
+}
+
+.notice-box {
+ margin: 0;
+ padding: 0.65rem 0.85rem;
+ border-radius: 8px;
+ border: 1px solid var(--line);
+ background: var(--surface);
+ color: var(--ink);
 }
 
 .mono {
@@ -552,7 +590,7 @@ details.card > summary {
 
 .warn-box p {
  margin: 0 0 0.65rem;
- color: var(--muted);
+ color: inherit;
 }
 
 .checklist ul {

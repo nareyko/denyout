@@ -54,9 +54,14 @@ failure was not recorded.
 `
 
 // LastErrorSummary returns a short snippet for Problems UI.
+// Placeholder / empty files are treated as no error.
 func LastErrorSummary() string {
 	s := strings.TrimSpace(ReadLastError())
 	if s == "" {
+		return ""
+	}
+	low := strings.ToLower(s)
+	if strings.Contains(low, "no errors recorded yet") {
 		return ""
 	}
 	if len(s) > 600 {
@@ -77,6 +82,11 @@ func AppendDesktopLog(format string, args ...any) {
 	defer f.Close()
 	_, _ = f.WriteString(line)
 	fmt.Fprint(os.Stderr, line)
+}
+
+// ClearLastError removes a stale last-error.txt after Protect recovers.
+func ClearLastError() {
+	_ = os.Remove(LastErrorPath())
 }
 
 // RecordError persists the last error for tray "Open diagnostics" / "Copy last error".

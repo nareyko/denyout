@@ -235,6 +235,16 @@ func (s *Session) AllowHost(host, reason string) {
 	}
 }
 
+// RevokeHost removes a host from the live policy allowlist (Undo Allow).
+func (s *Session) RevokeHost(host string) {
+	s.mu.Lock()
+	eng := s.eng
+	s.mu.Unlock()
+	if eng != nil {
+		eng.RevokeHost(host)
+	}
+}
+
 // SetThreatChecker attaches or replaces Book C on the live engine.
 func (s *Session) SetThreatChecker(c policy.ThreatChecker) {
 	s.mu.Lock()

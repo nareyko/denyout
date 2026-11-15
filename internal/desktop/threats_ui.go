@@ -196,13 +196,16 @@ func (a *App) UISetAdvancedThreatFeed(id string, on bool) error {
 	return a.setThreatFeedEnabled(id, on)
 }
 
-// UIRefreshThreatLists force-refreshes enabled feeds (Settings status only on failure).
+// UIRefreshThreatLists force-refreshes enabled feeds and rebinds live Protect.
 func (a *App) UIRefreshThreatLists() (ThreatListsView, error) {
 	st := a.ensureThreatStore(true)
 	if st == nil {
 		return ThreatListsView{}, fmt.Errorf("threat lists unavailable")
 	}
 	a.syncThreatChecker(st)
+	if err := a.rebindThreatsIfProtectOn(); err != nil {
+		return a.GetThreatLists(), err
+	}
 	return a.GetThreatLists(), nil
 }
 
@@ -246,9 +249,18 @@ func (a *App) syncThreatChecker(st *threatlists.Store) {
 	a.mu.Lock()
 	sess := a.session
 	a.threats = st
+	wraps := make([]*wrapProc, 0, len(a.wraps))
+	for _, wp := range a.wraps {
+		wraps = append(wraps, wp)
+	}
 	a.mu.Unlock()
 	if sess != nil {
 		sess.SetThreatChecker(st)
+	}
+	for _, wp := range wraps {
+		if wp != nil && wp.sess != nil {
+			wp.sess.SetThreatChecker(st)
+		}
 	}
 }
 
@@ -264,6 +276,6 @@ func (a *App) rebindThreatsIfProtectOn() error {
 	if !wasProxy {
 		return nil
 	}
-	a.stopComputerOpts(true, false)
+	_ = a.stopComputerOpts(true, false)
 	return a.startComputer()
 }

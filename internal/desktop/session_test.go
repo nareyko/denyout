@@ -13,6 +13,7 @@ func TestLegacySessionClearedOnRestore(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Setenv("XDG_STATE_HOME", filepath.Join(home, ".local", "state"))
 
 	st := desktop.DefaultState()
 	st.SetupDone = true

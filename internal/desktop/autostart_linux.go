@@ -10,12 +10,23 @@ import (
 	"syscall"
 )
 
-func registerAutostartLinux(self string) error {
+func linuxConfigHome() (string, error) {
+	if cfg := os.Getenv("XDG_CONFIG_HOME"); cfg != "" {
+		return cfg, nil
+	}
 	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".config"), nil
+}
+
+func registerAutostartLinux(self string) error {
+	cfg, err := linuxConfigHome()
 	if err != nil {
 		return err
 	}
-	dir := filepath.Join(home, ".config", "autostart")
+	dir := filepath.Join(cfg, "autostart")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
@@ -33,7 +44,7 @@ X-GNOME-Autostart-enabled=true
 		return err
 	}
 
-	unitDir := filepath.Join(home, ".config", "systemd", "user")
+	unitDir := filepath.Join(cfg, "systemd", "user")
 	_ = os.MkdirAll(unitDir, 0o755)
 	unit := fmt.Sprintf(`[Unit]
 Description=DenyOut desktop tray
@@ -52,19 +63,24 @@ WantedBy=default.target
 }
 
 func unregisterAutostartLinux() error {
-	home, err := os.UserHomeDir()
+	cfg, err := linuxConfigHome()
 	if err != nil {
 		return err
-	}
-	cfg := os.Getenv("XDG_CONFIG_HOME")
-	if cfg == "" {
-		cfg = filepath.Join(home, ".config")
 	}
 	_ = os.Remove(filepath.Join(cfg, "autostart", "denyout.desktop"))
 	unitDir := filepath.Join(cfg, "systemd", "user")
 	_ = os.Remove(filepath.Join(unitDir, "denyout-desktop.service"))
 	_ = os.Remove(filepath.Join(unitDir, "denyout-desktop.service.off"))
 	return nil
+}
+
+func autostartRegisteredLinux() bool {
+	cfg, err := linuxConfigHome()
+	if err != nil {
+		return false
+	}
+	_, err = os.Stat(filepath.Join(cfg, "autostart", "denyout.desktop"))
+	return err == nil
 }
 
 func detachCmd(cmd *exec.Cmd) {

@@ -134,6 +134,9 @@ func SaveProfile(p AgentProfile) error {
 	if p.ID == "" {
 		p.ID = slugID(p.Name)
 	}
+	if p.Learning.Enabled && strings.TrimSpace(p.Learning.StartedAt) == "" {
+		p.Learning.StartedAt = time.Now().UTC().Format(time.RFC3339)
+	}
 	if err := os.MkdirAll(ProfilesDir(), 0o755); err != nil {
 		return err
 	}

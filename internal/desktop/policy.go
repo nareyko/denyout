@@ -26,7 +26,7 @@ func (a *App) desktopPolicyConfig() (*policy.Config, error) {
 	a.mu.Lock()
 	profile := normalizePolicyProfile(a.state.PolicyProfile)
 	ask := a.state.AskMode
-	always := append([]string{}, a.state.AlwaysAllowHosts...)
+	always := liveAllowHostsLocked(a.state)
 	activeID := a.state.ActiveProfileID
 	a.mu.Unlock()
 

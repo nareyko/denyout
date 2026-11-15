@@ -8,6 +8,55 @@ import (
 	"github.com/nareyko/denyout/internal/threatlists"
 )
 
+// startThreatPollWorker periodically refreshes due threat feeds so Settings
+// "Update every (hours)" is real, not only honored on Protect start / Refresh now.
+func (a *App) startThreatPollWorker(ctx context.Context) {
+	go func() {
+		// First pass soon after launch (never-downloaded feeds are always due).
+		t := time.NewTimer(45 * time.Second)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				a.pollThreatListsOnce()
+				t.Reset(30 * time.Minute)
+			}
+		}
+	}()
+}
+
+func (a *App) pollThreatListsOnce() {
+	st := a.ensureThreatStore(false)
+	if st == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+	u := &threatlists.Updater{Store: st}
+	res := u.RefreshEnabled(ctx, false)
+	changed := false
+	for _, r := range res {
+		if r.Skipped {
+			continue
+		}
+		if r.OK {
+			changed = true
+			AppendDesktopLog("INFO threatlist poll %s: %d entries", r.ID, r.Entries)
+		} else if r.Error != "" {
+			AppendDesktopLog("WARN threatlist poll %s: %s", r.ID, r.Error)
+		}
+	}
+	if !changed {
+		return
+	}
+	a.syncThreatChecker(st)
+	if err := a.rebindThreatsIfProtectOn(); err != nil {
+		AppendDesktopLog("WARN threatlist rebind after poll: %v", err)
+	}
+}
+
 // ensureThreatStore opens (or reuses) Book C cache.
 // When forceRefresh is true, also refreshes enabled feeds (Protect start / Refresh now).
 func (a *App) ensureThreatStore(forceRefresh bool) *threatlists.Store {
@@ -73,6 +122,15 @@ func (a *App) ThreatNeedsAttention() bool {
 		return false
 	}
 	return (&threatlists.Updater{Store: st}).NeedsAttention()
+}
+
+// threatNeedsAttentionLocked uses the already-open store (caller holds a.mu).
+// Never call ensureThreatStore here — that would re-lock and deadlock.
+func (a *App) threatNeedsAttentionLocked() bool {
+	if a.threats == nil {
+		return false
+	}
+	return (&threatlists.Updater{Store: a.threats}).NeedsAttention()
 }
 
 func threatAttachLogSummary(st *threatlists.Store) string {

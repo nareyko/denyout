@@ -77,7 +77,9 @@ func TestQuitUnloadClearsLeaveOnWithoutElevate(t *testing.T) {
 	st.ProtectionOn = true
 	st.ComputerEnabled = false
 	a := &App{state: st, status: "Session"}
-	a.quitUnload()
+	if err := a.quitUnload(); err != nil {
+		t.Fatalf("quitUnload: %v", err)
+	}
 	if a.state.ProtectionOn || a.state.ComputerEnabled {
 		t.Fatalf("leave-on not cleared: protection=%v computer=%v", a.state.ProtectionOn, a.state.ComputerEnabled)
 	}

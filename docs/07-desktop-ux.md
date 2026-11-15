@@ -23,25 +23,27 @@ This document is the **inventory of what the user sees**: install, tray icon, tr
 
 Install is **terminal-first**. There is no browser installer and no multi-page GUI wizard during `install.sh`.
 
+**Deferred Protect (target behavior):** install never asks for a password; the app opens with a mode choice; Protect computer asks for a password only when enabling. Spec: [`ux-iters/deferred-protect-onboarding.md`](ux-iters/deferred-protect-onboarding.md), impl: [`ux-iters/deferred-protect-impl.md`](ux-iters/deferred-protect-impl.md).
+
 ### 1.1 Typical desktop install (GUI session or `--desktop`)
 
 **What appears in the terminal (in order):**
 
 1. Progress lines (`version`, fetch, checksum, installed `denyout`, optional `denyout-desktop`, `done`, `version` output).
 2. Mode line: `denyout install: mode=desktop (...)`.
-3. Banner: `Desktop install - silent: autostart, try Protect computer, tray in background.`
-4. `denyout desktop --install`: Safe prefs, autostart, stop previous instances, detach tray.
+3. Banner: `Desktop install — no password yet. Opening DenyOut to choose protection…`
+4. `denyout desktop --install`: Off prefs, stop previous instances, detach tray/UI (**no** Protect, **no** elevate). Autostart after mode choice.
 
-**Outside the terminal after silent install:**
+**Outside the terminal after install:**
 
 | Surface | When | What the user sees |
 | --- | --- | --- |
-| **System tray icon** | Immediately / next login | **DenyOut**. Tooltip `DenyOut - <mode>` (§2) |
-| **Admin / elevation** | If Protect needs privileges | OS elevation dialog |
-| **Your setup** | Once | Mode + 3 bullets. **Open DenyOut** (primary) - **Got it** (§4.4 / §5.5) |
-| **Wails window** | Only if user chooses Open DenyOut (or later left-click) | Does not auto-open every login |
+| **System tray icon** | Immediately | **DenyOut**. Tooltip `DenyOut - Off` until Protect |
+| **DenyOut window** | Opens once after install | Home + required **mode choice** modal |
+| **Admin / elevation** | Only after Protect computer → Continue | OS elevation (helper installed for later restores on Linux) |
+| **Your setup** | Once after a completed choice | Status + tips + autostart note. **Open DenyOut** / **Got it** |
 
-Silent install **does not** show the first-run three-way choice (§1.3).
+Closing the window without choosing does **not** count as Not now; the modal returns next open.
 
 ### 1.2 Server / headless
 
@@ -97,7 +99,7 @@ Quit DenyOut
 | **My agents...** | With Wails: open window on **My agents** screen. Fallback shell: native agent list / New / Start / Stop |
 | Off | Turn Protect off |
 | Open DenyOut... | Same as left-click -> Home |
-| Quit DenyOut | Full unload: tear down hostguard (admin once if needed), stop proxyd/agents, exit process. Does not delete binaries/config (use `denyout uninstall`). |
+| Quit DenyOut | Asks: **Turn off protection and quit** / **Keep protection on and quit** / Cancel. Turn off = full unload (admin if needed). Keep = proxyd+rules stay; tray exits. Does not delete binaries/config (`denyout uninstall`). |
 
 **Not in tray:** What was blocked, Always-allow, Help, Notifications, Test, Agents only, Switch Safe, Resume asks, Learning primary, Last block, version footer.
 
@@ -277,8 +279,14 @@ Normative detail: [`ux-iters/notifications-rework-plan.md`](ux-iters/notificatio
 
 Threat-list hits use reason `threat_list`. User **Allow this site** / timed allow beats threat lists. Starter **packs** do not. Product unbreak (Book D) skips threat lists only - scanners still apply. Detail: [`ux-iters/threat-lists-plan.md`](ux-iters/threat-lists-plan.md).
 
-**OS toasts (whitelist only):** Keep-repeat - Allow Undo - Protect pause ended - protection failure. 
-**Notifications levels:** Quiet / Normal / Detailed (dialogs always when Protect on). 
+**OS toasts (whitelist only):** `protect_failed` · `allow_undo` · `protect_resumed` · soft `open_app`.  
+`keep_repeat` never reaches the OS (History + tray count).  
+**Levels:** Quiet (default for new installs) / Normal / Detailed (Advanced). Dialogs always when Present.  
+**Presence:** Away (lock or idle ≥5m) → no Ask/Decision; tray `N waiting`; return → one in-app **While you were away**.  
+**Snooze:** tray / Settings mute non-critical OS for 1h or until tomorrow (Protect stays on).  
+`protect_failed` may still show when banners master is off.  
+**Fullscreen / night / sound:** Respect fullscreen (default on) suppresses steal-focus + non-critical OS; Quiet overnight mutes sound 22:00–08:00; sound only when you must answer (default on).  
+**Banner lifetimes:** failed stays · soft Open ~12s · status ~5s · Undo ~10s once per host (throttle).  
 **Protect Off:** pause presets (15m / 1h / tomorrow / forever). Home/tray truthful. No Off nags.
 
 No false-deny of normal API auth on Safe (0.2.1).

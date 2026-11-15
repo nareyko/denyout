@@ -8,6 +8,10 @@ import (
 )
 
 func TestUICheckForUpdatesNewer(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("XDG_STATE_HOME", dir)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{"version":"9.9.9","url":"https://example.com/rel","notes":"test notes"}`))
 	}))
@@ -37,6 +41,10 @@ func TestUICheckForUpdatesNewer(t *testing.T) {
 }
 
 func TestUICheckForUpdatesFailOpen(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("XDG_STATE_HOME", dir)
 	a := &App{
 		opts:       Options{Version: "0.1.0"},
 		state:      DefaultState(),

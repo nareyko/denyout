@@ -68,24 +68,24 @@ func (f *askFlight) PauseRemaining() time.Duration {
 	return d
 }
 
-func (f *askFlight) Do(host string, fn func() string) string {
+func (f *askFlight) Do(host string, fn func() string) (action string, storm bool) {
 	host = strings.ToLower(strings.TrimSpace(host))
 	if host == "" {
-		return "deny"
+		return "deny", false
 	}
 	f.mu.Lock()
 	if time.Now().Before(f.pausedUntil) {
 		f.mu.Unlock()
-		return "deny"
+		return "deny", false
 	}
 	if t, ok := f.suppress[host]; ok && time.Now().Before(t) {
 		f.mu.Unlock()
-		return "deny"
+		return "deny", false
 	}
 	if c, ok := f.pending[host]; ok {
 		f.mu.Unlock()
 		c.wg.Wait()
-		return c.action
+		return c.action, false
 	}
 	c := &askCall{}
 	c.wg.Add(1)
@@ -93,7 +93,7 @@ func (f *askFlight) Do(host string, fn func() string) string {
 	f.mu.Unlock()
 
 	f.global.Lock()
-	action := fn()
+	action = fn()
 	f.global.Unlock()
 
 	if action == "" {
@@ -120,20 +120,16 @@ func (f *askFlight) Do(host string, fn func() string) string {
 		}
 	}
 	f.askTimes = f.askTimes[:n]
-	storm := len(f.askTimes) >= askStormCount
+	storm = len(f.askTimes) >= askStormCount
 	f.mu.Unlock()
 	c.wg.Done()
-
-	if storm {
-		go maybeOfferAskPause(f)
-	}
-	return action
+	return action, storm
 }
 
 var askPauseOfferMu sync.Mutex
 var askPauseOfferedAt time.Time
 
-func maybeOfferAskPause(f *askFlight) {
+func (a *App) maybeOfferAskPause() {
 	askPauseOfferMu.Lock()
 	if time.Since(askPauseOfferedAt) < askStormWindow {
 		askPauseOfferMu.Unlock()
@@ -141,13 +137,19 @@ func maybeOfferAskPause(f *askFlight) {
 	}
 	askPauseOfferedAt = time.Now()
 	askPauseOfferMu.Unlock()
+	if a.opts.OpenUI != nil {
+		// Wails: open Settings → Asks (section mounts when ask_paused or agents active).
+		a.RequestOpenUI("settings-asks")
+		notify.Info("DenyOut", "Many Ask prompts. Open Settings → Advanced → Asks to pause for 15 minutes.")
+		return
+	}
 	if nativeConfirm(
 		"DenyOut",
 		"Many permission prompts in a short time.\n\nPause asks for 15 minutes? New sites stay blocked until you resume.",
 		"Pause asks",
 		"Keep asking",
 	) {
-		f.SetPaused(askPauseDefault)
+		_ = a.UIPauseAsks()
 		notify.Info("DenyOut", "Asks paused for 15 minutes. New sites stay blocked. Resume from Settings -> Advanced.")
 	}
 }
@@ -166,14 +168,37 @@ func (f *askFlight) notifyIPBlocked(host string) {
 	f.ipLast[host] = now
 	f.mu.Unlock()
 	notify.Info("DenyOut blocked a direct IP",
-		host+"\nConnections by raw IP are blocked in this mode. Prefer Protect computer for everyday apps.")
+		host+"\nRaw IP addresses are blocked in Agents mode. Everyday Protect computer allows public IPs.")
+}
+
+// restoreAskPause reapplies persisted AskPausedUntil into the in-memory flight.
+func (a *App) restoreAskPause() {
+	a.mu.Lock()
+	until := strings.TrimSpace(a.state.AskPausedUntil)
+	a.mu.Unlock()
+	if until == "" {
+		return
+	}
+	exp, err := time.Parse(time.RFC3339, until)
+	if err != nil || !time.Now().Before(exp) {
+		a.mu.Lock()
+		a.state.AskPausedUntil = ""
+		st := a.state
+		a.mu.Unlock()
+		_ = SaveState(st)
+		return
+	}
+	if a.asks == nil {
+		a.asks = newAskFlight()
+	}
+	a.asks.SetPaused(time.Until(exp))
 }
 
 func (a *App) coalescedAsk(host, reason string) string {
-	return a.coalescedAskProfile(host, reason, "")
+	return a.coalescedAskProfile(host, reason, "", "")
 }
 
-func (a *App) coalescedAskProfile(host, reason, profileName string) string {
+func (a *App) coalescedAskProfile(host, reason, profileName, profileID string) string {
 	if a.asks == nil {
 		a.asks = newAskFlight()
 	}
@@ -184,7 +209,53 @@ func (a *App) coalescedAskProfile(host, reason, profileName string) string {
 		a.asks.notifyIPBlocked(host)
 		return "deny"
 	}
-	return a.asks.Do(host, func() string {
+	// Away or fullscreen quiet: keep blocked without Ask popup; tray unread grows.
+	if a.isAway() || a.isFullscreenQuiet() {
+		a.noteAwayUnread(host, awayUnreadBlock)
+		return AskDeny
+	}
+	action, storm := a.asks.Do(host, func() string {
+		// Prefer in-app Wails Ask when the DecisionPresenter is registered.
+		if fn := getDecisionPresenter(); fn != nil {
+			why := notify.HumanReasons([]string{reason})
+			if profileName != "" {
+				why = profileName + " — " + why
+			}
+			timeout := decisionTimeout(a)
+			if timeout < 30*time.Second {
+				timeout = 30 * time.Second
+			}
+			act := fn(DecisionPrompt{
+				Host:        host,
+				Reason:      reason,
+				Why:         why,
+				Timeout:     timeout,
+				Taught:      true,
+				Kind:        "ask",
+				ProfileName: profileName,
+				ProfileID:   strings.TrimSpace(profileID),
+			})
+			return normalizeAskAction(act)
+		}
 		return askViaToastThenDialog(host, reason, profileName)
 	})
+	if storm {
+		go a.maybeOfferAskPause()
+	}
+	return action
+}
+
+func normalizeAskAction(action string) string {
+	action = strings.TrimSpace(strings.ToLower(action))
+	switch {
+	case action == AskOnce || action == "once":
+		return AskOnce
+	case action == AskAlways || action == DecisionAllow || action == "always":
+		return AskAlways
+	case strings.HasPrefix(action, DecisionAllowTimed):
+		// Timed allow from a hard-block-shaped click → session once for Ask.
+		return AskOnce
+	default:
+		return AskDeny
+	}
 }

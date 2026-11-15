@@ -410,7 +410,7 @@ if [ "$MODE" = "server" ]; then
 fi
 
 echo ""
-echo "Desktop install — silent: autostart, try Protect computer, tray in background."
+echo "Desktop install — no password yet. Opening DenyOut to choose protection…"
 echo ""
 
 # Prefer Wails shell when installed; Install() detaches sibling denyout-desktop when present.

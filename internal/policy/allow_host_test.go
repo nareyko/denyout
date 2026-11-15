@@ -27,4 +27,12 @@ func TestAllowHostLiveUpdate(t *testing.T) {
 	if d2.Verdict != "allow" {
 		t.Fatalf("after once: %+v", d2)
 	}
+	eng.RevokeHost("example.com")
+	d3, err := eng.EvaluateURL("https://example.com/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d3.Verdict != "deny" {
+		t.Fatalf("after revoke: %+v", d3)
+	}
 }

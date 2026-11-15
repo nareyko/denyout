@@ -157,7 +157,7 @@ kind: Config
 mode: blocklist
 preset: none
 allow_private: false
-allow_ip_literals: false
+allow_ip_literals: true
 allowed_ports: [443, 80]
 deny:
   - host: pastebin.com

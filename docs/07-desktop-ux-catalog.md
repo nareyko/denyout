@@ -58,11 +58,14 @@ App name: **DenyOut**.
 
 | Label |
 | --- |
-| `Off` / `Protected` / `Agents only` / ... (disabled status line) |
+| `Off` / `Protected` / `Agents only` / ... (disabled status line; may append `· N waiting` or `· snoozed`) |
 | `Protect computer` or `Protect computer ✓` |
 | `My agents...` |
 | `Off` or `Off ✓` |
 | `Open DenyOut...` |
+| `Snooze notifications 1 hour` |
+| `Snooze until tomorrow` |
+| `Clear notification snooze` |
 | `Quit DenyOut` |
 
 ---
@@ -192,13 +195,24 @@ Dropped - Home covers first open.
 | Protection | Turn Protect computer on to block... Prefer My agents... |
 | | **Turn on Protect computer** - **Turn off** - (**Switch to Protect computer** only if Agents only) |
 | | `Now: Protected` / Off / mode label |
-| Notifications | **Show OS notifications for blocks and asks** |
+| Notifications | Intro: Blocks always go to History… one summary when you return. |
+| | **How chatty** — Quiet (recommended) / A bit more |
+| | **Stay quiet while away** |
+| | **Snooze** — 1 hour / Until tomorrow / Clear snooze |
+| | **Quiet overnight** |
+| | **Sound only when you must answer** |
+| | Protect block timeout · Keep-repeat / re-ask interval |
 | Autostart | **Launch DenyOut at login** |
 
 ### 7.2 Advanced
 
 | Card | Copy / controls |
 | --- | --- |
+| System banners | **Allow system banners** (Protect failed still appears when off) |
+| | **Level** — Quiet / Normal / Detailed |
+| | **Respect fullscreen / games** |
+| | **If DenyOut is open, stay silent in the system** |
+| | Decisions only inside DenyOut (always on) · banner lifetime blurb |
 | Account | Sign in to sync settings across computers. DenyOut works fully without an account. |
 | | Email - **Email me a code** - One-time code - **Sign in** - (signed in) Sync settings - **Sync now** - **Sign out** - **Delete cloud data** |
 | Sites I've allowed or silenced | Allowed + Silenced (Keep blocked) - Filter - **Undo last allow** - Remove / Clear |
@@ -224,6 +238,18 @@ Dropped - Home covers first open.
 ---
 
 ## 9. OS toasts & dialogs (outside the window)
+
+**OS whitelist (only these kinds):** Protect failed · Allow Undo · Protect resumed · soft Open DenyOut.  
+Keep-repeat never uses OS. Away/return digest is **in-app** (`While you were away`).
+
+### 9.0 Return digest (in-app)
+
+| Element | Copy |
+| --- | --- |
+| Title | **While you were away** |
+| Body | `N sites blocked (hosts…)`. Protect stayed on. / `M decision was waiting…` |
+| Actions | **Review history** · **Open** (if waiting) · **Dismiss** |
+| Soft OS (Normal+, window closed) | While you were away — open DenyOut to see what waited. · **Open** |
 
 ### 9.1 Post-block (Safe desktop)
 

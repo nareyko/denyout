@@ -154,6 +154,24 @@ func (e *Engine) AllowHost(host, reason string) {
 	e.Cfg.Allow = append(e.Cfg.Allow, Rule{Host: host, Reason: reason})
 }
 
+// RevokeHost removes a host from the in-memory allowlist (Undo Allow / timed expiry).
+func (e *Engine) RevokeHost(host string) {
+	host = normalizeHost(host)
+	if host == "" {
+		return
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	out := e.Cfg.Allow[:0]
+	for _, r := range e.Cfg.Allow {
+		if strings.EqualFold(r.Host, host) {
+			continue
+		}
+		out = append(out, r)
+	}
+	e.Cfg.Allow = out
+}
+
 func denyForbiddenWildcards(cfg *Config) *Decision {
 	if cfg.InsecureAllowAll {
 		return nil
@@ -189,7 +207,7 @@ func (e *Engine) resolveIPs(cfg *Config, host string, ips []net.IP, reasons *[]s
 			if d := denyUnsafeIPs(ips, cfg.AllowPrivate, nil); d != nil {
 				return nil, d
 			}
-			return nil, &Decision{Verdict: "deny", Reasons: []string{ReasonHostNotAllowed}}
+			return nil, &Decision{Verdict: "deny", Reasons: []string{ReasonIPLiteral}}
 		}
 	}
 	return ips, nil

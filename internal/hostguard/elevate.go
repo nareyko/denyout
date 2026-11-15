@@ -11,7 +11,11 @@ import (
 )
 
 // ElevateApply re-executes `denyout hostctl apply` with admin rights.
+// Tries the privileged helper first (no password) when available.
 func ElevateApply(proxyPort int, caCert string, uid int) error {
+	if err := HelperApply(proxyPort, caCert, uid); err == nil {
+		return nil
+	}
 	exe, err := SelfExe()
 	if err != nil {
 		return err
@@ -27,6 +31,9 @@ func ElevateApply(proxyPort int, caCert string, uid int) error {
 
 // ElevateRemove re-executes hostctl remove with admin rights.
 func ElevateRemove(proxyPort int, uid int) error {
+	if err := HelperRemove(proxyPort, uid); err == nil {
+		return nil
+	}
 	exe, err := SelfExe()
 	if err != nil {
 		return err
@@ -41,6 +48,9 @@ func ElevateRemove(proxyPort int, uid int) error {
 
 // ElevateTeardown re-executes hostctl teardown (redirect Remove + system CA uninstall).
 func ElevateTeardown(proxyPort int, uid int) error {
+	if err := HelperTeardown(proxyPort, uid); err == nil {
+		return nil
+	}
 	exe, err := SelfExe()
 	if err != nil {
 		return err

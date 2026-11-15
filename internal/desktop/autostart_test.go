@@ -4,8 +4,26 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
+
+func TestPreferStableDesktopBinarySkipsGoTest(t *testing.T) {
+	dir := t.TempDir()
+	stable := filepath.Join(dir, "denyout-desktop")
+	if err := os.WriteFile(stable, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	got := preferStableDesktopBinary(filepath.Join(os.TempDir(), "go-build123", "desktop.test"))
+	if got != stable {
+		// LookPath may resolve to another denyout-desktop earlier on PATH; accept any non-test.
+		base := filepath.Base(got)
+		if strings.Contains(base, ".test") || strings.HasSuffix(base, ".test") {
+			t.Fatalf("still unstable: %s", got)
+		}
+	}
+}
 
 func TestAutostartExecLine(t *testing.T) {
 	desktop := filepath.Join("/opt", "denyout-desktop")

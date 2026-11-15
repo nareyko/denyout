@@ -58,6 +58,16 @@ func unregisterAutostartDarwin() error {
 	return nil
 }
 
+func autostartRegisteredDarwin() bool {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return false
+	}
+	path := filepath.Join(home, "Library", "LaunchAgents", "com.denyout.desktop.plist")
+	_, err = os.Stat(path)
+	return err == nil
+}
+
 func updateMacAutostartEnv(proxyURL, caFile string) error {
 	home, err := os.UserHomeDir()
 	if err != nil {
