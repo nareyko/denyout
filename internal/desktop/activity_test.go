@@ -81,12 +81,17 @@ func TestControlReadyAndSessionRestore(t *testing.T) {
 		}
 	}
 
-	// Bootstrap continues after /ready (restore clears legacy Session). Poll state.
+	// Bootstrap continues after /ready (restore clears legacy Session). Poll until
+	// clearLegacySessionScope has persisted Off — disk already had LastDenyHost/SetupDone,
+	// so do not treat those alone as "restore finished".
 	var got desktop.State
 	deadline = time.Now().Add(3 * time.Second)
+	cleared := false
 	for time.Now().Before(deadline) {
 		got = desktop.LoadState()
-		if got.LastDenyHost == "blocked.example" && got.SetupDone {
+		if got.LastDenyHost == "blocked.example" && got.SetupDone &&
+			!(got.Scope == desktop.ScopeSession && got.ProtectionOn) {
+			cleared = true
 			break
 		}
 		time.Sleep(20 * time.Millisecond)
@@ -94,8 +99,7 @@ func TestControlReadyAndSessionRestore(t *testing.T) {
 	if got.LastDenyHost != "blocked.example" {
 		t.Fatalf("hydrate last_deny path=%s got=%+v", desktop.StatePath(), got)
 	}
-	// Legacy Session scope must not silently restore - cleared to Off.
-	if got.Scope == desktop.ScopeSession && got.ProtectionOn {
+	if !cleared {
 		t.Fatalf("legacy session must not stay on after restore, got %+v", got)
 	}
 
