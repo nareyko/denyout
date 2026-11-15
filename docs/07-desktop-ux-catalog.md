@@ -239,17 +239,17 @@ Dropped - Home covers first open.
 
 ## 9. OS toasts & dialogs (outside the window)
 
-**OS whitelist (only these kinds):** Protect failed · Allow Undo · Protect resumed · soft Open DenyOut.  
-Keep-repeat never uses OS. Away/return digest is **in-app** (`While you were away`).
+**OS whitelist (only these kinds):** Protect failed · Protect resumed · soft Open DenyOut / tray-hidden.  
+**No OS Undo** (Undo is in-app only). Keep-repeat never uses OS. Away/return digest is **in-app**.
 
 ### 9.0 Return digest (in-app)
 
 | Element | Copy |
 | --- | --- |
-| Title | **While you were away** |
+| Title | **Quiet items waiting** |
 | Body | `N sites blocked (hosts…)`. Protect stayed on. / `M decision was waiting…` |
 | Actions | **Review history** · **Open** (if waiting) · **Dismiss** |
-| Soft OS (Normal+, window closed) | While you were away — open DenyOut to see what waited. · **Open** |
+| Soft OS (Normal+, window closed) | Quiet items waiting — switch to DenyOut to review. · **Open** |
 
 ### 9.1 Post-block (Safe desktop)
 

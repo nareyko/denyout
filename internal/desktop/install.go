@@ -12,29 +12,23 @@ import (
 // stop old instances, detach tray/UI. Does NOT enable Protect, does NOT
 // elevate, and does NOT register autostart until the user finishes mode choice
 // (see completeSetupSideEffects).
+//
+// Re-install / upgrade (SetupDone already true): keep setup + soft prefs
+// (notify level, Stay quiet, Respect fullscreen, …); still force Protect Off
+// and clear a stale last-error so Problems is not stuck on a fixed elevate bug.
 func Install(opts Options) error {
 	_ = opts
-	st := LoadState()
-	st.SetupDone = false
-	st.Notify = true
-	st.AskMode = false
-	st.PolicyProfile = PolicyProfileBrowse
-	st.UXv2Migrated = true
-	st.ComputerAvailable = true
-	st.Scope = ScopeOff
-	st.ProtectionOn = false
-	st.ComputerEnabled = false
-	st.Autostart = false
-	st.AutostartAsked = false
-	st.YourSetupShown = false
-	st.PendingYourSetup = ""
-	if err := SaveState(st); err != nil {
+	st, err := installPrepareState()
+	if err != nil {
 		return err
 	}
-	notify.SetEnabled(true)
-	// Login launch is registered only after mode choice (completeSetupSideEffects).
-	// Drop any leftover entry from a previous install so Settings matches Off.
-	_ = UnregisterAutostart()
+	upgrade := st.SetupDone
+
+	if !upgrade {
+		// Login launch is registered only after mode choice (completeSetupSideEffects).
+		// Drop any leftover entry from a previous install so Settings matches Off.
+		_ = UnregisterAutostart()
+	}
 
 	fmt.Fprintln(os.Stderr, "denyout install: stopping previous tray/proxyd (if any)...")
 	StopPreviousInstances()
@@ -52,10 +46,50 @@ func Install(opts Options) error {
 		return fmt.Errorf("start tray: %w", err)
 	}
 
-	fmt.Fprintln(os.Stderr, "denyout install: started (protection off until you choose)")
+	if upgrade {
+		fmt.Fprintln(os.Stderr, "denyout install: upgrade — keeping your setup; protection off until you turn it on")
+	} else {
+		fmt.Fprintln(os.Stderr, "denyout install: started (protection off until you choose)")
+	}
 	fmt.Fprintf(os.Stderr, "denyout install: done (scope=%s profile=%s protection_on=%v setup_done=%v)\n",
 		st.Scope, st.PolicyProfile, st.ProtectionOn, st.SetupDone)
 	return nil
+}
+
+// installPrepareState shapes desktop.json for Install (also used by tests).
+func installPrepareState() (State, error) {
+	prev := LoadState()
+	upgrade := prev.SetupDone
+
+	st := prev
+	if !upgrade {
+		st.SetupDone = false
+		st.Notify = true
+		st.AskMode = false
+		st.PolicyProfile = PolicyProfileBrowse
+		st.UXv2Migrated = true
+		st.Autostart = false
+		st.AutostartAsked = false
+		st.YourSetupShown = false
+		st.PendingYourSetup = ""
+	} else {
+		st.SetupDone = true
+		st.UXv2Migrated = true
+		if st.PolicyProfile == "" {
+			st.PolicyProfile = PolicyProfileBrowse
+		}
+	}
+	st.ComputerAvailable = true
+	st.Scope = ScopeOff
+	st.ProtectionOn = false
+	st.ComputerEnabled = false
+	if err := SaveState(st); err != nil {
+		return st, err
+	}
+	ClearLastError()
+	notify.SetEnabled(true)
+	applyNotifyPrefs(st)
+	return st, nil
 }
 
 func desktopBinaryPresent() bool {

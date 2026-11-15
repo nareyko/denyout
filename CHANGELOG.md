@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **Upgrade install** keeps `setup_done` and soft prefs (Quiet / Stay quiet / tips); still forces Protect Off. No longer re-opens first-run on every `install.sh --desktop`.
+- **Obsolete last-error** from fixed elevate bugs (`--action-id=…`, test/CI skip) cleared on install and desktop start so Problems stays honest.
+
 ## 0.4.4 - pkexec Protect fix (2026-11-15)
 
 ### Fixed

@@ -126,6 +126,7 @@ func (a *App) Bootstrap(ctx context.Context) error {
 		fmt.Fprintf(os.Stderr, "denyout desktop: control IPC server: %v\n", err)
 	}
 
+	clearObsoleteLastError()
 	a.maybePromptCrashLeftovers()
 	a.normalizePersistedState()
 	a.reconcileAutostart()
