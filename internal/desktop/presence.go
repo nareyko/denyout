@@ -1,6 +1,7 @@
 package desktop
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -137,9 +138,11 @@ func (a *App) maybeSoftOpenReturn() {
 	if n <= 0 {
 		return
 	}
-	body := "While you were away — open DenyOut to see what waited."
+	body := "While you were away — open DenyOut to see quiet items."
 	if n == 1 {
-		body = "While you were away — 1 item waiting. Open DenyOut."
+		body = "While you were away — 1 quiet item. Open DenyOut."
+	} else if n > 1 {
+		body = fmt.Sprintf("While you were away — %d quiet items. Open DenyOut.", n)
 	}
 	notify.EmitAction(notify.KindOpenApp, "DenyOut", body, 12*time.Second,
 		[]notify.Action{{ID: "open", Label: "Open"}},
@@ -151,6 +154,21 @@ func (a *App) maybeSoftOpenReturn() {
 	)
 }
 
+func appendAwayHost(list *[]string, host string) {
+	if host == "" {
+		return
+	}
+	for _, h := range *list {
+		if h == host {
+			return
+		}
+	}
+	*list = append(*list, host)
+	if len(*list) > 20 {
+		*list = (*list)[len(*list)-20:]
+	}
+}
+
 func (a *App) noteAwayUnread(host string, kind awayUnreadKind) {
 	host = strings.TrimSpace(host)
 	if kind == "" {
@@ -160,21 +178,9 @@ func (a *App) noteAwayUnread(host string, kind awayUnreadKind) {
 	a.state.AwayUnreadBlocks++
 	if kind == awayUnreadWaiting {
 		a.state.AwayUnreadWaiting++
-	}
-	if host != "" {
-		found := false
-		for _, h := range a.state.AwayUnreadHosts {
-			if h == host {
-				found = true
-				break
-			}
-		}
-		if !found {
-			a.state.AwayUnreadHosts = append(a.state.AwayUnreadHosts, host)
-			if len(a.state.AwayUnreadHosts) > 20 {
-				a.state.AwayUnreadHosts = a.state.AwayUnreadHosts[len(a.state.AwayUnreadHosts)-20:]
-			}
-		}
+		appendAwayHost(&a.state.AwayUnreadWaitingHosts, host)
+	} else {
+		appendAwayHost(&a.state.AwayUnreadHosts, host)
 	}
 	st := a.state
 	a.mu.Unlock()
@@ -202,6 +208,7 @@ func (a *App) clearAwayUnread() {
 	a.state.AwayUnreadBlocks = 0
 	a.state.AwayUnreadWaiting = 0
 	a.state.AwayUnreadHosts = nil
+	a.state.AwayUnreadWaitingHosts = nil
 	st := a.state
 	a.mu.Unlock()
 	_ = SaveState(st)

@@ -712,8 +712,8 @@ export function Settings({
           </label>
           <p className="muted" style={{ marginTop: "0.25rem" }}>
             {snap.notify_level === "detailed"
-              ? "Detailed is on. Pick Quiet or A bit more here, or change Detailed under Advanced → System banners."
-              : "Detailed (more status banners) is under Advanced → System banners."}
+              ? "Detailed is on (Advanced → System banners). Today it uses the same OS banner kinds as A bit more — pick Quiet or A bit more here to leave Detailed."
+              : "Detailed lives under Advanced → System banners. Today it matches A bit more for OS banner kinds."}
           </p>
           <label style={{ display: "block", marginTop: "0.65rem" }}>
             <input
@@ -730,7 +730,7 @@ export function Settings({
           </label>
           <p className="muted" style={{ marginTop: "0.25rem" }}>
             {snap.quiet_while_away === false
-              ? "Off: Ask and block dialogs can appear while the screen is locked or idle."
+              ? "Off: Ask dialogs can appear while the screen is locked or idle (soft OS banners still follow Quiet/Normal)."
               : `When on: no Ask popups while locked or idle. Tray count grows. One summary when you return. ${protectionContinuityNow(snap)}`}
             {typeof snap.away_unread === "number" && snap.away_unread > 0
               ? ` Quiet so far: ${snap.away_unread}.`
@@ -739,20 +739,15 @@ export function Settings({
           </p>
           <div style={{ marginTop: "0.65rem" }}>
             <div style={{ fontWeight: 500, marginBottom: "0.35rem" }}>Snooze</div>
-            {snap.notify_snooze_active ? (
-              <p className="notice-box" style={{ marginBottom: "0.35rem" }}>
-                Notifications snoozed
-                {snap.notify_snooze_until
-                  ? ` until ${new Date(snap.notify_snooze_until).toLocaleString()}`
-                  : ""}
-                . Soft OS banners stay off until then. {protectionContinuityNow(snap)}
-              </p>
-            ) : (
-              <p className="muted" style={{ marginBottom: "0.35rem" }}>
-                Temporarily quiet OS banners without changing How chatty.{" "}
-                {protectionContinuityNow(snap)}
-              </p>
-            )}
+            <p className="muted" style={{ marginBottom: "0.35rem" }}>
+              {snap.notify_snooze_active
+                ? `Snoozed${
+                    snap.notify_snooze_until
+                      ? ` until ${new Date(snap.notify_snooze_until).toLocaleString()}`
+                      : ""
+                  }. Soft OS banners stay off until then. Clear below or see the notice at the top. ${protectionContinuityNow(snap)}`
+                : `Temporarily quiet OS banners without changing How chatty. ${protectionContinuityNow(snap)}`}
+            </p>
             <div className="row-actions" style={{ gap: "0.4rem", flexWrap: "wrap" }}>
               <button
                 type="button"
@@ -823,7 +818,7 @@ export function Settings({
             Sound only when you must answer
           </label>
           <p className="muted" style={{ marginTop: "0.25rem" }}>
-            Passive blocks stay silent. Ask / Protect failed may still sound.
+            Passive OS banners stay silent. Protect failed may still sound.
           </p>
             <label style={{ display: "block", marginTop: "0.5rem" }}>
               Protect block timeout (seconds){" "}
@@ -872,8 +867,9 @@ export function Settings({
               />
             </label>
             <p className="muted" style={{ marginTop: "0.35rem" }}>
-              How often to remind after Keep blocked (post-block throttle). Agent Ask storms
-              still use a fixed short window — pause Asks under Advanced if prompts pile up.
+              How often to re-open a decision after Decide later / timeout. After Keep blocked,
+              repeats stay in History (no OS remind). Agent Ask storms still use a fixed short
+              window — pause Asks under Advanced if prompts pile up.
             </p>
  </section>
  )}
@@ -955,7 +951,7 @@ export function Settings({
           </p>
  {!threats && (
  <p className="warn-box" style={{ marginTop: "0.5rem" }}>
- Couldn’t load threat lists yet. Prefer Refresh — don’t treat the checkboxes below as live prefs.
+ Couldn’t load threat lists yet. Use Refresh now below — don’t treat the checkboxes as live prefs until that works.
  {snap?.threat_lists_warn
  ? " The top bar still shows they need attention."
  : ""}
@@ -1086,17 +1082,24 @@ export function Settings({
  <button
  type="button"
  className="btn"
- disabled={threatBusy || !threats}
+ disabled={threatBusy}
  onClick={() => {
  setThreatBusy(true);
  void api
- .refreshThreatLists()
- .then(async (t) => {
- setThreats(t);
- await reload();
- })
- .catch((err) => fail(err))
- .finally(() => setThreatBusy(false));
+  .refreshThreatLists()
+  .then(async (t) => {
+   setThreats(t);
+   await reload();
+  })
+  .catch(async (err) => {
+   fail(err);
+   try {
+    await reloadThreats();
+   } catch {
+    /* still unavailable */
+   }
+  })
+  .finally(() => setThreatBusy(false));
  }}
  >
  {threatBusy ? "Working..." : "Refresh now"}
@@ -1227,6 +1230,10 @@ export function Settings({
  <option value="detailed">Detailed</option>
  </select>
  </label>
+ <p className="muted" style={{ marginTop: "0.25rem" }}>
+ Detailed today matches A bit more for which OS banner kinds appear. Quiet still
+ limits to Protect failed.
+ </p>
  <label style={{ display: "block", marginTop: "0.65rem" }}>
  <input
  type="checkbox"
@@ -1241,7 +1248,7 @@ export function Settings({
  Respect fullscreen / games
  </label>
  <p className="muted" style={{ marginTop: "0.25rem" }}>
- Avoid steal-focus and sound while a fullscreen app is in front.
+ Avoid Ask/block dialogs, soft OS banners, and steal-focus while a fullscreen app is in front.
  </p>
  <label style={{ display: "block", marginTop: "0.5rem" }}>
  <input
@@ -1991,6 +1998,8 @@ export function Settings({
  {pauseOpen ? (
  <PauseModal
  busy={pauseBusy}
+ mode={snap?.mode}
+ intentAgents={intentAgents}
  alreadyOff={canChangePause}
  brokenIntent={brokenIntent}
  error={err}

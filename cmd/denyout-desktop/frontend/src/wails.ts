@@ -45,6 +45,7 @@ export type UISnapshot = {
   blocks?: number;
   waiting?: number;
   hosts?: string[];
+  waiting_hosts?: string[];
  };
  notify_snooze_until?: string;
  notify_snooze_active?: boolean;
