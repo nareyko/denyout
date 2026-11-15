@@ -1,23 +1,44 @@
+import type { ReactNode } from "react";
+
 type Props = {
   blocks: number;
   waiting: number;
-  hosts: string[];
+  /** Hosts for auto-kept / block quiet items. */
+  hosts?: string[];
+  /** Hosts for waiting decisions (Decide later). */
+  waitingHosts?: string[];
   /** Mode-honest line: Protect computer / Agents only / My agents / generic. */
   keptRunningLine?: string;
   onReview: () => void;
   onDismiss: () => void;
 };
 
+function hostSpan(hosts: string[]): ReactNode {
+  const top = (hosts || []).filter(Boolean).slice(0, 5);
+  if (top.length === 0) return null;
+  return (
+    <>
+      {" "}
+      <span className="muted">
+        ({top.join(", ")}
+        {hosts.length > top.length ? ", …" : ""})
+      </span>
+    </>
+  );
+}
+
 /** One-shot return card after Away (Phase C). Not an OS toast wall. */
 export function AwayDigestModal({
   blocks,
   waiting,
   hosts,
+  waitingHosts,
   keptRunningLine,
   onReview,
   onDismiss,
 }: Props) {
-  const top = (hosts || []).filter(Boolean).slice(0, 5);
+  const blockHosts = hosts || [];
+  const waitHosts = waitingHosts || [];
   const hasWaiting = waiting > 0;
   const hasBlocks = blocks > 0;
   const kept =
@@ -36,17 +57,7 @@ export function AwayDigestModal({
         {hasBlocks ? (
           <p>
             {blocks === 1 ? "1 site blocked" : `${blocks} sites blocked`}
-            {top.length > 0 ? (
-              <>
-                {" "}
-                <span className="muted">
-                  (
-                  {top.join(", ")}
-                  {hosts.length > top.length ? ", …" : ""})
-                </span>
-              </>
-            ) : null}
-            . {kept}
+            {hostSpan(blockHosts)}.
           </p>
         ) : null}
         {hasWaiting ? (
@@ -54,12 +65,13 @@ export function AwayDigestModal({
             {waiting === 1
               ? "1 decision was waiting"
               : `${waiting} decisions were waiting`}
-            . Review History to Allow or Keep blocked.
+            {hostSpan(waitHosts)}. Review History to Allow or Keep blocked.
           </p>
         ) : null}
         {!hasBlocks && !hasWaiting ? (
           <p className="muted">Something waited while you were away.</p>
         ) : null}
+        <p className="muted">{kept}</p>
         <div className="decision-actions" style={{ marginTop: "0.85rem" }}>
           <button type="button" className="btn primary" onClick={onReview}>
             Review History

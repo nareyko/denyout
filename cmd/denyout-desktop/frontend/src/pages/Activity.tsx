@@ -247,6 +247,30 @@ export function Activity({
  )}
  {displayRows.length === 0 ? (
  <div className="empty card">
+ {showFilters && (search.trim() || reason || rememberedOnly) ? (
+ <>
+ <p>
+ <strong>No matches for these filters.</strong>
+ </p>
+ <p className="muted">
+ Clear search, reason, or Silenced only to see the full History again.
+ </p>
+ <div className="row-actions">
+ <button
+ className="btn subtle"
+ type="button"
+ onClick={() => {
+ setSearch("");
+ setReason("");
+ setRememberedOnly(false);
+ }}
+ >
+ Clear filters
+ </button>
+ </div>
+ </>
+ ) : (
+ <>
  <p>
  <strong>Nothing blocked yet - that is OK.</strong>
  </p>
@@ -289,6 +313,8 @@ export function Activity({
  </button>
  ) : null}
  </div>
+ </>
+ )}
  </div>
  ) : (
  <div className="layout-split">

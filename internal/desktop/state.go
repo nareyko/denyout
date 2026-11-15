@@ -26,9 +26,10 @@ type State struct {
 	QuietWhileAwayOff bool `json:"quiet_while_away_off,omitempty"`
 	// AwayUnreadBlocks / AwayUnreadHosts: suppressed prompts while Away (tray count).
 	AwayUnreadBlocks int      `json:"away_unread_blocks,omitempty"`
-	AwayUnreadHosts  []string `json:"away_unread_hosts,omitempty"`
+	AwayUnreadHosts  []string `json:"away_unread_hosts,omitempty"` // auto-kept / block quiet hosts
 	// AwayUnreadWaiting: subset of AwayUnreadBlocks that were hard-block "Decide later" while Away.
-	AwayUnreadWaiting int `json:"away_unread_waiting,omitempty"`
+	AwayUnreadWaiting      int      `json:"away_unread_waiting,omitempty"`
+	AwayUnreadWaitingHosts []string `json:"away_unread_waiting_hosts,omitempty"`
 	// NotifySnoozeUntil: RFC3339; non-critical OS banners muted until then (Protect stays on).
 	NotifySnoozeUntil string `json:"notify_snooze_until,omitempty"`
 	// QuietOvernightOff: default false = no sound at night (22:00–08:00).

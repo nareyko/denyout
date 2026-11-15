@@ -121,8 +121,11 @@ func TestReturnArmsAwayDigest(t *testing.T) {
 	if view.Blocks != 1 || view.Waiting != 1 {
 		t.Fatalf("blocks=%d waiting=%d", view.Blocks, view.Waiting)
 	}
-	if len(view.Hosts) < 1 {
-		t.Fatal("expected hosts")
+	if len(view.Hosts) != 1 || view.Hosts[0] != "evil.example" {
+		t.Fatalf("block hosts=%v", view.Hosts)
+	}
+	if len(view.WaitingHosts) != 1 || view.WaitingHosts[0] != "ask.example" {
+		t.Fatalf("waiting hosts=%v", view.WaitingHosts)
 	}
 	_ = a.UIDismissAwayDigest()
 	if a.awayDigestPending() || a.awayUnreadCount() != 0 {

@@ -306,6 +306,8 @@ export function Home({
  {pauseOpen ? (
  <PauseModal
  busy={busy}
+ mode={snap?.mode}
+ intentAgents={intentAgents}
  alreadyOff={canChangePause && !brokenIntent}
  brokenIntent={brokenIntent}
  error={err}

@@ -31,7 +31,7 @@ func (a *App) runFirstRunWizard() {
 		st := a.state
 		a.mu.Unlock()
 		_ = SaveState(st)
-		a.maybeAskAutostart()
+		a.maybeAskAutostart("protect")
 		if err := a.enableSafeDesktop(); err != nil {
 			notify.Emit(notify.KindProtectFailed, "DenyOut", "Could not turn on Protect computer (admin may be required). You can retry from the tray.")
 			a.showYourSetup("off")
@@ -50,7 +50,7 @@ func (a *App) runFirstRunWizard() {
 		st := a.state
 		a.mu.Unlock()
 		_ = SaveState(st)
-		a.maybeAskAutostart()
+		a.maybeAskAutostart("agents")
 		a.showYourSetup("agents")
 		go func() {
 			// Wails already opens New agent from the frontend — do not re-emit
@@ -66,7 +66,7 @@ func (a *App) runFirstRunWizard() {
 		}()
 	default: // not now / cancel
 		_ = a.finishSetupNotNow("")
-		a.maybeAskAutostart()
+		a.maybeAskAutostart("off")
 		a.showYourSetup("off")
 	}
 }
@@ -465,7 +465,8 @@ return r`, text, title)
 	return "notnow"
 }
 
-func (a *App) maybeAskAutostart() {
+// maybeAskAutostart offers login launch once. kind: protect | agents | off.
+func (a *App) maybeAskAutostart(kind string) {
 	a.mu.Lock()
 	asked := a.state.AutostartAsked
 	a.mu.Unlock()
@@ -474,9 +475,16 @@ func (a *App) maybeAskAutostart() {
 	}
 	yes := true
 	if dialogToolkitAvailable() {
+		body := "Start DenyOut automatically when you log in?\n\nRecommended so DenyOut is ready after reboot."
+		switch strings.ToLower(strings.TrimSpace(kind)) {
+		case "protect", "safe", "computer":
+			body = "Start DenyOut automatically when you log in?\n\nRecommended so Protect computer stays on after reboot."
+		case "agents":
+			body = "Start DenyOut automatically when you log in?\n\nRecommended so DenyOut is ready for My agents after reboot. Everyday browsing stays unprotected until you turn on Protect computer."
+		}
 		yes = nativeConfirm(
 			"DenyOut",
-			"Start DenyOut automatically when you log in?\n\nRecommended so Protect computer stays on after reboot.",
+			body,
 			"Yes, start at login",
 			"Not now",
 		)

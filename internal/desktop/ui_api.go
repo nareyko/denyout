@@ -110,10 +110,11 @@ type UISnapshot struct {
 
 // AwayDigestView is the one-shot "While you were away" card (Phase C).
 type AwayDigestView struct {
-	Pending bool     `json:"pending"`
-	Blocks  int      `json:"blocks"`  // auto-kept / keep-repeat while Away
-	Waiting int      `json:"waiting"` // hard-block Decide later while Away
-	Hosts   []string `json:"hosts"`
+	Pending      bool     `json:"pending"`
+	Blocks       int      `json:"blocks"`  // auto-kept / keep-repeat while Away
+	Waiting      int      `json:"waiting"` // hard-block Decide later while Away
+	Hosts        []string `json:"hosts"`         // block hosts only
+	WaitingHosts []string `json:"waiting_hosts"` // waiting-decision hosts
 }
 
 // ProblemsView is the Problems screen payload.
@@ -836,11 +837,16 @@ func (a *App) awayDigestViewLocked() *AwayDigestView {
 	if len(hosts) > 5 {
 		hosts = hosts[:5]
 	}
+	waitHosts := append([]string(nil), a.state.AwayUnreadWaitingHosts...)
+	if len(waitHosts) > 5 {
+		waitHosts = waitHosts[:5]
+	}
 	return &AwayDigestView{
-		Pending: true,
-		Blocks:  blocks,
-		Waiting: waiting,
-		Hosts:   hosts,
+		Pending:      true,
+		Blocks:       blocks,
+		Waiting:      waiting,
+		Hosts:        hosts,
+		WaitingHosts: waitHosts,
 	}
 }
 

@@ -336,6 +336,8 @@ export function Problems({
       {pauseOpen ? (
         <PauseModal
           busy={pauseBusy}
+          mode={mode}
+          intentAgents={intentAgents}
           alreadyOff={canChangePause}
           brokenIntent={brokenIntent}
           error={err}

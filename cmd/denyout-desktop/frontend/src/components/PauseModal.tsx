@@ -1,12 +1,18 @@
 import { useEffect } from "react";
 import { decisionModalOpen } from "./DecisionModal";
 
+type ProtectMode = "safe" | "agents" | "session" | "off" | string;
+
 type Props = {
   busy?: boolean;
   /** True when Protect is already off (paused / forever) — change duration only. */
   alreadyOff?: boolean;
   /** Intent on but protector dead (Needs attention) — Cancel does not keep live Protect. */
   brokenIntent?: boolean;
+  /** Live snapshot mode — wording must not say Protect when Agents only / Session. */
+  mode?: ProtectMode;
+  /** Last intent was Agents only (broken Off path). */
+  intentAgents?: boolean;
   /** Shown inside the modal — page err behind the backdrop is invisible. */
   error?: string;
   onChoose: (choice: string) => void;
@@ -20,25 +26,38 @@ const CHOICES: { id: string; label: string; hint: string }[] = [
   { id: "forever", label: "Until I turn it on", hint: "Stay off" },
 ];
 
+function modeLabel(mode?: ProtectMode, intentAgents?: boolean): string {
+  if (mode === "agents" || intentAgents) return "Agents only";
+  if (mode === "session") return "Session protection";
+  return "Protect computer";
+}
+
 /** In-app pause / turn-off picker. */
 export function PauseModal({
   busy,
   alreadyOff,
   brokenIntent,
+  mode,
+  intentAgents,
   error,
   onChoose,
   onCancel,
 }: Props) {
+  const label = modeLabel(mode, intentAgents);
+  const agentsNote =
+    mode === "agents" || intentAgents
+      ? " Everyday browsing stays unprotected either way."
+      : "";
   const title = brokenIntent
-    ? "Clear Protect intent?"
+    ? `Clear ${label} intent?`
     : alreadyOff
       ? "Change pause?"
-      : "Pause / turn off Protect?";
+      : `Pause / turn off ${label}?`;
   const body = brokenIntent
-    ? "Protect is not running right now. Choosing a duration clears restore intent so DenyOut stops trying to turn Protect back on. Cancel leaves intent as-is."
+    ? `${label} is not running right now. Choosing a duration clears restore intent so DenyOut stops trying to turn it back on. Cancel leaves intent as-is.${agentsNote}`
     : alreadyOff
-      ? "How long should Protect stay off? Cancel leaves the current pause as-is."
-      : "How long should Protect stay off? Cancel keeps protection on.";
+      ? `How long should ${label} stay off? Cancel leaves the current pause as-is.${agentsNote}`
+      : `How long should ${label} stay off? Cancel keeps ${label} on.${agentsNote}`;
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {

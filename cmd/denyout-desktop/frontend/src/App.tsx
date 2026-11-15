@@ -656,12 +656,20 @@ export default function App() {
  (!!(snap?.protect_paused_until || "").trim() ||
  (snap?.protect_pause_last || "") === "forever");
  if (protectLive || snap?.problems_alert || protectPaused) {
+ const pauseNoun =
+  snap?.mode === "agents"
+   ? "Agents only"
+   : snap?.mode === "session"
+     ? "Session protection"
+     : "Protect";
  items.push({
  label: protectPaused
- ? "Change Protect pause…"
+ ? `Change ${pauseNoun} pause…`
  : snap?.problems_alert && (snap?.mode === "off" || !snap?.mode)
-   ? "Clear Protect intent…"
-   : "Pause / turn off Protect…",
+   ? (snap?.policy_profile || "").toLowerCase() === "agent"
+     ? "Clear Agents only intent…"
+     : "Clear Protect intent…"
+   : `Pause / turn off ${pauseNoun}…`,
  route: "home",
  hint: "Opens pause choices",
  openProtectPause: true,
@@ -683,6 +691,7 @@ export default function App() {
  snap?.problems_alert,
  snap?.protect_paused_until,
  snap?.protect_pause_last,
+ // Jump pause labels depend on mode + policy_profile above.
  ]);
 
  function go(
@@ -1152,6 +1161,7 @@ export default function App() {
    blocks={awayDigest.blocks ?? 0}
    waiting={awayDigest.waiting ?? 0}
    hosts={awayDigest.hosts ?? []}
+   waitingHosts={awayDigest.waiting_hosts ?? []}
    keptRunningLine={
     snap?.mode === "safe" && snap.protection_on
      ? "Protect computer stayed on."
@@ -1178,6 +1188,8 @@ export default function App() {
  {trayPauseOpen ? (
  <PauseModal
  busy={trayPauseBusy}
+ mode={snap?.mode}
+ intentAgents={(snap?.policy_profile || "").toLowerCase() === "agent"}
  brokenIntent={
  !!snap?.problems_alert && (snap?.mode === "off" || !snap?.mode)
  }
@@ -1219,9 +1231,13 @@ export default function App() {
       <p className="muted">
         {snap?.mode === "session"
           ? "Session protection runs inside DenyOut and always stops when you quit. My agents wraps stop too."
-          : snap?.problems_alert && (snap?.mode === "off" || !snap?.mode)
-            ? "Protect is not running. Clear restore intent and quit, quit but keep intent for next launch, or Cancel."
-            : "Whole-PC Protect (computer proxy) can stay on after Quit, or turn off first. Session and My agents wraps always stop when you quit."}
+          : snap?.mode === "agents"
+            ? "Agents only can stay on after Quit (everyday browsing stays unprotected), or turn off first. My agents wraps always stop when you quit."
+            : snap?.problems_alert && (snap?.mode === "off" || !snap?.mode)
+              ? (snap?.policy_profile || "").toLowerCase() === "agent"
+                ? "Agents only is not running. Clear restore intent and quit, quit but keep intent for next launch, or Cancel."
+                : "Protect is not running. Clear restore intent and quit, quit but keep intent for next launch, or Cancel."
+              : "Whole-PC Protect (computer proxy) can stay on after Quit, or turn off first. Session and My agents wraps always stop when you quit."}
       </p>
  {quitMsg ? <p className="warn-box">{quitMsg}</p> : null}
  <div className="stack" style={{ gap: "0.5rem", marginTop: "0.85rem" }}>
@@ -1244,7 +1260,9 @@ export default function App() {
  <strong>
  {snap?.problems_alert && (snap?.mode === "off" || !snap?.mode)
  ? "Clear intent and quit"
- : "Turn off protection and quit"}
+ : snap?.mode === "agents"
+   ? "Turn off Agents only and quit"
+   : "Turn off protection and quit"}
  </strong>
  </button>
  {snap?.mode !== "session" ? (
@@ -1267,7 +1285,9 @@ export default function App() {
  <strong>
  {snap?.problems_alert && (snap?.mode === "off" || !snap?.mode)
  ? "Quit and keep restore intent"
- : "Keep protection on and quit"}
+ : snap?.mode === "agents"
+   ? "Keep Agents only on and quit"
+   : "Keep protection on and quit"}
  </strong>
  </button>
  ) : null}
