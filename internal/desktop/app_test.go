@@ -6,15 +6,24 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/nareyko/denyout/internal/desktop"
 )
 
-func TestWizardAPISetup(t *testing.T) {
+func isolateDesktopXDG(t *testing.T) string {
+	t.Helper()
 	dir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("HOME", dir)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, "config"))
+	t.Setenv("XDG_STATE_HOME", filepath.Join(dir, "state"))
+	return dir
+}
+
+func TestWizardAPISetup(t *testing.T) {
+	_ = isolateDesktopXDG(t)
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -96,8 +105,7 @@ func TestWizardAPISetup(t *testing.T) {
 }
 
 func TestAllowAPIOnceAndAlways(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", dir)
+	_ = isolateDesktopXDG(t)
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -159,8 +167,7 @@ func TestAllowAPIOnceAndAlways(t *testing.T) {
 }
 
 func TestAskModeSettings(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", dir)
+	_ = isolateDesktopXDG(t)
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

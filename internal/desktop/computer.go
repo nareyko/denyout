@@ -18,10 +18,12 @@ import (
 func (a *App) startComputer() error {
 	a.mu.Lock()
 	if a.session != nil || a.proxyd != nil {
+		// Idempotent: restore/retry while already running is OK (not a failure).
 		a.mu.Unlock()
-		return fmt.Errorf("protection is already on")
+		return nil
 	}
-	ask := a.state.AskMode
+	// Browse (Protect computer) never uses whole-PC host Ask.
+	ask := a.state.AskMode && normalizePolicyProfile(a.state.PolicyProfile) != PolicyProfileBrowse
 	wizard := a.wizardURL
 	control := a.controlURL
 	a.status = "Starting..."
@@ -81,15 +83,18 @@ func (a *App) startComputer() error {
 		args = append(args, "--allow-base", strings.TrimRight(wizard, "/"))
 	}
 	cmd := exec.Command(self, args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	// Detached so "Quit but keep protection" can leave proxyd running after tray exits.
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	detachCmd(cmd)
 	env := os.Environ()
 	a.mu.Lock()
-	if len(a.state.AlwaysAllowHosts) > 0 {
-		env = append(env, "DENYOUT_ALWAYS_ALLOW="+strings.Join(a.state.AlwaysAllowHosts, ","))
-	}
+	allows := liveAllowHostsLocked(a.state)
 	profile := normalizePolicyProfile(a.state.PolicyProfile)
 	a.mu.Unlock()
+	if len(allows) > 0 {
+		env = append(env, "DENYOUT_ALWAYS_ALLOW="+strings.Join(allows, ","))
+	}
 	env = append(env, "DENYOUT_POLICY_PROFILE="+profile)
 	cmd.Env = env
 	if err := cmd.Start(); err != nil {
@@ -118,7 +123,21 @@ func (a *App) startComputer() error {
 	a.status = "Computer"
 	st := a.state
 	a.mu.Unlock()
+	// Drop stale Last blocked from old IP-literal policy (Safe browse now allows public IPs).
+	if normalizePolicyProfile(profile) == PolicyProfileBrowse && isIPLiteral(st.LastDenyHost) {
+		st.LastDenyHost = ""
+		st.LastDenyURL = ""
+		st.LastDenySummary = ""
+		st.LastDenyProcess = ""
+		a.mu.Lock()
+		a.state.LastDenyHost = ""
+		a.state.LastDenyURL = ""
+		a.state.LastDenySummary = ""
+		a.state.LastDenyProcess = ""
+		a.mu.Unlock()
+	}
 	_ = SaveState(st)
+	ClearLastError()
 
 	go func() {
 		_ = cmd.Wait()
@@ -127,9 +146,15 @@ func (a *App) startComputer() error {
 			a.proxyd = nil
 			a.proxyPort = 0
 			a.state.ComputerEnabled = false
+			// Keep ProtectionOn so restore / Problems "Needs attention" still
+			// reflect leave-on intent after an unexpected proxyd exit.
 			if a.status == "Computer" {
-				a.status = "Off"
+				a.status = "Needs attention"
 			}
+			st := a.state
+			a.mu.Unlock()
+			_ = SaveState(st)
+			return
 		}
 		a.mu.Unlock()
 	}()
@@ -139,7 +164,9 @@ func (a *App) startComputer() error {
 // stopComputerOpts stops computer-mode proxyd.
 // If elevateRemove is false, only kills proxyd - next ElevateApply replaces nft/pf
 // in one admin prompt (avoid Remove+Apply = two passwords).
-func (a *App) stopComputerOpts(keepRestore, elevateRemove bool) {
+// When elevateRemove is true and Remove fails (password cancelled), returns error
+// and leaves leave-on state intact so Quit can abort (D19).
+func (a *App) stopComputerOpts(keepRestore, elevateRemove bool) error {
 	a.mu.Lock()
 	cmd := a.proxyd
 	port := a.proxyPort
@@ -147,6 +174,9 @@ func (a *App) stopComputerOpts(keepRestore, elevateRemove bool) {
 	// Remove even if proxyd already exited (rules can linger after crash).
 	shouldRemove := elevateRemove && (hadProxyd ||
 		(a.state.Scope == ScopeComputer && (a.state.ProtectionOn || a.state.ComputerEnabled)))
+	wasProtectionOn := a.state.ProtectionOn
+	wasComputerEnabled := a.state.ComputerEnabled
+	wasScope := a.state.Scope
 	a.proxyd = nil
 	if hadProxyd {
 		a.proxyPort = 0
@@ -179,12 +209,26 @@ func (a *App) stopComputerOpts(keepRestore, elevateRemove bool) {
 	// Session mode also stores proxyPort - must not trigger ElevateRemove/pkexec.
 	if shouldRemove {
 		uid, _ := hostguard.CurrentUID()
-		_ = hostguard.ElevateRemove(port, uid)
+		if err := hostguard.ElevateRemove(port, uid); err != nil {
+			// Restore leave-on so we do not pretend Protect is gone (D19).
+			a.mu.Lock()
+			a.state.ProtectionOn = wasProtectionOn
+			a.state.ComputerEnabled = wasComputerEnabled
+			a.state.Scope = wasScope
+			if wasProtectionOn {
+				a.status = "Needs admin"
+			}
+			st2 := a.state
+			a.mu.Unlock()
+			_ = SaveState(st2)
+			return err
+		}
 	}
+	return nil
 }
 
 func (a *App) stopAll() {
-	a.stopComputerOpts(true, false) // keep rules; caller may re-Apply once
+	_ = a.stopComputerOpts(true, false) // keep rules; caller may re-Apply once
 	a.stopSessionKeep(true)
 	a.setStatus("Off")
 }
@@ -196,7 +240,13 @@ func (a *App) stopAllKeepRestore() {
 }
 
 func (a *App) stopProtection() {
-	a.stopComputerOpts(false, true) // user turned off -> one Remove prompt
+	_ = a.stopProtectionErr()
+}
+
+func (a *App) stopProtectionErr() error {
+	if err := a.stopComputerOpts(false, true); err != nil {
+		return err
+	}
 	a.stopSession()
 	a.mu.Lock()
 	a.state.ProtectionOn = false
@@ -205,12 +255,71 @@ func (a *App) stopProtection() {
 	st := a.state
 	a.mu.Unlock()
 	_ = SaveState(st)
+	return nil
 }
 
-// quitUnload fully tears down protection (one ElevateRemove if needed) and clears
-// leave-on state so the next login does not auto-restore. Used by tray Quit.
-func (a *App) quitUnload() {
-	a.stopProtection()
+// quitUnload fully tears down protection and clears leave-on state so the next
+// login does not auto-restore. Used by tray Quit when user chooses turn off.
+// Prefer helper; if password is required and the user cancels, return error and
+// do not exit — never leave half-running protection with tray gone.
+func (a *App) quitUnload() error {
+	return a.stopProtectionErr()
+}
+
+// quitLeaveProtectionOn keeps hostguard + proxyd running and persists leave-on
+// so protection continues after the tray process exits.
+func (a *App) quitLeaveProtectionOn() {
+	a.mu.Lock()
+	cmd := a.proxyd
+	a.proxyd = nil // do not Signal/Wait — process stays up (started with Setsid)
+	if cmd != nil {
+		a.state.ProtectionOn = true
+		a.state.ComputerEnabled = true
+		a.state.Scope = ScopeComputer
+	}
+	st := a.state
+	a.mu.Unlock()
+	_ = SaveState(st)
+	AppendDesktopLog("INFO quit: leaving protection on (proxyd kept)")
+}
+
+// trayQuitChoice asks whether to unload protection when quitting the tray.
+// Returns "off", "keep", or "" (cancel).
+func (a *App) trayQuitChoice() string {
+	a.mu.Lock()
+	on := a.proxyd != nil || a.state.ProtectionOn || a.state.ComputerEnabled
+	a.mu.Unlock()
+	if !on {
+		return "off" // nothing to leave on
+	}
+	if !dialogToolkitAvailable() {
+		// No dialog toolkit: safest default is full unload (ask via notify is weak).
+		if nativeConfirm(
+			"Quit DenyOut?",
+			"Turn off protection and quit?\n\nCancel keeps DenyOut running.",
+			"Turn off and quit",
+			"Cancel",
+		) {
+			return "off"
+		}
+		return ""
+	}
+	choice, ok := nativeListPick(
+		"Quit DenyOut?",
+		"Protection is on. What should happen?",
+		[]string{
+			"Turn off protection and quit",
+			"Keep protection on and quit",
+			"Cancel",
+		},
+	)
+	if !ok || choice == "Cancel" || choice == "" {
+		return ""
+	}
+	if strings.HasPrefix(choice, "Keep") {
+		return "keep"
+	}
+	return "off"
 }
 
 func (a *App) setStatus(s string) {
@@ -235,31 +344,27 @@ func (a *App) allowHostOnce(host string) error {
 		sess.AllowHost(host, "user_once")
 		return nil
 	}
-	// proxyd: once without IPC to live engine -> persist + restart
-	return a.allowHostAlways(host)
+	// proxyd has no ephemeral AllowOnce IPC — use a 1h timed allow (not permanent Always).
+	a.addTimedAllow(host, time.Hour)
+	return nil
 }
 
 func (a *App) allowHostAlways(host string) error {
-	if err := a.persistAlwaysHost(host); err != nil {
-		return err
-	}
-	a.mu.Lock()
-	sess := a.session
-	wasProxy := a.proxyd != nil
-	a.mu.Unlock()
-	if sess != nil {
-		return nil
-	}
-	if wasProxy {
-		// Kill proxyd only; ElevateApply replaces redirect in one password.
-		a.stopComputerOpts(true, false)
-		return a.startComputer()
-	}
-	return nil
+	// persistAlwaysHost also restarts proxyd / updates session when protection is on.
+	return a.persistAlwaysHost(host)
 }
 
 func (a *App) enableComputerFromTray() error {
 	if a.currentMode() == ModeComputer {
+		// Already live: "Try again" must restart when unhealthy (CA missing, status error),
+		// not silently succeed while chrome stays Needs attention.
+		a.mu.Lock()
+		unhealthy := problemsUnhealthyLocked(a)
+		a.mu.Unlock()
+		if unhealthy {
+			return a.restartActiveProtector()
+		}
+		a.clearProtectPause()
 		return nil
 	}
 	a.stopSession()
@@ -281,6 +386,7 @@ func (a *App) enableComputerFromTray() error {
 		notify.Emit(notify.KindProtectFailed, "DenyOut", "A password window should have appeared. If you cancelled it, protection stayed Off. Open DenyOut -> Problems, or try Protect computer again.")
 		return err
 	}
+	a.clearProtectPause()
 	AppendDesktopLog("INFO computer mode on profile=%s", normalizePolicyProfile(a.state.PolicyProfile))
 	if !certutilAvailable() {
 		AppendDesktopLog("INFO hint: install libnss3-tools (certutil) for Chrome/Chromium trust")
@@ -292,11 +398,47 @@ func (a *App) enableComputerFromTray() error {
 	return nil
 }
 
+// activeProtectPausedUntil returns until if still in the future; empty if expired/invalid.
+func activeProtectPausedUntil(until string) string {
+	until = strings.TrimSpace(until)
+	if until == "" {
+		return ""
+	}
+	exp, err := time.Parse(time.RFC3339, until)
+	if err != nil || !time.Now().Before(exp) {
+		return ""
+	}
+	return until
+}
+
+// clearProtectPause drops a scheduled auto-resume after the user turns Protect on.
+func (a *App) clearProtectPause() {
+	a.mu.Lock()
+	changed := false
+	if a.state.ProtectPausedUntil != "" {
+		a.state.ProtectPausedUntil = ""
+		changed = true
+	}
+	// Drop stale "forever" so Home/Settings stop saying "Off until you turn it on"
+	// after Protect is back on.
+	if a.state.ProtectPauseLast == "forever" {
+		a.state.ProtectPauseLast = ""
+		changed = true
+	}
+	if !changed {
+		a.mu.Unlock()
+		return
+	}
+	st := a.state
+	a.mu.Unlock()
+	_ = SaveState(st)
+}
+
 func (a *App) enableSessionFromTray() error {
 	if a.currentMode() == ModeSession {
 		return nil
 	}
-	a.stopComputerOpts(false, true) // leaving computer -> Remove once
+	_ = a.stopComputerOpts(false, true) // leaving computer -> Remove once
 	if err := a.startSession(); err != nil {
 		fmt.Fprintf(os.Stderr, "denyout desktop: %v\n", err)
 		a.setStatus("Error")
@@ -306,17 +448,35 @@ func (a *App) enableSessionFromTray() error {
 }
 
 func (a *App) stopProtectionFromTray() {
-	if a.currentMode() == ModeOff {
+	a.mu.Lock()
+	leaveOn := a.state.ProtectionOn || a.state.ComputerEnabled
+	paused := activeProtectPausedUntil(a.state.ProtectPausedUntil) != "" || a.state.ProtectPauseLast == "forever"
+	a.mu.Unlock()
+	if a.currentMode() == ModeOff && !leaveOn {
+		// Already paused / forever-off: reopen PauseModal so duration can change.
+		if paused && a.opts.OpenUI != nil {
+			a.RequestOpenUI("pause")
+		}
 		return
 	}
-	choice := a.chooseProtectPause()
+	// Wails: open in-app PauseModal (Cancel keeps Protect on). Avoid silent 1h when zenity missing.
+	if a.opts.OpenUI != nil {
+		a.RequestOpenUI("pause")
+		return
+	}
+	choice, ok := a.chooseProtectPause()
+	if !ok {
+		return // user cancelled — leave protection on
+	}
 	a.stopProtection()
 	a.applyProtectPauseChoice(choice)
 	// Intentional Off: no OS nag - Home/tray show status.
 }
 
-// chooseProtectPause asks how long to leave Protect off. Empty = until manual On.
-func (a *App) chooseProtectPause() string {
+// chooseProtectPause asks how long to leave Protect off.
+// ok=false means the user cancelled (do not turn protection off).
+// choice "forever" means until manual On (empty ProtectPausedUntil).
+func (a *App) chooseProtectPause() (choice string, ok bool) {
 	a.mu.Lock()
 	last := a.state.ProtectPauseLast
 	a.mu.Unlock()
@@ -324,8 +484,8 @@ func (a *App) chooseProtectPause() string {
 	if last != "" {
 		def = last
 	}
-	title := "DenyOut - Pause protection"
-	text := "How long should Protect stay off?\n(Default: " + def + ". Forever is available but not the default.)"
+	title := "DenyOut - Turn off / pause"
+	text := "How long should Protect stay off?\n(Cancel keeps protection on. Default: " + def + ".)"
 	if runtime.GOOS == "linux" {
 		if zenity, err := exec.LookPath("zenity"); err == nil {
 			cmd := exec.Command(zenity, "--list",
@@ -334,7 +494,7 @@ func (a *App) chooseProtectPause() string {
 				"--column=Choice",
 				"--hide-header",
 				"--width=420",
-				"--height=280",
+				"--height=300",
 				"15 minutes",
 				"1 hour",
 				"Until tomorrow",
@@ -342,12 +502,16 @@ func (a *App) chooseProtectPause() string {
 			)
 			out, err := cmd.Output()
 			if err != nil {
-				return def
+				return "", false
 			}
-			return mapPauseLabel(strings.TrimSpace(string(out)), def)
+			label := strings.TrimSpace(string(out))
+			if label == "" {
+				return "", false
+			}
+			return mapPauseLabel(label, def), true
 		}
 	}
-	return def
+	return def, true
 }
 
 func mapPauseLabel(s, def string) string {
@@ -380,18 +544,20 @@ func (a *App) applyProtectPauseChoice(choice string) {
 		until = ""
 	}
 	a.state.ProtectPausedUntil = until
+	// Drop frozen Your setup "protected" copy — live mode is Off after pause.
+	a.state.PendingYourSetup = ""
 	st := a.state
 	a.mu.Unlock()
 	_ = SaveState(st)
 }
 
-func (a *App) restartActiveProtector() {
+func (a *App) restartActiveProtector() error {
 	a.mu.Lock()
 	scope := a.state.Scope
 	on := a.proxyd != nil || a.session != nil
 	a.mu.Unlock()
 	if !on {
-		return
+		return nil
 	}
 	a.stopAll() // computer: no ElevateRemove; session: stop in-process
 	a.mu.Lock()
@@ -402,16 +568,36 @@ func (a *App) restartActiveProtector() {
 	case ScopeComputer:
 		if err := a.startComputer(); err != nil {
 			fmt.Fprintf(os.Stderr, "denyout desktop: restart computer failed: %v - staying Off\n", err)
+			a.mu.Lock()
+			a.state.ProtectionOn = false
+			a.state.ComputerEnabled = false
+			a.state.Scope = ScopeOff
+			stFail := a.state
+			a.mu.Unlock()
+			_ = SaveState(stFail)
 			a.setStatus("Needs admin")
 			notify.Emit(notify.KindProtectFailed, "DenyOut", "Could not restart Protect computer - staying Off. Retry from Open DenyOut or the tray.")
+			return err
 		}
+		a.clearProtectPause()
+		return nil
 	case ScopeSession:
 		// Session is not a user-facing restore target after UX v2.
-		_ = a.startSession()
+		return a.startSession()
 	default:
 		if err := a.startComputer(); err != nil {
+			a.mu.Lock()
+			a.state.ProtectionOn = false
+			a.state.ComputerEnabled = false
+			a.state.Scope = ScopeOff
+			stFail := a.state
+			a.mu.Unlock()
+			_ = SaveState(stFail)
 			a.setStatus("Needs admin")
+			return err
 		}
+		a.clearProtectPause()
+		return nil
 	}
 }
 
@@ -430,6 +616,8 @@ func (a *App) restoreProtection() {
 		a.state.Scope = ScopeOff
 		a.state.ProtectionOn = false
 		a.state.ComputerEnabled = false
+		a.legacySessionNote =
+			"Earlier Session mode was cleared. Turn on Protect computer from Home when you want browsing protection."
 		st := a.state
 		a.mu.Unlock()
 		_ = SaveState(st)

@@ -21,14 +21,26 @@ const (
 
 // DecisionPrompt is one hard-block decision (compact dialog / in-app modal).
 type DecisionPrompt struct {
-	ID      string
-	Host    string
-	Reason  string
-	Why     string
-	URL     string
-	Timeout time.Duration
-	Taught  bool
+	ID          string
+	Host        string
+	Reason      string
+	Why         string
+	URL         string
+	Timeout     time.Duration
+	Taught      bool
+	Kind        string // ""|"hard" (default) or "ask" (My agents host Ask)
+	ProfileName string
+	ProfileID   string // wrap agent id; timed Allow is session-only (no PC TimedAllows)
+	Batch       bool   // multi-host queue: one action applies to every site
+	MultiAgent  bool   // batch spans more than one wrap profile — UI plural copy
 }
+
+// Ask action strings (Kind == "ask").
+const (
+	AskOnce   = "once"
+	AskAlways = "always"
+	AskDeny   = "deny"
+)
 
 // DecisionPresenter shows a compact decision UI and returns an action string.
 // nil -> native zenity/kdialog fallback.
@@ -109,6 +121,13 @@ func (a *App) presentHardBlockDecision(p DecisionPrompt) string {
 	if p.ID == "" {
 		p.ID = fmt.Sprintf("%d", time.Now().UnixNano())
 	}
+	// Away or fullscreen quiet: do not steal focus; safe default = Decide later.
+	if a != nil && (a.isAway() || a.isFullscreenQuiet()) {
+		a.noteAwayUnread(p.Host, awayUnreadWaiting)
+		key := postBlockKey(p.Host, p.Reason)
+		notePromptIgnore(key)
+		return DecisionLater
+	}
 	if fn := getDecisionPresenter(); fn != nil {
 		return fn(p)
 	}
@@ -147,9 +166,10 @@ func nativeDecisionDialog(p DecisionPrompt) string {
 		timeout = 15 * time.Second
 	}
 
+	wrapAgent := strings.TrimSpace(p.ProfileID) != ""
 	done := make(chan string, 1)
 	go func() {
-		done <- nativeDecisionDialogSync(title, text)
+		done <- nativeDecisionDialogSyncOpts(title, text, wrapAgent)
 	}()
 	select {
 	case a := <-done:
@@ -162,26 +182,31 @@ func nativeDecisionDialog(p DecisionPrompt) string {
 	}
 }
 
-func nativeDecisionDialogSync(title, text string) string {
+func nativeDecisionDialogSyncOpts(title, text string, wrapAgent bool) string {
 	switch runtime.GOOS {
 	case "linux":
 		if zenity, err := exec.LookPath("zenity"); err == nil {
-			cmd := exec.Command(zenity, "--list",
-				"--title="+title,
-				"--text="+text,
-				"--column=Choice",
-				"--hide-header",
-				"--width=480",
-				"--height=320",
+			choices := []string{
 				"Keep blocked",
 				"Keep blocked for 15 minutes",
 				"Keep blocked for 1 hour",
 				"Allow this site",
-				"Allow for 15 minutes",
-				"Allow for 1 hour",
-				"Decide later",
-				"Open DenyOut",
-			)
+			}
+			if !wrapAgent {
+				choices = append(choices, "Allow for 15 minutes", "Allow for 1 hour")
+			}
+			choices = append(choices, "Decide later", "Open DenyOut")
+			args := []string{
+				"--list",
+				"--title=" + title,
+				"--text=" + text,
+				"--column=Choice",
+				"--hide-header",
+				"--width=480",
+				"--height=320",
+			}
+			args = append(args, choices...)
+			cmd := exec.Command(zenity, args...)
 			out, err := cmd.Output()
 			if err != nil {
 				return DecisionLater
@@ -190,16 +215,20 @@ func nativeDecisionDialogSync(title, text string) string {
 		}
 		if kdialog, err := exec.LookPath("kdialog"); err == nil {
 			// menu returns selected tag
-			cmd := exec.Command(kdialog, "--title", title, "--menu", text,
+			args := []string{"--title", title, "--menu", text,
 				"keep", "Keep blocked",
 				"keep_15m", "Keep blocked for 15 minutes",
 				"keep_1h", "Keep blocked for 1 hour",
 				"allow", "Allow this site",
-				"allow_15m", "Allow for 15 minutes",
-				"allow_1h", "Allow for 1 hour",
-				"later", "Decide later",
-				"open", "Open DenyOut",
-			)
+			}
+			if !wrapAgent {
+				args = append(args,
+					"allow_15m", "Allow for 15 minutes",
+					"allow_1h", "Allow for 1 hour",
+				)
+			}
+			args = append(args, "later", "Decide later", "open", "Open DenyOut")
+			cmd := exec.Command(kdialog, args...)
 			out, err := cmd.Output()
 			if err != nil {
 				return DecisionLater

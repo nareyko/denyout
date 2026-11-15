@@ -78,6 +78,7 @@ func (a *App) handleControlAsk(w http.ResponseWriter, r *http.Request) {
 	a.mu.Lock()
 	a.lastDeny = host
 	a.state.LastDenyHost = host
+	a.state.LastDenyProcess = ""
 	st := a.state
 	a.mu.Unlock()
 	_ = SaveState(st)
@@ -130,7 +131,9 @@ func (a *App) handleControlDenyEvent(w http.ResponseWriter, r *http.Request) {
 		a.state.LastDenyHost = body.Host
 		a.state.LastDenySummary = summary
 		a.state.LastDenyURL = redURL
+		a.state.LastDenyProcess = ""
 		ask := a.state.AskMode
+		profile := normalizePolicyProfile(a.state.PolicyProfile)
 		st := a.state
 		a.mu.Unlock()
 		_ = SaveState(st)
@@ -142,7 +145,6 @@ func (a *App) handleControlDenyEvent(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 		}
-		profile := normalizePolicyProfile(a.state.PolicyProfile)
 		safeDesktop := profile == PolicyProfileBrowse && !ask
 		if isIPLiteral(body.Host) {
 			if doNotify {
@@ -186,17 +188,24 @@ func (a *App) persistAlwaysHost(host string) error {
 	}
 	st := a.state
 	sess := a.session
+	wasProxy := a.proxyd != nil
 	a.mu.Unlock()
 	if err := SaveState(st); err != nil {
 		return err
 	}
 	if sess != nil {
 		sess.AllowHost(host, "user_always")
+		return nil
+	}
+	// Protect computer: Always-allow must reach live proxyd (DENYOUT_ALWAYS_ALLOW).
+	if wasProxy {
+		_ = a.stopComputerOpts(true, false)
+		return a.startComputer()
 	}
 	return nil
 }
 
-func (a *App) removeAlwaysHost(host string) {
+func (a *App) removeAlwaysHost(host string) error {
 	host = strings.TrimSpace(host)
 	a.mu.Lock()
 	out := a.state.AlwaysAllowHosts[:0]
@@ -209,8 +218,15 @@ func (a *App) removeAlwaysHost(host string) {
 	st := a.state
 	wasOn := a.proxyd != nil || a.session != nil
 	a.mu.Unlock()
-	_ = SaveState(st)
-	if wasOn {
-		a.restartActiveProtector()
+	if err := SaveState(st); err != nil {
+		return err
 	}
+	// Running My agents wraps keep session allows until revoked.
+	a.revokeHostEverywhere(host)
+	if wasOn {
+		if err := a.restartActiveProtector(); err != nil {
+			return err
+		}
+	}
+	return nil
 }

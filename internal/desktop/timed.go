@@ -56,13 +56,31 @@ func (a *App) sweepTimedRules() {
 	a.mu.Unlock()
 	_ = SaveState(st)
 
-	for _, r := range expiredAllows {
-		host := strings.TrimSpace(r.Host)
-		if host == "" {
-			continue
+	if len(expiredAllows) > 0 {
+		// Drop temporary allows from proxyd + in-process session + wraps.
+		a.mu.Lock()
+		wasProxy := a.proxyd != nil
+		stillLive := map[string]bool{}
+		for _, h := range liveAllowHostsLocked(a.state) {
+			stillLive[h] = true
 		}
-		// Timed allow ended -> ask again (decision dialog).
-		go a.handlePostBlockDeny(host, []string{"host_denied"}, "")
+		a.mu.Unlock()
+		if wasProxy {
+			_ = a.stopComputerOpts(true, false)
+			if err := a.startComputer(); err != nil {
+				AppendDesktopLog("WARN timed-allow expiry rebind: %v", err)
+			}
+		}
+		for _, r := range expiredAllows {
+			host := strings.TrimSpace(r.Host)
+			if host == "" {
+				continue
+			}
+			if !stillLive[strings.ToLower(host)] {
+				a.revokeHostEverywhere(host)
+			}
+			notify.Info("DenyOut", "Temporary allow ended for "+host)
+		}
 	}
 
 	if pauseUntil == "" {
@@ -72,25 +90,30 @@ func (a *App) sweepTimedRules() {
 	if err != nil || now.Before(exp) {
 		return
 	}
-	a.mu.Lock()
-	a.state.ProtectPausedUntil = ""
-	st2 := a.state
-	a.mu.Unlock()
-	_ = SaveState(st2)
+	// User may have turned Protect on during the pause — only resume + toast when still off.
+	if a.currentMode() == ModeComputer {
+		a.clearProtectPause()
+		return
+	}
+	// Clear pause only after a successful resume. Failed password/admin must not
+	// look like a deliberate Off (Home/Settings would drop the Paused label).
 	if err := a.enableComputerFromTray(); err != nil {
+		// Do not invent a new 1h pause the user never picked. Clear the expired
+		// schedule so Home shows Off + Turn on (not a fake "Paused until…").
+		a.clearProtectPause()
+		notify.Emit(notify.KindProtectFailed, "DenyOut",
+			"Could not resume Protect automatically. Turn on from Home when ready.")
 		return
 	}
 	notify.EmitAction(notify.KindProtectResumed, "DenyOut",
-		"Protection is on again.\nUndo to pause again.", 15*time.Second,
+		"Protection is on again.\nUndo to pause again.", notify.ExpireFor(notify.KindProtectResumed),
 		[]notify.Action{{ID: "undo", Label: "Undo"}},
 		func(id string) {
 			if id != "undo" {
 				return
 			}
-			// Re-open pause presets (same as intentional Off).
-			choice := a.chooseProtectPause()
-			a.stopProtection()
-			a.applyProtectPauseChoice(choice)
+			// Same path as tray Off (in-app PauseModal when Wails).
+			a.stopProtectionFromTray()
 		},
 	)
 }

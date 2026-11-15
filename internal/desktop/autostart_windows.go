@@ -39,6 +39,16 @@ func unregisterAutostartWindows() error {
 	return nil
 }
 
+func autostartRegisteredWindows() bool {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return false
+	}
+	cmdPath := filepath.Join(home, "AppData", "Roaming", "Microsoft", "Windows", "Start Menu", "Programs", "Startup", "DenyOut.cmd")
+	_, err = os.Stat(cmdPath)
+	return err == nil
+}
+
 func writeWindowsUserProxy(proxyURL, caFile string) error {
 	_ = exec.Command("setx", "HTTP_PROXY", proxyURL).Run()
 	_ = exec.Command("setx", "HTTPS_PROXY", proxyURL).Run()

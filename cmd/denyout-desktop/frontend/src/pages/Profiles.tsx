@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { ConfirmModal } from "../components/ConfirmModal";
 import { Tip, tipGone } from "../components/Tip";
 import { AllowPack, api, AgentProfile, ProfileView, UISnapshot } from "../wails";
 
@@ -12,25 +13,53 @@ const emptyProfile = (): AgentProfile => ({
  learning: { enabled: true, duration_hours: 24 },
 });
 
+/** Count of open Edit/New agent drafts — App blocks Jump (Ctrl+K) while editing. */
+let openProfileEditCount = 0;
+
+export function profileEditOpen(): boolean {
+ return openProfileEditCount > 0;
+}
+
 export function Profiles({
  openNew,
  onNewConsumed,
  snap,
  onTipDismiss,
  tipsEnabled = true,
+ /** Shell owns Esc (Your setup / Jump / Decision / Quit / Pause) — do not discard draft. */
+ escDeferred = false,
 }: {
  openNew?: boolean;
  onNewConsumed?: () => void;
  snap?: UISnapshot | null;
  onTipDismiss?: () => void;
  tipsEnabled?: boolean;
+ escDeferred?: boolean;
 }) {
  const [list, setList] = useState<ProfileView[]>([]);
  const [edit, setEdit] = useState<AgentProfile | null>(null);
  const [cmdLine, setCmdLine] = useState("");
  const [msg, setMsg] = useState("");
+ const [err, setErr] = useState("");
+ const note = (m: string) => {
+ setErr("");
+ setMsg(m);
+ };
+ const fail = (e: unknown) => {
+ setMsg("");
+ setErr(String(e));
+ };
  const [packs, setPacks] = useState<AllowPack[]>([]);
  const [addPackID, setAddPackID] = useState("");
+ const [addHost, setAddHost] = useState("");
+ const [confirm, setConfirm] = useState<null | {
+ title: string;
+ body: string;
+ danger?: boolean;
+ confirmLabel?: string;
+ run: () => Promise<void>;
+ }>(null);
+ const [confirmBusy, setConfirmBusy] = useState(false);
 
  async function reload() {
  setList((await api.profiles()) ?? []);
@@ -44,20 +73,61 @@ export function Profiles({
  }, []);
 
  useEffect(() => {
- void reload().catch((e) => setMsg(String(e)));
+ void reload().catch((e) => fail(e));
+ const poll = window.setInterval(() => {
+ void reload().catch(() => undefined);
+ }, 4000);
+ return () => window.clearInterval(poll);
  }, []);
 
  useEffect(() => {
- if (openNew) {
- openNewForm();
+ if (!openNew) return;
+ requestOpenNew();
  onNewConsumed?.();
- }
  }, [openNew]);
+
+ useEffect(() => {
+ if (!edit) return;
+ openProfileEditCount += 1;
+ return () => {
+ openProfileEditCount = Math.max(0, openProfileEditCount - 1);
+ };
+ }, [edit]);
+
+ useEffect(() => {
+ if (!edit || confirm || escDeferred) return;
+ function onKey(e: KeyboardEvent) {
+ if (e.key !== "Escape") return;
+ e.preventDefault();
+ e.stopPropagation();
+ setEdit(null);
+ }
+ window.addEventListener("keydown", onKey, true);
+ return () => window.removeEventListener("keydown", onKey, true);
+ }, [edit, confirm, escDeferred]);
 
  function openNewForm() {
  const p = emptyProfile();
  setEdit(p);
  setCmdLine(p.command.join(" "));
+ }
+
+ /** Jump / toolbar New agent: keep New draft; confirm before discarding Edit. */
+ function requestOpenNew() {
+ if (edit && !(edit.id || "").trim()) return;
+ if (edit && (edit.id || "").trim()) {
+ setConfirm({
+ title: "Discard edit?",
+ body: `Discard changes to ${edit.name || "this agent"} and create a new agent?`,
+ confirmLabel: "Discard and create new",
+ danger: true,
+ run: async () => {
+ openNewForm();
+ },
+ });
+ return;
+ }
+ openNewForm();
  }
 
  function openEdit(p: ProfileView) {
@@ -69,7 +139,7 @@ export function Profiles({
  if (!edit) return;
  const parts = cmdLine.trim().split(/\s+/).filter(Boolean);
  if (!edit.name.trim() || parts.length === 0) {
- setMsg("Name and command are required.");
+ fail("Name and command are required.");
  return;
  }
  const isNew = !edit.id;
@@ -92,30 +162,34 @@ export function Profiles({
  packs.find((x) => x.id === suggest) ||
  packs.find((x) => x.id === "cursor-starter") ||
  packs[0];
+ setEdit(null);
+ await reload();
  if (pack) {
- const ok = confirm(
- `Add recommended hosts?\n\n${pack.name}: ${pack.description}\n\nYou can Undo the pack later from Edit agent.`,
- );
- if (ok) {
+ setConfirm({
+ title: `Add ${pack.name}?`,
+ body: `${pack.description}\n\nYou can Undo the pack later from Edit agent.`,
+ confirmLabel: "Add hosts",
+ run: async () => {
  const added = await api.applyAllowPack(p.id, pack.id);
- setMsg(
+ note(
  added?.length
  ? `Saved ${p.name}. Added ${added.length} host(s) from ${pack.name}.`
  : `Saved ${p.name}. Pack already covered.`,
  );
+ await reload();
+ },
+ });
+ note(`Saved ${p.name}.`);
  } else {
- setMsg(`Saved ${p.name}.`);
+ note(`Saved ${p.name}.`);
  }
  } else {
- setMsg(`Saved ${p.name}.`);
- }
- } else {
- setMsg("");
- }
+ note("");
  setEdit(null);
  await reload();
+ }
  } catch (e) {
- setMsg(String(e));
+ fail(e);
  }
  }
 
@@ -134,11 +208,11 @@ export function Profiles({
  )}
 
  <div className="toolbar">
- <button className="btn primary" onClick={openNewForm}>
+ <button className="btn primary" onClick={requestOpenNew}>
  New agent
  </button>
  </div>
- {msg && <p className="muted">{msg}</p>}
+ {err ? <p className="warn-box">{err}</p> : msg ? <p className="muted">{msg}</p> : null}
 
  {pendingTotal > 0 && (
  <section className="card">
@@ -147,6 +221,49 @@ export function Profiles({
  {pendingTotal} pending Allow once host{pendingTotal === 1 ? "" : "s"}. Pin adds them to
  the agent allowlist; Discard clears them.
  </p>
+ <div className="row-actions" style={{ marginTop: "0.55rem" }}>
+ {list
+ .filter((p) => (p.pending_once?.length || 0) > 0)
+ .map((p) => (
+ <span key={p.id} className="row-actions" style={{ gap: "0.35rem" }}>
+ <button
+ className="btn"
+ onClick={() => {
+ const n = p.pending_once?.length || 0;
+ setConfirm({
+ title: `Pin sites for ${p.name}?`,
+ body: `Pin ${n} site${n === 1 ? "" : "s"}?\n\nThey move onto this agent’s allowlist.`,
+ confirmLabel: "Pin",
+ run: async () => {
+ await api.pinLearning(p.id);
+ await reload();
+ },
+ });
+ }}
+ >
+ Pin {p.name}
+ </button>
+ <button
+ className="btn subtle"
+ onClick={() => {
+ const n = p.pending_once?.length || 0;
+ setConfirm({
+ title: `Discard pending for ${p.name}?`,
+ body: `Discard ${n} pending site${n === 1 ? "" : "s"}?\n\nThey stay blocked for this agent.`,
+ danger: true,
+ confirmLabel: "Discard",
+ run: async () => {
+ await api.discardLearning(p.id);
+ await reload();
+ },
+ });
+ }}
+ >
+ Discard {p.name}
+ </button>
+ </span>
+ ))}
+ </div>
  </section>
  )}
 
@@ -159,7 +276,7 @@ export function Profiles({
  Create an agent only when you want to wrap a tool (for example an AI CLI). Protect
  computer on Home covers normal web use.
  </p>
- <button className="btn primary" onClick={openNewForm}>
+ <button className="btn primary" onClick={requestOpenNew}>
  New agent
  </button>
  </div>
@@ -171,6 +288,7 @@ export function Profiles({
  <th>Name</th>
  <th>Command</th>
  <th>Ask</th>
+ <th>Dialogs</th>
  <th>Learning</th>
  <th>Status</th>
  <th />
@@ -182,6 +300,7 @@ export function Profiles({
  <td>{p.name}</td>
  <td className="mono">{(p.command || []).join(" ")}</td>
  <td>{p.ask_mode ? "on" : "off"}</td>
+ <td>{p.notify ? "on" : "off"}</td>
  <td>
  {p.learning?.enabled ? "on" : "off"}
  {(p.pending_once?.length ?? 0) > 0
@@ -191,15 +310,23 @@ export function Profiles({
  <td>{p.running ? `running (pid ${p.pid})` : "stopped"}</td>
  <td>
  <div className="row-actions">
- {p.running ? (
- <button className="btn" onClick={() => void api.stopProfile(p.id).then(reload)}>
- Stop
- </button>
- ) : (
+                    {p.running ? (
+                      <button
+                        className="btn"
+                        onClick={() =>
+                          void api
+                            .stopProfile(p.id)
+                            .then(reload)
+                            .catch((e) => fail(e))
+                        }
+                      >
+                        Stop
+                      </button>
+                    ) : (
  <button
  className="btn primary"
  onClick={() =>
- void api.startProfile(p.id).then(reload).catch((e) => setMsg(String(e)))
+ void api.startProfile(p.id).then(reload).catch((e) => fail(e))
  }
  >
  Start
@@ -212,20 +339,36 @@ export function Profiles({
  <>
  <button
  className="btn"
- onClick={() =>
- void api.pinLearning(p.id).then(reload).catch((e) => setMsg(String(e)))
- }
+ onClick={() => {
+ const n = p.pending_once?.length || 0;
+ setConfirm({
+ title: `Pin sites for ${p.name}?`,
+ body: `Pin ${n} site${n === 1 ? "" : "s"}?\n\nThey move onto this agent’s allowlist.`,
+ confirmLabel: "Pin",
+ run: async () => {
+ await api.pinLearning(p.id);
+ await reload();
+ },
+ });
+ }}
  >
  Pin
  </button>
  <button
  className="btn"
- onClick={() =>
- void api
- .discardLearning(p.id)
- .then(reload)
- .catch((e) => setMsg(String(e)))
- }
+ onClick={() => {
+ const n = p.pending_once?.length || 0;
+ setConfirm({
+ title: `Discard pending for ${p.name}?`,
+ body: `Discard ${n} pending site${n === 1 ? "" : "s"}?\n\nThey stay blocked for this agent.`,
+ danger: true,
+ confirmLabel: "Discard",
+ run: async () => {
+ await api.discardLearning(p.id);
+ await reload();
+ },
+ });
+ }}
  >
  Discard
  </button>
@@ -233,10 +376,18 @@ export function Profiles({
  )}
  <button
  className="btn danger"
- onClick={() => {
- if (!confirm(`Delete agent ${p.name}?`)) return;
- void api.deleteProfile(p.id).then(reload).catch((e) => setMsg(String(e)));
- }}
+ onClick={() =>
+ setConfirm({
+ title: `Delete ${p.name}?`,
+ body: "This removes the agent profile. Running wraps for it will stop.",
+ danger: true,
+ confirmLabel: "Delete",
+ run: async () => {
+ await api.deleteProfile(p.id);
+ await reload();
+ },
+ })
+ }
  >
  Delete
  </button>
@@ -250,7 +401,7 @@ export function Profiles({
  )}
 
  {edit && (
- <div className="modal-backdrop">
+ <div className="modal-backdrop" style={{ zIndex: 55 }}>
  <div className="modal">
  <h2>{edit.id ? "Edit agent" : "New agent"}</h2>
  <p className="muted">Wrap one command. Ask prompts before new hosts when enabled.</p>
@@ -279,13 +430,32 @@ export function Profiles({
  onChange={(e) => setEdit({ ...edit, workdir: e.target.value })}
  />
  </label>
+          <label style={{ display: "block", marginTop: 8 }}>
+            Allowlist preset{" "}
+            <select
+              value={edit.preset || "agent"}
+              onChange={(e) => setEdit({ ...edit, preset: e.target.value })}
+            >
+              <option value="agent">Agent + Cursor (recommended)</option>
+              <option value="models">Models only (stricter)</option>
+              <option value="none">None (allowlist empty)</option>
+            </select>
+          </label>
+          <label style={{ display: "block", marginTop: 8 }}>
+            <input
+              type="checkbox"
+              checked={edit.ask_mode}
+              onChange={(e) => setEdit({ ...edit, ask_mode: e.target.checked })}
+            />{" "}
+            Ask before new hosts
+          </label>
  <label style={{ display: "block", marginTop: 8 }}>
  <input
  type="checkbox"
- checked={edit.ask_mode}
- onChange={(e) => setEdit({ ...edit, ask_mode: e.target.checked })}
+ checked={edit.notify}
+ onChange={(e) => setEdit({ ...edit, notify: e.target.checked })}
  />{" "}
- Ask before new hosts
+ Show Ask and block dialogs for this agent
  </label>
  <label style={{ display: "block", marginTop: 8 }}>
  <input
@@ -300,6 +470,27 @@ export function Profiles({
  />{" "}
  Remember Allow once hosts (Learning)
  </label>
+ {edit.learning?.enabled ? (
+ <label style={{ display: "block", marginTop: 8 }}>
+ Learning window (hours){" "}
+ <input
+ type="number"
+ min={1}
+ max={168}
+ value={edit.learning?.duration_hours || 24}
+ onChange={(e) =>
+ setEdit({
+ ...edit,
+ learning: {
+ ...edit.learning,
+ enabled: true,
+ duration_hours: Number(e.target.value) || 24,
+ },
+ })
+ }
+ />
+ </label>
+ ) : null}
  <details className="tech-details">
  <summary>Advanced options</summary>
  <label style={{ display: "block", marginTop: 8 }}>
@@ -310,7 +501,8 @@ export function Profiles({
  setEdit({
  ...edit,
  require_isolation: e.target.checked,
- sandbox: e.target.checked ? "srt" : edit.sandbox,
+ // Uncheck must clear sandbox — startProfile still enforces sandbox=="srt".
+ sandbox: e.target.checked ? "srt" : "",
  })
  }
  />{" "}
@@ -350,9 +542,9 @@ export function Profiles({
  const fresh = views?.find((v) => v.id === edit.id);
  if (fresh) setEdit({ ...fresh });
  await reload();
- setMsg(`Undid pack ${ap.id}.`);
+ note(`Undid pack ${ap.id}.`);
  })
- .catch((e) => setMsg(String(e)));
+ .catch((e) => fail(e));
  }}
  >
  Undo pack
@@ -391,26 +583,76 @@ export function Profiles({
  if (fresh) setEdit({ ...fresh });
  await reload();
  setAddPackID("");
- setMsg(
+ note(
  added?.length
  ? `Added ${added.length} host(s) from pack.`
  : "Pack already applied (no new hosts).",
  );
  })
- .catch((e) => setMsg(String(e)));
+ .catch((e) => fail(e));
  }}
  >
  Add
  </button>
  </div>
  )}
- {(edit.extra_allow || []).length > 0 && (
- <p className="muted mono" style={{ marginTop: 8 }}>
- Allowlist: {(edit.extra_allow || []).join(", ")}
- </p>
+ <div style={{ marginTop: 8 }}>
+ <h3 className="settings-subhead">Allowlist</h3>
+ {(edit.extra_allow || []).length > 0 ? (
+ <ul>
+ {edit.extra_allow!.map((h) => (
+ <li key={h} className="row-actions" style={{ marginBottom: "0.35rem" }}>
+ <span className="mono">{h}</span>
+ <button
+ className="btn danger"
+ type="button"
+ onClick={() =>
+ setEdit({
+ ...edit,
+ extra_allow: (edit.extra_allow || []).filter((x) => x !== h),
+ })
+ }
+ >
+ Remove
+ </button>
+ </li>
+ ))}
+ </ul>
+ ) : (
+ <p className="muted">None yet.</p>
  )}
+ <div className="row-actions" style={{ marginTop: 8 }}>
+ <input
+ placeholder="Add host..."
+ value={addHost}
+ onChange={(e) => setAddHost(e.target.value)}
+ style={{ flex: 1 }}
+ />
+ <button
+ className="btn"
+ type="button"
+ onClick={() => {
+ const h = addHost.trim().toLowerCase();
+ if (!h) return;
+ if ((edit.extra_allow || []).includes(h)) {
+ setAddHost("");
+ return;
+ }
+ setEdit({ ...edit, extra_allow: [...(edit.extra_allow || []), h] });
+ setAddHost("");
+ }}
+ >
+ Add
+ </button>
+ </div>
+          <p className="muted">
+            Save to apply allowlist changes. If this agent is running, DenyOut restarts it so the
+            new allowlist takes effect.
+          </p>
+ </div>
  </div>
  )}
+ {err ? <p className="warn-box" style={{ marginTop: 12 }}>{err}</p> : null}
  <div className="row-actions" style={{ marginTop: 12 }}>
  <button className="btn primary" onClick={() => void save()}>
  Save
@@ -422,6 +664,27 @@ export function Profiles({
  </div>
  </div>
  )}
+
+ {confirm ? (
+ <ConfirmModal
+ title={confirm.title}
+ body={confirm.body}
+ busy={confirmBusy}
+ error={err}
+ danger={confirm.danger}
+ confirmLabel={confirm.confirmLabel || "Continue"}
+ onCancel={() => setConfirm(null)}
+ onConfirm={() => {
+ setConfirmBusy(true);
+ setErr("");
+ void confirm
+ .run()
+ .then(() => setConfirm(null))
+ .catch((e) => fail(e))
+ .finally(() => setConfirmBusy(false));
+ }}
+ />
+ ) : null}
  </div>
  );
 }

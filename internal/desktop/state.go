@@ -21,7 +21,27 @@ type State struct {
 	SetupDone          bool        `json:"setup_done"`
 	Notify             bool        `json:"notify"`
 	NotifyLevel        string      `json:"notify_level,omitempty"` // quiet | normal | detailed
-	AskMode            bool        `json:"ask_mode"`
+	// QuietWhileAwayOff: when true, Ask/Decision still appear while locked/idle.
+	// Default false = stay quiet while away (Presence wave).
+	QuietWhileAwayOff bool `json:"quiet_while_away_off,omitempty"`
+	// AwayUnreadBlocks / AwayUnreadHosts: suppressed prompts while Away (tray count).
+	AwayUnreadBlocks int      `json:"away_unread_blocks,omitempty"`
+	AwayUnreadHosts  []string `json:"away_unread_hosts,omitempty"`
+	// AwayUnreadWaiting: subset of AwayUnreadBlocks that were hard-block "Decide later" while Away.
+	AwayUnreadWaiting int `json:"away_unread_waiting,omitempty"`
+	// NotifySnoozeUntil: RFC3339; non-critical OS banners muted until then (Protect stays on).
+	NotifySnoozeUntil string `json:"notify_snooze_until,omitempty"`
+	// QuietOvernightOff: default false = no sound at night (22:00–08:00).
+	QuietOvernightOff bool `json:"quiet_overnight_off,omitempty"`
+	// SoundOnlyAnswerOff: default false = sound only when Ask/Decision / Protect failed.
+	SoundOnlyAnswerOff bool `json:"sound_only_answer_off,omitempty"`
+	// SystemBannersOff: Advanced master; protect_failed still allowed (L7).
+	SystemBannersOff bool `json:"system_banners_off,omitempty"`
+	// RespectFullscreenOff: default false = respect fullscreen/games.
+	RespectFullscreenOff bool `json:"respect_fullscreen_off,omitempty"`
+	// SilentWhenOpenOff: default false = stay silent in the system when DenyOut is open.
+	SilentWhenOpenOff bool `json:"silent_when_open_off,omitempty"`
+	AskMode          bool     `json:"ask_mode"`
 	PolicyProfile      string      `json:"policy_profile,omitempty"` // browse (Safe desktop) | agent (Agents only)
 	ActiveProfileID    string      `json:"active_profile_id,omitempty"`
 	Scope              string      `json:"scope,omitempty"`
@@ -39,6 +59,7 @@ type State struct {
 	LastDenyHost       string      `json:"last_deny_host,omitempty"`
 	LastDenySummary    string      `json:"last_deny_summary,omitempty"`
 	LastDenyURL        string      `json:"last_deny_url,omitempty"`        // redacted
+	LastDenyProcess    string      `json:"last_deny_process,omitempty"`    // e.g. wrap:<profileID>
 	AskPausedUntil     string      `json:"ask_paused_until,omitempty"`     // RFC3339
 	WrapPIDs           []int       `json:"wrap_pids,omitempty"`            // for crash leftover detection
 	RememberedKeeps    []string    `json:"remembered_keeps,omitempty"`     // host|reason after Keep forever
@@ -50,7 +71,9 @@ type State struct {
 	ProtectPauseLast   string      `json:"protect_pause_last,omitempty"`   // last Off duration choice
 	PostBlockTaught    bool        `json:"post_block_taught,omitempty"`
 	YourSetupShown     bool        `json:"your_setup_shown,omitempty"`
-	DismissedTips      []string    `json:"dismissed_tips,omitempty"` // tip ids closed forever
+	// PendingYourSetup is "safe"|"agents"|"agents_only"|"off" until MarkYourSetupShown (Wails modal copy).
+	PendingYourSetup string   `json:"pending_your_setup,omitempty"`
+	DismissedTips    []string `json:"dismissed_tips,omitempty"` // tip ids closed forever
 	// Program update tip (public manifest; no account).
 	UpdateManifestURL      string `json:"update_manifest_url,omitempty"` // empty -> default denyout.com URL
 	UpdateAvailableVersion string `json:"update_available_version,omitempty"`
@@ -84,8 +107,9 @@ var stateMu sync.Mutex
 // DefaultState returns first-run defaults (Safe desktop UX).
 func DefaultState() State {
 	return State{
-		Notify:            true,
-		AskMode:           false, // Safe desktop: no host Ask
+		Notify:            false,
+		NotifyLevel:       "quiet", // new installs: OS almost silent (History + tray)
+		AskMode:           false,   // Safe desktop: no host Ask
 		PolicyProfile:     PolicyProfileBrowse,
 		ComputerAvailable: true,
 		Autostart:         true,

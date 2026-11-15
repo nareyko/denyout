@@ -101,18 +101,43 @@ func (a *App) applyRemoteDocument(doc cloudsync.Document) error {
 	a.state.ConfigUpdatedAt = doc.UpdatedAt.UTC().Format(time.RFC3339)
 	st := a.state
 	prefs, haveThreat := ThreatPrefsFromSettings(doc.Settings)
+	needRebind := a.proxyd != nil || a.session != nil
+	hosts := append([]string(nil), a.state.AlwaysAllowHosts...)
 	a.mu.Unlock()
 	if err := SaveState(st); err != nil {
 		return err
 	}
 	applyNotifyPrefs(st)
+	var threatErr error
 	if haveThreat {
-		_ = a.UISetBlockPhishing(prefs.BlockPhishing)
-		_ = a.UISetBlockMalware(prefs.BlockMalware)
-		_ = a.UISetBlockStronger(prefs.BlockStronger)
-		if prefs.ThreatPollHours > 0 {
-			_ = a.UISetThreatPollHours(prefs.ThreatPollHours)
+		if err := a.UISetBlockPhishing(prefs.BlockPhishing); err != nil {
+			threatErr = err
 		}
+		if err := a.UISetBlockMalware(prefs.BlockMalware); err != nil {
+			threatErr = err
+		}
+		if err := a.UISetBlockStronger(prefs.BlockStronger); err != nil {
+			threatErr = err
+		}
+		if prefs.ThreatPollHours > 0 {
+			if err := a.UISetThreatPollHours(prefs.ThreatPollHours); err != nil {
+				threatErr = err
+			}
+		}
+	}
+	// Always-allow hosts must hit live Protect — disk-only merge left proxyd stale.
+	if needRebind {
+		if err := a.restartActiveProtector(); err != nil {
+			AppendDesktopLog("WARN sync rebind after pull: %v", err)
+			return fmt.Errorf("synced settings, but Protect could not reload allows: %w", err)
+		}
+	}
+	if threatErr != nil {
+		AppendDesktopLog("WARN sync threat prefs: %v", threatErr)
+		return fmt.Errorf("synced settings, but threat lists could not fully apply: %w", threatErr)
+	}
+	for _, h := range hosts {
+		a.allowHostOnRunningWraps(h)
 	}
 	return nil
 }

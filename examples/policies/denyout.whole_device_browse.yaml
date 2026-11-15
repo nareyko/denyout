@@ -18,7 +18,8 @@ listen:
   port: 0
 
 allow_private: false
-allow_ip_literals: false
+# Public IP literals OK (Telegram, CDNs, …). Private/metadata still hard-denied via unsafe_ip.
+allow_ip_literals: true
 deny_on_dns_failure: true
 
 allowed_ports: [443, 80]

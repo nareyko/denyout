@@ -4,6 +4,7 @@ package policy
 const (
 	ReasonInvalidURL       = "invalid_url"
 	ReasonUnsafeIP         = "unsafe_ip"
+	ReasonIPLiteral        = "ip_literal" // raw IP while allow_ip_literals=false (agents)
 	ReasonHostNotAllowed   = "host_not_allowed"
 	ReasonHostDenied       = "host_denied"
 	ReasonThreatList       = "threat_list" // Book C subscription hit

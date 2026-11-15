@@ -8,7 +8,24 @@ import (
 	"time"
 
 	"github.com/gogpu/systray"
+
+	"github.com/nareyko/denyout/internal/hostguard"
 )
+
+func (a *App) trayEnableProtectComputer() {
+	// Wails: open Home turn-on confirm (same copy as in-app). Avoid native zenity mismatch.
+	if a.opts.OpenUI != nil {
+		a.RequestOpenUI("enable-protect")
+		return
+	}
+	title, body := ProtectConfirmText(hostguard.HelperAvailable())
+	if dialogToolkitAvailable() {
+		if !nativeConfirm(title, body, "Continue", "Cancel") {
+			return
+		}
+	}
+	_ = a.enableSafeDesktop()
+}
 
 // RunTray runs the system tray until ctx is cancelled or Quit.
 func (a *App) RunTray(ctx context.Context) error {
@@ -21,19 +38,15 @@ func (a *App) runTray(ctx context.Context) error {
 	tray.SetTooltip("DenyOut - Off")
 	tray.SetAppName("DenyOut")
 
-	// Left-click: Home, or History when needs attention / last deny pending review.
+	// Left-click: Problems when Protect is broken or threat lists need a refresh; else Home.
 	tray.OnClick(func() {
 		go func() {
 			a.mu.Lock()
-			alert := problemsUnhealthyLocked(a) || a.state.LastDenyHost != "" && !a.state.ProtectionOn
-			pause := a.state.ProtectPausedUntil != ""
+			alert := problemsUnhealthyLocked(a)
+			threatWarn := a.threatNeedsAttentionLocked()
 			a.mu.Unlock()
-			if alert {
-				a.RequestOpenUI("activity")
-				return
-			}
-			if pause {
-				a.RequestOpenUI("home")
+			if alert || threatWarn {
+				a.RequestOpenUI("problems")
 				return
 			}
 			a.RequestOpenUI("home")
@@ -46,7 +59,7 @@ func (a *App) runTray(ctx context.Context) error {
 	menu.AddSeparator()
 
 	computerItem := menu.Add("Protect computer", func() {
-		_ = a.enableSafeDesktop()
+		go a.trayEnableProtectComputer()
 	})
 	menu.Add("My agents...", func() {
 		go a.myAgentsMenu()
@@ -59,11 +72,40 @@ func (a *App) runTray(ctx context.Context) error {
 	menu.Add("Open DenyOut...", func() {
 		go a.RequestOpenUI("home")
 	})
+	snooze1h := menu.Add("Snooze notifications 1 hour", func() {
+		go func() { _ = a.UISetNotifySnooze("1h") }()
+	})
+	snoozeTomorrow := menu.Add("Snooze until tomorrow", func() {
+		go func() { _ = a.UISetNotifySnooze("tomorrow") }()
+	})
+	clearSnooze := menu.Add("Clear notification snooze", func() {
+		go func() { _ = a.UISetNotifySnooze("clear") }()
+	})
 	menu.AddSeparator()
 
 	menu.Add("Quit DenyOut", func() {
-		// Full unload: hostguard Remove (one admin prompt if rules present) + exit.
-		a.quitUnload()
+		// Wails: in-app quit modal (works without zenity). Native fallback otherwise.
+		if a.opts.OpenUI != nil {
+			a.RequestOpenUI("quit")
+			return
+		}
+		choice := a.trayQuitChoice()
+		if choice == "" {
+			return // cancel
+		}
+		if choice == "keep" {
+			a.quitLeaveProtectionOn()
+			a.stopAllWrapsOpts("Quit", true)
+			a.stopProtect()
+			tray.Remove()
+			os.Exit(0)
+			return
+		}
+		// Turn off protection and quit (password OK if needed).
+		if err := a.quitUnload(); err != nil {
+			fmt.Fprintf(os.Stderr, "denyout desktop: quit cancelled or failed: %v\n", err)
+			return
+		}
 		a.stopAllWrapsOpts("Quit", true)
 		a.stopProtect()
 		tray.Remove()
@@ -90,36 +132,123 @@ func (a *App) runTray(ctx context.Context) error {
 				st := a.status
 				profile := normalizePolicyProfile(a.state.PolicyProfile)
 				avail := a.state.ComputerAvailable
-				pauseUntil := a.state.ProtectPausedUntil
+				pauseUntil := activeProtectPausedUntil(a.state.ProtectPausedUntil)
+				pauseLast := a.state.ProtectPauseLast
+				leaveOn := a.state.ProtectionOn || a.state.ComputerEnabled
 				needsAttention := problemsUnhealthyLocked(a)
+				threatWarn := a.threatNeedsAttentionLocked()
+				unread := a.state.AwayUnreadBlocks
+				snoozeUntil := activeNotifySnoozeUntil(a.state.NotifySnoozeUntil)
 				a.mu.Unlock()
+				a.pollPresenceOnce()
+
+				snooze1h.SetDisabled(snoozeUntil != "")
+				snoozeTomorrow.SetDisabled(snoozeUntil != "")
+				clearSnooze.SetDisabled(snoozeUntil == "")
 
 				label := userModeLabel(mode, profile)
+				paused := mode == ModeOff && (pauseUntil != "" || pauseLast == "forever")
 				if mode == ModeOff && pauseUntil != "" {
 					label = "Paused"
 					if t, err := time.Parse(time.RFC3339, pauseUntil); err == nil {
-						label = "Paused until " + t.Local().Format("15:04")
+						local := t.Local()
+						// Prefer 12h clock to match typical chrome toLocaleTimeString.
+						if local.Format("2006-01-02") == time.Now().Local().Format("2006-01-02") {
+							label = "Paused until " + local.Format("3:04 PM")
+						} else {
+							label = "Paused until " + local.Format("Jan 2, 3:04 PM")
+						}
 					}
+				} else if mode == ModeOff && pauseLast == "forever" {
+					label = "Off until you turn it on"
 				} else if mode == ModeOff && !avail {
 					label = "Off (unavailable)"
 				}
 				if needsAttention {
 					label = "Needs attention"
 				}
+				// Threat-list warn stays in the tooltip (chrome keeps Protected + warn pill).
 				statusItem.SetLabel(label)
 
 				computerItem.SetLabel(checkedLabel("Protect computer", mode == ModeComputer && profile == PolicyProfileBrowse))
 				computerItem.SetDisabled(mode == ModeComputer && profile == PolicyProfileBrowse)
-				offItem.SetLabel(checkedLabel("Off", mode == ModeOff && pauseUntil == ""))
-				offItem.SetDisabled(mode == ModeOff)
+				// Needs attention is ModeOff with leave-on intent — Off must stay
+				// clickable so PauseModal can clear broken Protect (same as Home).
+				if paused {
+					offItem.SetLabel("Change pause…")
+					offItem.SetDisabled(false)
+				} else if needsAttention && mode == ModeOff {
+					// Match Home/Jump: Clear intent only when Protect is not live.
+					offItem.SetLabel("Clear intent / turn off…")
+					offItem.SetDisabled(false)
+				} else if needsAttention || (mode == ModeOff && leaveOn) {
+					offItem.SetLabel("Pause / turn off…")
+					offItem.SetDisabled(false)
+				} else if mode != ModeOff {
+					// Match Home / Settings / Jump: live Protect → pause wording, not bare "Off".
+					offItem.SetLabel("Pause / turn off…")
+					offItem.SetDisabled(false)
+				} else {
+					offItem.SetLabel(checkedLabel("Off", true))
+					offItem.SetDisabled(true)
+				}
 
-				tray.SetTooltip("DenyOut - " + label)
+				tooltip := "DenyOut - " + label
+				if snoozeUntil != "" {
+					tooltip += " · snoozed"
+					if !needsAttention && unread == 0 {
+						statusItem.SetLabel(label + " · snoozed")
+					}
+				}
+				if unread > 0 {
+					if unread == 1 {
+						tooltip += " · 1 quiet"
+						if !needsAttention {
+							statusItem.SetLabel(label + " · 1 quiet")
+						}
+					} else {
+						tooltip += fmt.Sprintf(" · %d quiet", unread)
+						if !needsAttention {
+							statusItem.SetLabel(fmt.Sprintf("%s · %d quiet", label, unread))
+						}
+					}
+				}
+				tray.SetTooltip(tooltip)
 
+				wrapsRunning := a.runningWrapCount() > 0
 				switch {
 				case needsAttention, strings.Contains(strings.ToLower(st), "error"), strings.Contains(st, "Needs"):
 					tray.SetIcon(iconAlertPNG)
-				case mode != ModeOff || a.runningWrapCount() > 0:
+				case mode != ModeOff:
+					// Threat-list warn keeps the on icon (chrome: mode pill + warn chip).
 					tray.SetIcon(iconOnPNG)
+					if threatWarn {
+						tray.SetTooltip(tooltip + " · Threat lists need a refresh")
+					}
+				case threatWarn:
+					tray.SetIcon(iconIdlePNG)
+					tray.SetTooltip(tooltip + " · Threat lists need a refresh")
+				case wrapsRunning:
+					// Protect computer is Off — don't imply whole-PC Protect with the on icon.
+					tray.SetIcon(iconIdlePNG)
+					if !paused && !needsAttention && !threatWarn {
+						if mode == ModeOff && !avail {
+							// Match chrome: unavailable wins, agents still visible.
+							statusItem.SetLabel("Off (unavailable) · agents running")
+							tip := "DenyOut - Off (unavailable) · agents running"
+							if unread > 0 {
+								tip += fmt.Sprintf(" · %d quiet", unread)
+							}
+							tray.SetTooltip(tip)
+						} else if mode == ModeOff && pauseUntil == "" && pauseLast != "forever" {
+							tip := "DenyOut - Off · agents running"
+							if unread > 0 {
+								tip += fmt.Sprintf(" · %d quiet", unread)
+							}
+							tray.SetTooltip(tip)
+							statusItem.SetLabel("Off · agents running")
+						}
+					}
 				default:
 					tray.SetIcon(iconIdlePNG)
 				}
@@ -161,7 +290,7 @@ func userModeLabel(mode, profile string) string {
 		}
 		return "Agents only"
 	case ModeSession:
-		return "Limited (session)"
+		return "Session"
 	default:
 		return "Off"
 	}

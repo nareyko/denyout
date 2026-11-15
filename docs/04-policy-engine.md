@@ -97,7 +97,7 @@ allow:
 | `*.example.com` | One or more labels under `example.com` (**MUST NOT** match `example.com` itself unless `include_apex: true`) |
 | `*`, `*.*` | **Forbidden** in enforce without `insecure_allow_all: true` |
 
-IP literals are **hard-denied** when `allow_ip_literals` is false (default): evaluation stops immediately. Ask / Always-allow cannot bypass. Desktop shows a rate-limited toast instead of an Ask dialog. Use **Browse** profile for apps that connect by raw IP (e.g. some messengers).
+IP literals: **Safe browse** (`Protect computer`) sets `allow_ip_literals: true` so public IPs work (messengers/CDNs); private/metadata IPs still deny as `unsafe_ip`. **Agents / enforce** keeps `allow_ip_literals: false` — raw IPs hard-deny as `ip_literal` (Ask / Always-allow cannot bypass); desktop shows a rate-limited toast, not an Ask dialog.
 
 ### 4.2 Path matching (L2)
 

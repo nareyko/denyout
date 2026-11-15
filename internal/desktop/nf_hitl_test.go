@@ -1,6 +1,7 @@
 package desktop
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -9,7 +10,10 @@ import (
 
 // Code-level NF checks for notifications rework (pairs with manual M1-M18).
 func TestNF_DecisionActionsAndWhitelist(t *testing.T) {
-	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("XDG_STATE_HOME", dir)
 	notify.SetLevel("normal")
 
 	a := &App{state: DefaultState(), wraps: map[string]*wrapProc{}, asks: newAskFlight()}
@@ -36,18 +40,23 @@ func TestNF_DecisionActionsAndWhitelist(t *testing.T) {
 		t.Fatal("timed deny row")
 	}
 
-	// M7: timed allow
+	// M7: timed allow (must NOT land in permanent AlwaysAllowHosts)
 	a2.applyHardBlockDecision("c.example", "secret_in_url", DecisionAllowTimed+"15m")
 	if len(a2.state.TimedAllows) == 0 {
 		t.Fatal("timed allow row")
 	}
-
-	// M15: Quiet filters keep-repeat kind
-	notify.SetLevel("quiet")
-	if notify.AllowedKind(notify.KindKeepRepeat) && notify.Level() == "quiet" {
-		// AllowedKind is structural; Quiet filtering is in Emit - check Level
+	for _, h := range a2.state.AlwaysAllowHosts {
+		if strings.EqualFold(h, "c.example") {
+			t.Fatal("timed allow must not persist as always-allow")
+		}
 	}
-	notify.Emit(notify.KindKeepRepeat, "t", "must not show in quiet")
+
+	// M15: keep_repeat is never on the OS whitelist (Presence wave A1)
+	if notify.AllowedKind(notify.KindKeepRepeat) {
+		t.Fatal("keep_repeat must not be OS-whitelisted")
+	}
+	notify.SetLevel("quiet")
+	notify.Emit(notify.KindKeepRepeat, "t", "must not show")
 	notify.SetLevel("normal")
 }
 
@@ -73,7 +82,10 @@ func TestNF_ClearPostBlockReasons(t *testing.T) {
 }
 
 func TestNF_BatchDedupe(t *testing.T) {
-	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("XDG_STATE_HOME", dir)
 	a := &App{state: DefaultState(), wraps: map[string]*wrapProc{}, asks: newAskFlight()}
 	// Presenter returns later immediately so we don't block on zenity.
 	SetDecisionPresenter(func(p DecisionPrompt) string { return DecisionLater })

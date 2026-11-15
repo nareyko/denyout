@@ -204,6 +204,33 @@ func isIPLiteral(host string) bool {
 	return net.ParseIP(strings.TrimSpace(host)) != nil
 }
 
+// nativeShowHome is the CLI-tray stand-in for Wails Home (status + Protect / history).
+func (a *App) nativeShowHome() {
+	mode := a.currentMode()
+	a.mu.Lock()
+	profile := normalizePolicyProfile(a.state.PolicyProfile)
+	a.mu.Unlock()
+	status := userModeLabel(mode, profile)
+	choice, ok := nativeListPick(
+		"DenyOut - Home",
+		"Status: "+status+"\n\nChoose an action:",
+		[]string{"Protect computer", "Turn off", "What was blocked...", "Problems...", "Close"},
+	)
+	if !ok || choice == "Close" || choice == "" {
+		return
+	}
+	switch choice {
+	case "Protect computer":
+		a.trayEnableProtectComputer()
+	case "Turn off":
+		a.stopProtectionFromTray()
+	case "What was blocked...":
+		a.nativeShowActivity()
+	case "Problems...":
+		a.showProblems()
+	}
+}
+
 // nativeShowActivity is Activity v2: human denial list with URL, Always allow / Undo / Details / Problems.
 func (a *App) nativeShowActivity() {
 	for {

@@ -10,6 +10,10 @@ import (
 )
 
 func TestAccountSignInOut(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("XDG_STATE_HOME", dir)
 	var lastOTP string
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/auth/magic-link", func(w http.ResponseWriter, r *http.Request) {

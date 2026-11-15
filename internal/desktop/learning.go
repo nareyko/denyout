@@ -34,14 +34,13 @@ func (a *App) pinLearningUI(id string) {
 	case "Pin all":
 		hosts := append([]string{}, p.PendingOnce...)
 		p.PinPending(nil)
-		// Default after Pin: keep learning No (owner lock).
-		p.Learning.Enabled = false
+		// Match Wails UIPinLearning: keep Learning on for future Allow-once hosts.
 		if err := SaveProfile(p); err != nil {
 			notify.Info("DenyOut", err.Error())
 			return
 		}
 		a.applyPinnedLive(id, hosts)
-		notify.Info("DenyOut", fmt.Sprintf("Pinned %d site(s) for %s. Learning off - turn on again in profile if needed.", len(hosts), p.Name))
+		notify.Info("DenyOut", fmt.Sprintf("Pinned %d site(s) for %s.", len(hosts), p.Name))
 	case "Discard pending":
 		p.DiscardPending()
 		if err := SaveProfile(p); err != nil {
@@ -95,21 +94,28 @@ func (a *App) maybeLearningNudge() {
 	}
 }
 
-// UndoAlwaysAllow removes last always host if present (Always Undo).
-func (a *App) undoLastAlwaysAllow() {
+func (a *App) testProtectionMessage() string {
 	a.mu.Lock()
-	hosts := a.state.AlwaysAllowHosts
-	if len(hosts) == 0 {
-		a.mu.Unlock()
-		notify.Info("DenyOut", "Always-allow list is empty.")
-		return
-	}
-	last := hosts[len(hosts)-1]
+	unhealthy := problemsUnhealthyLocked(a)
+	profile := normalizePolicyProfile(a.state.PolicyProfile)
 	a.mu.Unlock()
-	a.removeAlwaysHost(last)
-	notify.Info("DenyOut", "Undid always-allow: "+last)
-}
-
-func (a *App) testProtection() {
-	notify.Info("DenyOut", "Test: open a browser and visit a normal site. If Protect computer is on, it should work. A clear block shows Keep blocked / Allow this site for 15 seconds.")
+	if unhealthy {
+		if profile == PolicyProfileAgent {
+			return "Agents only did not stay on. Use Try Agents only again on Home or Problems."
+		}
+		return "Protect did not start correctly. Use Try Protect computer again on Home or Problems."
+	}
+	mode := a.currentMode()
+	switch {
+	case mode == ModeComputer && profile == PolicyProfileBrowse:
+		return "Protect computer is on. Browse as usual - a clear block shows Keep blocked / Allow this site."
+	case mode == ModeComputer:
+		return "Agents only is on for the whole PC. Everyday browsing is not covered - use My agents or switch to Protect computer."
+	case mode == ModeSession:
+		return "Session protection is on (limited proxy). Prefer Protect computer from Home for everyday browsing."
+	case a.runningWrapCount() > 0:
+		return "Protect computer is off, but a wrapped agent is running. Start Protect computer from Home for everyday browsing."
+	default:
+		return "Protection is off. Turn on Protect computer from Home, then browse as usual."
+	}
 }

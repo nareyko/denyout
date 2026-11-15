@@ -533,11 +533,12 @@ Profiles live in ~/.config/denyout/profiles/`)
 
 func cmdHostctl(args []string) int {
 	if len(args) == 0 || args[0] == "--help" || args[0] == "-h" {
-		fmt.Println(`Usage: denyout hostctl apply|remove|teardown|render|proxyd [flags]
+		fmt.Println(`Usage: denyout hostctl apply|remove|teardown|render|proxyd|helper-serve [flags]
 
   Privileged helper for Protect this computer (transparent redirect + CA trust).
   proxyd runs the transparent proxy (started after setcap so SO_MARK works).
   teardown removes redirect rules and the system CA (used by denyout uninstall).
+  helper-serve runs the root unix-socket helper (systemd; Linux).
 
 Flags:
   --port N     local DenyOut proxy port
@@ -552,6 +553,13 @@ Flags:
 	action := args[0]
 	if action == "proxyd" {
 		return cmdHostctlProxyd(args[1:])
+	}
+	if action == "helper-serve" {
+		if err := hostguard.ServeHelper(); err != nil {
+			fmt.Fprintf(os.Stderr, "denyout hostctl helper-serve: %v\n", err)
+			return 2
+		}
+		return 0
 	}
 	port := 0
 	ca := ""
@@ -610,6 +618,10 @@ Flags:
 			fmt.Fprintf(os.Stderr, "denyout hostctl: %v\n", err)
 			return 2
 		}
+		// First successful elevated apply installs the restore helper (Linux).
+		if !hostguard.HelperAvailable() {
+			_ = hostguard.InstallHelper(uid)
+		}
 		return 0
 	case "remove":
 		if !noElevate {
@@ -636,6 +648,7 @@ Flags:
 			fmt.Fprintf(os.Stderr, "denyout hostctl: %v\n", err)
 			return 2
 		}
+		_ = hostguard.UninstallHelper()
 		return 0
 	default:
 		fmt.Fprintf(os.Stderr, "denyout hostctl: unknown action %q\n", action)

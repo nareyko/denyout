@@ -13,29 +13,244 @@ import (
 )
 
 var (
-	mu      sync.Mutex
-	enabled = true
-	level   = "normal" // quiet | normal | detailed
+	mu               sync.Mutex
+	enabled          = true
+	level            = "quiet" // quiet | normal | detailed — new installs default Quiet
+	uiFocused        bool      // main window focused/visible
+	away             bool      // screen locked / idle
+	snoozeUntil      time.Time // zero = not snoozed
+	bannersAllowed   = true    // master: Allow system banners (protect_failed still passes when off)
+	silentWhenOpen   = true    // If DenyOut is open, stay silent in the system
+	respectFullscreen = true   // Respect fullscreen / games
+	fullscreen       bool      // runtime: currently fullscreen (Phase E detector wires this)
+	quietOvernight   = true    // No sound at night (sound gate; Emit banners unchanged)
+	soundOnlyAnswer  = true    // Sound only when you must answer
+	nowFunc          = time.Now // overridable in tests (night window)
 )
 
 // Kind is an OS-toast category. Only whitelisted kinds may reach the desktop.
 type Kind string
 
 const (
+	// KindKeepRepeat is retained for call sites / future tray counts but must NEVER
+	// reach the OS (lock-screen flood). Prefer History + tray.
 	KindKeepRepeat     Kind = "keep_repeat"
 	KindAllowUndo      Kind = "allow_undo"
 	KindProtectResumed Kind = "protect_resumed"
 	KindProtectFailed  Kind = "protect_failed"
+	// KindOpenApp is a soft "Open DenyOut" nudge (return digest / missed waiting).
+	// Quiet suppresses it; never while Away or while the UI is focused.
+	KindOpenApp Kind = "open_app"
 )
 
 // AllowedKind reports whether kind may emit an OS notification.
 func AllowedKind(kind Kind) bool {
 	switch kind {
-	case KindKeepRepeat, KindAllowUndo, KindProtectResumed, KindProtectFailed:
+	case KindAllowUndo, KindProtectResumed, KindProtectFailed, KindOpenApp:
 		return true
 	default:
+		// keep_repeat and unknowns stay off the OS whitelist
 		return false
 	}
+}
+
+// SetUIFocused suppresses non-critical OS toasts while the DenyOut window is focused
+// (when SilentWhenOpen is on). Protect-failed still gets through.
+func SetUIFocused(on bool) {
+	mu.Lock()
+	uiFocused = on
+	mu.Unlock()
+}
+
+// UIFocused reports whether the main UI is focused (tests / diagnostics).
+func UIFocused() bool {
+	mu.Lock()
+	defer mu.Unlock()
+	return uiFocused
+}
+
+// SetAway suppresses non-critical OS toasts while the user is away (locked / idle).
+func SetAway(on bool) {
+	mu.Lock()
+	away = on
+	mu.Unlock()
+}
+
+// Away reports the Away suppress flag (tests / diagnostics).
+func Away() bool {
+	mu.Lock()
+	defer mu.Unlock()
+	return away
+}
+
+// SetSnoozeUntil mutes non-critical OS toasts until t (zero clears).
+func SetSnoozeUntil(t time.Time) {
+	mu.Lock()
+	snoozeUntil = t
+	mu.Unlock()
+}
+
+// Snoozed reports whether a snooze window is active.
+func Snoozed() bool {
+	mu.Lock()
+	defer mu.Unlock()
+	return !snoozeUntil.IsZero() && time.Now().Before(snoozeUntil)
+}
+
+// SnoozeUntil returns the snooze end time (zero if none).
+func SnoozeUntil() time.Time {
+	mu.Lock()
+	defer mu.Unlock()
+	return snoozeUntil
+}
+
+// SetBannersAllowed is the Advanced "Allow system banners" master.
+// When off, only protect_failed may still reach the OS (L7).
+func SetBannersAllowed(on bool) {
+	mu.Lock()
+	bannersAllowed = on
+	mu.Unlock()
+}
+
+// BannersAllowed reports the banners master switch.
+func BannersAllowed() bool {
+	mu.Lock()
+	defer mu.Unlock()
+	return bannersAllowed
+}
+
+// SetSilentWhenOpen toggles "If DenyOut is open, stay silent in the system".
+func SetSilentWhenOpen(on bool) {
+	mu.Lock()
+	silentWhenOpen = on
+	mu.Unlock()
+}
+
+// SilentWhenOpen reports the silent-when-open preference.
+func SilentWhenOpen() bool {
+	mu.Lock()
+	defer mu.Unlock()
+	return silentWhenOpen
+}
+
+// SetRespectFullscreen toggles "Respect fullscreen / games".
+func SetRespectFullscreen(on bool) {
+	mu.Lock()
+	respectFullscreen = on
+	mu.Unlock()
+}
+
+// RespectFullscreen reports the preference.
+func RespectFullscreen() bool {
+	mu.Lock()
+	defer mu.Unlock()
+	return respectFullscreen
+}
+
+// SetFullscreen marks whether a fullscreen/game session is active (detector in Phase E).
+func SetFullscreen(on bool) {
+	mu.Lock()
+	fullscreen = on
+	mu.Unlock()
+}
+
+// Fullscreen reports the runtime fullscreen flag.
+func Fullscreen() bool {
+	mu.Lock()
+	defer mu.Unlock()
+	return fullscreen
+}
+
+// SetQuietOvernight toggles night sound suppression preference (sound gate).
+func SetQuietOvernight(on bool) {
+	mu.Lock()
+	quietOvernight = on
+	mu.Unlock()
+}
+
+// QuietOvernight reports the preference.
+func QuietOvernight() bool {
+	mu.Lock()
+	defer mu.Unlock()
+	return quietOvernight
+}
+
+// SetSoundOnlyWhenAnswer toggles "Sound only when you must answer".
+func SetSoundOnlyWhenAnswer(on bool) {
+	mu.Lock()
+	soundOnlyAnswer = on
+	mu.Unlock()
+}
+
+// SoundOnlyWhenAnswer reports the preference.
+func SoundOnlyWhenAnswer() bool {
+	mu.Lock()
+	defer mu.Unlock()
+	return soundOnlyAnswer
+}
+
+// SetNowFunc overrides the clock used for night-window checks (tests). Pass nil to reset.
+func SetNowFunc(f func() time.Time) {
+	mu.Lock()
+	defer mu.Unlock()
+	if f == nil {
+		nowFunc = time.Now
+		return
+	}
+	nowFunc = f
+}
+
+// SoundAllowed reports whether an OS sound may play (night + answer-only prefs).
+// Banner visibility (Emit) is separate — night only mutes sound.
+func SoundAllowed(mustAnswer bool) bool {
+	mu.Lock()
+	qo := quietOvernight
+	soa := soundOnlyAnswer
+	now := nowFunc
+	mu.Unlock()
+	if soa && !mustAnswer {
+		return false
+	}
+	if qo && inNightWindow(now()) {
+		return false
+	}
+	return true
+}
+
+// KindWantsSound reports whether this OS kind is treated as "must answer" for sound.
+func KindWantsSound(kind Kind) bool {
+	return kind == KindProtectFailed
+}
+
+// ExpireFor returns how long an OS banner of this kind should live.
+// Zero means sticky / long-lived (Protect failed).
+func ExpireFor(kind Kind) time.Duration {
+	switch kind {
+	case KindProtectFailed:
+		return 0
+	case KindAllowUndo:
+		return 10 * time.Second
+	case KindOpenApp:
+		return 12 * time.Second
+	case KindProtectResumed:
+		return 5 * time.Second
+	default:
+		return 8 * time.Second
+	}
+}
+
+// Night window: 22:00–08:00 local (wave Findings).
+func inNightWindow(now time.Time) bool {
+	h := now.Hour()
+	return h >= 22 || h < 8
+}
+
+// InNightWindow reports whether local time is in the quiet-overnight window.
+func InNightWindow() bool {
+	mu.Lock()
+	now := nowFunc
+	mu.Unlock()
+	return inNightWindow(now())
 }
 
 // SetEnabled turns OS notifications on or off (desktop preference).
@@ -84,24 +299,52 @@ func Enabled() bool {
 }
 
 func levelAllows(kind Kind) bool {
+	if !AllowedKind(kind) {
+		return false
+	}
 	switch level {
 	case "quiet":
 		return kind == KindProtectFailed
 	default: // normal, detailed
-		return AllowedKind(kind)
+		return true
 	}
+}
+
+func emitAllowed(kind Kind) bool {
+	if !levelAllows(kind) {
+		return false
+	}
+	critical := kind == KindProtectFailed
+	if !bannersAllowed && !critical {
+		return false
+	}
+	if !snoozeUntil.IsZero() && time.Now().Before(snoozeUntil) && !critical {
+		return false
+	}
+	focusSuppress := uiFocused && silentWhenOpen
+	fsSuppress := fullscreen && respectFullscreen
+	if (focusSuppress || away || fsSuppress) && !critical {
+		return false
+	}
+	return true
 }
 
 // Emit shows an OS notification only for a whitelisted kind (and when level allows).
 func Emit(kind Kind, title, body string) {
 	mu.Lock()
-	ok := levelAllows(kind)
+	ok := emitAllowed(kind)
 	mu.Unlock()
 	if !ok {
 		return
 	}
 	if title == "" {
 		title = "DenyOut"
+	}
+	if runtime.GOOS == "linux" {
+		if _, err := exec.LookPath("notify-send"); err == nil {
+			runNotifySendPlain(kind, title, body)
+			return
+		}
 	}
 	if err := beeep.Notify(title, body, ""); err != nil {
 		fmt.Fprintf(os.Stderr, "denyout: notification: %v\n", err)
@@ -120,7 +363,7 @@ type Action struct {
 // onAction is called asynchronously with the chosen id when non-empty.
 func EmitAction(kind Kind, title, body string, wait time.Duration, actions []Action, onAction func(id string)) {
 	mu.Lock()
-	ok := levelAllows(kind)
+	ok := emitAllowed(kind)
 	mu.Unlock()
 	if !ok {
 		return
@@ -129,12 +372,15 @@ func EmitAction(kind Kind, title, body string, wait time.Duration, actions []Act
 		title = "DenyOut"
 	}
 	if wait <= 0 {
-		wait = 10 * time.Second
+		wait = ExpireFor(kind)
+	}
+	if wait <= 0 {
+		wait = 60 * time.Second // sticky kinds still need a wait bound for --wait
 	}
 	if runtime.GOOS == "linux" && len(actions) > 0 {
 		if _, err := exec.LookPath("notify-send"); err == nil {
 			go func() {
-				id := runNotifySendActions(title, body, wait, actions)
+				id := runNotifySendActions(kind, title, body, wait, actions)
 				if id != "" && onAction != nil {
 					onAction(id)
 				}
@@ -145,13 +391,49 @@ func EmitAction(kind Kind, title, body string, wait time.Duration, actions []Act
 	Emit(kind, title, body)
 }
 
-func runNotifySendActions(title, body string, wait time.Duration, actions []Action) string {
-	args := []string{
-		"--app-name=DenyOut",
-		"--urgency=normal",
-		fmt.Sprintf("--expire-time=%d", int(wait.Milliseconds())),
-		"--wait",
+func notifySendSoundArgs(kind Kind) []string {
+	if SoundAllowed(KindWantsSound(kind)) {
+		return nil
 	}
+	// Mute OS sound while still showing the banner (night / answer-only).
+	return []string{"--hint=byte:suppress-sound:1"}
+}
+
+func runNotifySendPlain(kind Kind, title, body string) {
+	expire := ExpireFor(kind)
+	args := []string{"--app-name=DenyOut"}
+	if kind == KindProtectFailed {
+		args = append(args, "--urgency=critical")
+	} else {
+		args = append(args, "--urgency=normal")
+	}
+	if expire > 0 {
+		args = append(args, fmt.Sprintf("--expire-time=%d", int(expire.Milliseconds())))
+	}
+	args = append(args, notifySendSoundArgs(kind)...)
+	args = append(args, title, body)
+	cmd := exec.Command("notify-send", args...)
+	if err := cmd.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "denyout: notification: %v\n", err)
+	}
+}
+
+func runNotifySendActions(kind Kind, title, body string, wait time.Duration, actions []Action) string {
+	args := []string{"--app-name=DenyOut"}
+	if kind == KindProtectFailed {
+		args = append(args, "--urgency=critical")
+	} else {
+		args = append(args, "--urgency=normal")
+	}
+	expireMs := int(wait.Milliseconds())
+	if exp := ExpireFor(kind); exp > 0 && (expireMs <= 0 || int(exp.Milliseconds()) < expireMs) {
+		expireMs = int(exp.Milliseconds())
+	}
+	if expireMs > 0 {
+		args = append(args, fmt.Sprintf("--expire-time=%d", expireMs))
+	}
+	args = append(args, notifySendSoundArgs(kind)...)
+	args = append(args, "--wait")
 	for _, a := range actions {
 		args = append(args, "--action="+a.ID+"="+a.Label)
 	}
@@ -202,6 +484,8 @@ func HumanReasons(reasons []string) string {
 		switch r {
 		case "host_not_allowed":
 			parts = append(parts, "That site is not on your allowed list.")
+		case "ip_literal":
+			parts = append(parts, "Blocked a raw IP address (not allowed in this mode).")
 		case "host_denied":
 			parts = append(parts, "This site is on your deny list.")
 		case "threat_list":

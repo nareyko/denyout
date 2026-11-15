@@ -15,6 +15,7 @@ export type DenialView = {
  url: string;
  why: string;
  reasons: string[];
+ primary_reason?: string;
  process: string;
  method?: string;
  detectors?: string[];
@@ -36,9 +37,26 @@ export type UISnapshot = {
  protection_on: boolean;
  notify: boolean;
  notify_level: string;
+ quiet_while_away?: boolean;
+ away?: boolean;
+ away_unread?: number;
+ away_digest?: {
+  pending?: boolean;
+  blocks?: number;
+  waiting?: number;
+  hosts?: string[];
+ };
+ notify_snooze_until?: string;
+ notify_snooze_active?: boolean;
+ quiet_overnight?: boolean;
+ sound_only_answer?: boolean;
+ system_banners?: boolean;
+ respect_fullscreen?: boolean;
+ silent_when_open?: boolean;
  decision_timeout_sec: number;
  reask_interval_sec: number;
  protect_paused_until?: string;
+ protect_pause_last?: string;
  timed_allows: TimedRule[];
  timed_denies: TimedRule[];
  ask_mode: boolean;
@@ -48,14 +66,21 @@ export type UISnapshot = {
  last_deny_host: string;
  last_deny_url: string;
  last_deny_summary: string;
+ last_deny_process?: string;
  blocked_today: number;
  your_setup_shown: boolean;
  setup_done: boolean;
+ policy_profile?: string;
+ helper_ok?: boolean;
+ protect_confirm_title?: string;
+ protect_confirm_body?: string;
  new_denials: number;
  audit_path: string;
  log_dir: string;
  dismissed_tips: string[];
  ask_paused: boolean;
+ ask_paused_until?: string;
+ needs_uxv2_migration?: boolean;
  problems_alert: boolean;
  your_setup_text: string;
  checklist_done: boolean;
@@ -66,7 +91,11 @@ export type UISnapshot = {
  account_signed_in?: boolean;
  account_email?: string;
  account_trust_line?: string;
- sync_enabled?: boolean;
+  sync_enabled?: boolean;
+  computer_available?: boolean;
+  agents_running?: number;
+  threat_lists_warn?: boolean;
+  notice?: string;
 };
 
 export type UpdateCheckView = {
@@ -109,22 +138,35 @@ export type ThreatListsView = {
 };
 
 export type ProblemsView = {
- last_error: string;
- last_deny_host: string;
- last_deny_url: string;
- last_deny_summary: string;
- control_ok: boolean;
- proxyd_running: boolean;
- session_running: boolean;
- ca_present: boolean;
- clipboard_ok: boolean;
- log_dir: string;
- audit_path: string;
- status: string;
- mode_label: string;
- update_available?: boolean;
- update_version?: string;
- update_url?: string;
+  last_error: string;
+  last_deny_host: string;
+  last_deny_url: string;
+  last_deny_summary: string;
+  last_deny_process?: string;
+  control_ok: boolean;
+  proxyd_running: boolean;
+  session_running: boolean;
+  ca_present: boolean;
+  clipboard_ok: boolean;
+  helper_ok?: boolean;
+  protection_on?: boolean;
+  unhealthy?: boolean;
+  threat_lists_warn?: boolean;
+  log_dir: string;
+  audit_path: string;
+  status: string;
+  mode?: string;
+  mode_label: string;
+  policy_profile?: string;
+  protect_confirm_title?: string;
+  protect_confirm_body?: string;
+  protect_paused_until?: string;
+  protect_pause_last?: string;
+  agents_running?: number;
+  computer_available?: boolean;
+  update_available?: boolean;
+  update_version?: string;
+  update_url?: string;
 };
 
 export type AppliedPack = {
@@ -162,14 +204,26 @@ export type ProfileView = AgentProfile & { running: boolean; pid?: number };
 
 type Bridge = {
  GetUISnapshot(): Promise<UISnapshot>;
- MarkYourSetupShown(): Promise<void>;
+  MarkYourSetupShown(): Promise<void>;
+  UIClearNotice(): Promise<void>;
  ListDenials(q: DenialQuery): Promise<DenialView[]>;
  UIAlwaysAllowHost(host: string, reason: string): Promise<void>;
+ UIAlwaysAllowHostFrom(host: string, reason: string, process: string): Promise<void>;
  UIForgetKeep(host: string, reason: string): Promise<void>;
  UIClearAllKeeps(): Promise<void>;
  UIRemoveAlwaysAllow(host: string): Promise<void>;
  UISetNotify(on: boolean): Promise<void>;
  UISetNotifyLevel(level: string): Promise<void>;
+ UISetNotifyUIFocused(on: boolean): void;
+ UISetQuietWhileAway(on: boolean): Promise<void>;
+ UIClearAwayUnread(): Promise<void>;
+ UIDismissAwayDigest(): Promise<void>;
+ UISetNotifySnooze(choice: string): Promise<void>;
+ UISetQuietOvernight(on: boolean): Promise<void>;
+ UISetSoundOnlyAnswer(on: boolean): Promise<void>;
+ UISetSystemBanners(on: boolean): Promise<void>;
+ UISetRespectFullscreen(on: boolean): Promise<void>;
+ UISetSilentWhenOpen(on: boolean): Promise<void>;
  UISetDecisionTimeoutSec(sec: number): Promise<void>;
  UISetReaskIntervalSec(sec: number): Promise<void>;
  UIRemoveTimedAllow(host: string): Promise<void>;
@@ -177,8 +231,12 @@ type Bridge = {
  UISetAutostart(on: boolean): Promise<void>;
  UIEnableSafeDesktop(): Promise<void>;
  UIEnableAgentsOnly(): Promise<void>;
+ UIOnboardingNotNow(): Promise<void>;
+ UIOnboardingAgents(): Promise<void>;
+ UIResetSetup(): Promise<void>;
  UISwitchSafe(): Promise<void>;
  UIStopProtection(): Promise<void>;
+ UIStopProtectionWithChoice(choice: string): Promise<void>;
  GetProblems(): Promise<ProblemsView>;
  UIOpenLogs(): Promise<void>;
  UICopyLastError(): Promise<string>;
@@ -196,10 +254,12 @@ type Bridge = {
  UIDiscardLearning(id: string): Promise<void>;
  TipDismissed(id: string): Promise<boolean>;
  UIDismissTip(id: string): Promise<void>;
- UIResumeAsks(): Promise<void>;
- UIUndoLastAlwaysAllow(): Promise<void>;
- UITestProtection(): Promise<void>;
- UIBulkAlwaysAllow(hosts: string[]): Promise<void>;
+ UIPauseAsks(): Promise<string>;
+ UIResumeAsks(): Promise<string>;
+ UIMigrateUXv2(switchToSafe: boolean): Promise<void>;
+ UIUndoLastAlwaysAllow(): Promise<string>;
+ UITestProtection(): Promise<string>;
+ UIBulkAlwaysAllow(hosts: string[]): Promise<string>;
  GetThreatLists(): Promise<ThreatListsView>;
  UISetBlockPhishing(on: boolean): Promise<void>;
  UISetBlockMalware(on: boolean): Promise<void>;
@@ -224,7 +284,9 @@ type Bridge = {
  UISetSyncEnabled(on: boolean): Promise<void>;
  UISyncNow(): Promise<{ ok: boolean; message: string; pushed?: boolean; pulled?: boolean }>;
  UIReady(): Promise<void>;
- UIResolveDecision(id: string, action: string): Promise<void>;
+ UIResolveDecision(id: string, action: string): Promise<void>; // rejects if expired
+ UIQuitNeedsChoice(): Promise<boolean>;
+ UIQuit(choice: string): Promise<void>;
 };
 
 declare global {
@@ -246,14 +308,34 @@ function bridge(): Bridge {
 
 export const api = {
  snapshot: () => bridge().GetUISnapshot(),
- markYourSetup: () => bridge().MarkYourSetupShown(),
+  markYourSetup: () => bridge().MarkYourSetupShown(),
+  clearNotice: () => bridge().UIClearNotice(),
  listDenials: (q: DenialQuery) => bridge().ListDenials(q),
- alwaysAllow: (host: string, reason = "") => bridge().UIAlwaysAllowHost(host, reason),
+ alwaysAllow: (host: string, reason = "", process = "") =>
+ process
+ ? bridge().UIAlwaysAllowHostFrom(host, reason, process)
+ : bridge().UIAlwaysAllowHost(host, reason),
  forgetKeep: (host: string, reason: string) => bridge().UIForgetKeep(host, reason),
  clearKeeps: () => bridge().UIClearAllKeeps(),
  removeAlways: (host: string) => bridge().UIRemoveAlwaysAllow(host),
  setNotify: (on: boolean) => bridge().UISetNotify(on),
  setNotifyLevel: (level: string) => bridge().UISetNotifyLevel(level),
+ setNotifyUIFocused: (on: boolean) => {
+ try {
+ bridge().UISetNotifyUIFocused(on);
+ } catch {
+ /* browser preview without Wails */
+ }
+ },
+ setQuietWhileAway: (on: boolean) => bridge().UISetQuietWhileAway(on),
+ clearAwayUnread: () => bridge().UIClearAwayUnread(),
+ dismissAwayDigest: () => bridge().UIDismissAwayDigest(),
+ setNotifySnooze: (choice: string) => bridge().UISetNotifySnooze(choice),
+ setQuietOvernight: (on: boolean) => bridge().UISetQuietOvernight(on),
+ setSoundOnlyAnswer: (on: boolean) => bridge().UISetSoundOnlyAnswer(on),
+ setSystemBanners: (on: boolean) => bridge().UISetSystemBanners(on),
+ setRespectFullscreen: (on: boolean) => bridge().UISetRespectFullscreen(on),
+ setSilentWhenOpen: (on: boolean) => bridge().UISetSilentWhenOpen(on),
  setDecisionTimeout: (sec: number) => bridge().UISetDecisionTimeoutSec(sec),
  setReaskInterval: (sec: number) => bridge().UISetReaskIntervalSec(sec),
  removeTimedAllow: (host: string) => bridge().UIRemoveTimedAllow(host),
@@ -261,8 +343,12 @@ export const api = {
  setAutostart: (on: boolean) => bridge().UISetAutostart(on),
  enableSafe: () => bridge().UIEnableSafeDesktop(),
  enableAgents: () => bridge().UIEnableAgentsOnly(),
+ onboardingNotNow: () => bridge().UIOnboardingNotNow(),
+ onboardingAgents: () => bridge().UIOnboardingAgents(),
+ resetSetup: () => bridge().UIResetSetup(),
  switchSafe: () => bridge().UISwitchSafe(),
  stopProtection: () => bridge().UIStopProtection(),
+ stopProtectionWithChoice: (choice: string) => bridge().UIStopProtectionWithChoice(choice),
  problems: () => bridge().GetProblems(),
  openLogs: () => bridge().UIOpenLogs(),
  copyLastError: () => bridge().UICopyLastError(),
@@ -283,10 +369,12 @@ export const api = {
  discardLearning: (id: string) => bridge().UIDiscardLearning(id),
  tipDismissed: (id: string) => bridge().TipDismissed(id),
  dismissTip: (id: string) => bridge().UIDismissTip(id),
+ pauseAsks: () => bridge().UIPauseAsks(),
  resumeAsks: () => bridge().UIResumeAsks(),
+ migrateUXv2: (switchToSafe: boolean) => bridge().UIMigrateUXv2(switchToSafe),
  undoLastAlways: () => bridge().UIUndoLastAlwaysAllow(),
  testProtection: () => bridge().UITestProtection(),
- bulkAlwaysAllow: (hosts: string[]) => bridge().UIBulkAlwaysAllow(hosts),
+ bulkAlwaysAllow: (hosts: string[]) => bridge().UIBulkAlwaysAllow(hosts) as Promise<string>,
  threatLists: () => bridge().GetThreatLists(),
  setBlockPhishing: (on: boolean) => bridge().UISetBlockPhishing(on),
  setBlockMalware: (on: boolean) => bridge().UISetBlockMalware(on),
@@ -307,6 +395,8 @@ export const api = {
  syncNow: () => bridge().UISyncNow(),
  ready: () => bridge().UIReady(),
  resolveDecision: (id: string, action: string) => bridge().UIResolveDecision(id, action),
+ quitNeedsChoice: () => bridge().UIQuitNeedsChoice(),
+ quit: (choice: string) => bridge().UIQuit(choice),
  onNavigate: (cb: (route: string) => void) => {
  if (!window.runtime?.EventsOn) return () => undefined;
  return window.runtime.EventsOn("navigate", (r) => cb(String(r ?? "")));
@@ -316,6 +406,14 @@ export const api = {
  return window.runtime.EventsOn("decision", (raw) => {
  const p = (raw ?? {}) as Record<string, unknown>;
  cb(p);
+ });
+ },
+ /** Bridge timed out — drop a zombie Decision modal (background-tab throttle). */
+ onDecisionDone: (cb: (id: string) => void) => {
+ if (!window.runtime?.EventsOn) return () => undefined;
+ return window.runtime.EventsOn("decision-done", (raw) => {
+ const p = (raw ?? {}) as Record<string, unknown>;
+ cb(String(p.id ?? ""));
  });
  },
 };

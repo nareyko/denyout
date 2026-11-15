@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ConfirmModal } from "../components/ConfirmModal";
 import { Tip, tipGone } from "../components/Tip";
 import { api, DenialView, UISnapshot } from "../wails";
 
@@ -10,8 +11,18 @@ const REASONS: { value: string; label: string }[] = [
  { value: "canary_detected", label: "Canary detected" },
  { value: "host_denied", label: "Host denied" },
  { value: "unsafe_ip", label: "Unsafe IP" },
+ { value: "ip_literal", label: "Raw IP (agents)" },
+ { value: "threat_list", label: "Threat list" },
  { value: "host_not_allowed", label: "Host not allowed" },
 ];
+
+function looksLikeIP(host: string): boolean {
+ const h = (host || "").trim();
+ if (!h) return false;
+ if (/^\d{1,3}(\.\d{1,3}){3}$/.test(h)) return true;
+ if (h.includes(":")) return true;
+ return false;
+}
 
 export function Activity({
  snap,
@@ -34,13 +45,16 @@ export function Activity({
  const [selected, setSelected] = useState<DenialView | null>(null);
  const [checked, setChecked] = useState<Record<string, boolean>>({});
  const [err, setErr] = useState("");
+ const [info, setInfo] = useState("");
  const [busy, setBusy] = useState(false);
+ const [allowRow, setAllowRow] = useState<DenialView | null>(null);
+ const [allowBusy, setAllowBusy] = useState(false);
 
  const dismissed = snap?.dismissed_tips;
 
- const load = useCallback(async () => {
+ const load = useCallback(async (opts?: { preserveErr?: boolean }) => {
  setBusy(true);
- setErr("");
+ if (!opts?.preserveErr) setErr("");
  try {
  const list = await api.listDenials({
  search: showFilters ? search : "",
@@ -54,7 +68,7 @@ export function Activity({
  return (list ?? []).find((r) => r.id === prev.id) ?? null;
  });
  } catch (e) {
- setErr(String(e));
+ if (!opts?.preserveErr) setErr(String(e));
  } finally {
  setBusy(false);
  }
@@ -62,6 +76,14 @@ export function Activity({
 
  useEffect(() => {
  void load();
+ }, [load]);
+
+ useEffect(() => {
+ const poll = window.setInterval(() => {
+ // Poll must not wipe Allow / bulk failure under ConfirmModal.
+ void load({ preserveErr: true });
+ }, 4000);
+ return () => window.clearInterval(poll);
  }, [load]);
 
  const displayRows = useMemo(() => {
@@ -83,24 +105,58 @@ export function Activity({
  return Array.from(hosts);
  }, [checked, displayRows]);
 
- async function alwaysAllow(row: DenialView) {
- const code = row.reasons?.[0] ?? "";
- await api.alwaysAllow(row.host, code);
- await load();
+ function denialReason(row: DenialView): string {
+ return row.primary_reason || row.reasons?.[0] || "";
  }
 
- async function allowThisSite(row: DenialView) {
- const code = row.reasons?.[0] ?? "";
- await api.forgetKeep(row.host, code);
- await api.alwaysAllow(row.host, code);
+ function requestAlwaysAllow(row: DenialView) {
+ if (looksLikeIP(row.host)) {
+ setErr("Raw IP addresses cannot be always-allowed.");
+ return;
+ }
+ setAllowRow(row);
+ }
+
+ async function confirmAlwaysAllow() {
+ const row = allowRow;
+ if (!row) return;
+ const code = denialReason(row);
+ setAllowBusy(true);
+ setErr("");
+ try {
+ await api.alwaysAllow(row.host, code, row.process || "");
+ setAllowRow(null);
+ setErr("");
+ setInfo("Allowed " + row.host);
  await load();
+ } catch (e) {
+ setInfo("");
+ setErr(String(e));
+ // Keep failure visible on ConfirmModal — do not clear err via load().
+ await load({ preserveErr: true });
+ } finally {
+ setAllowBusy(false);
+ }
  }
 
  async function bulkAllow() {
- if (selectedHosts.length === 0) return;
- await api.bulkAlwaysAllow(selectedHosts);
+ const hosts = selectedHosts.filter((h) => !looksLikeIP(h));
+ if (hosts.length === 0) {
+ setErr("Selected rows are raw IPs — they cannot be always-allowed.");
+ return;
+ }
+ try {
+ const msg = await api.bulkAlwaysAllow(hosts);
+ setErr("");
+ setInfo(msg || "Allowed selected sites.");
  setChecked({});
  await load();
+ } catch (e) {
+ // Partial success still updates disk — reload rows, keep failure message.
+ setInfo("");
+ setErr(String(e));
+ await load({ preserveErr: true });
+ }
  }
 
  function copy(text: string) {
@@ -135,7 +191,7 @@ export function Activity({
  </button>
  {selectMode && selectedHosts.length > 0 && (
  <button className="btn primary" onClick={() => void bulkAllow()}>
- Always allow selected ({selectedHosts.length})
+ Allow selected ({selectedHosts.length})
  </button>
  )}
  <button className="btn subtle" onClick={() => void load()} disabled={busy}>
@@ -176,21 +232,60 @@ export function Activity({
  </div>
  )}
 
- {err && <p className="muted">{err}</p>}
+ {err && <p className="warn-box">{err}</p>}
+ {info && !err ? <p className="muted">{info}</p> : null}
+ {snap &&
+ !snap.problems_alert &&
+ snap.mode !== "safe" &&
+ snap.mode !== "agents" &&
+ snap.mode !== "session" && (
+ <p className="notice-box">
+ Everyday browsing is not protected right now. History may be empty or only show My
+ agents blocks. Turn on Protect computer from Home when you want that.
+ </p>
+ )}
  {displayRows.length === 0 ? (
  <div className="empty card">
  <p>
  <strong>Nothing blocked yet - that is OK.</strong>
  </p>
  <p>
- When DenyOut blocks something, you'll get a short Keep blocked / Allow this site toast,
- and it will show up here.
+ Every block is recorded here.
+ {snap?.protection_on || snap?.mode === "safe" || snap?.mode === "agents" || snap?.mode === "session"
+ ? " When you are at the computer, DenyOut asks Keep blocked / Allow this site in the app. With Stay quiet while away on (default), it stays quiet while you are away and shows one summary when you return."
+ : " Turn on Protect computer (or run My agents) to start recording blocks here."}
  </p>
- {onOpenSettingsAdvanced && (
+ <div className="row-actions">
+ <button
+ className="btn subtle"
+                  onClick={() =>
+                    void api
+                      .testProtection()
+                      .then((m) => {
+                        const t = m || "Checked.";
+                        // Backend returns a plain string for unhealthy — style as warning.
+                        if (/did not stay on|did not start correctly/i.test(t)) {
+                          setInfo("");
+                          setErr(t);
+                        } else {
+                          setErr("");
+                          setInfo(t);
+                        }
+                      })
+                      .catch((e) => {
+                        setInfo("");
+                        setErr(String(e));
+                      })
+                  }
+                >
+                  Try a safe check...
+                </button>
+ {onOpenSettingsAdvanced ? (
  <button className="btn subtle" onClick={onOpenSettingsAdvanced}>
- Try a safe check...
+ Open diagnostics
  </button>
- )}
+ ) : null}
+ </div>
  </div>
  ) : (
  <div className="layout-split">
@@ -231,9 +326,13 @@ export function Activity({
  <td>{r.why}</td>
  <td onClick={(e) => e.stopPropagation()}>
  <div className="row-actions">
- <button className="btn subtle" onClick={() => void alwaysAllow(r)}>
- Always allow
+ {looksLikeIP(r.host) ? (
+ <span className="muted">IP — no allow</span>
+ ) : (
+ <button className="btn subtle" onClick={() => requestAlwaysAllow(r)}>
+ Allow this site
  </button>
+ )}
  </div>
  </td>
  </tr>
@@ -248,18 +347,22 @@ export function Activity({
  <p>{selected.why || "Blocked for your safety."}</p>
  <p className="url muted">{selected.url || " - "}</p>
  <div className="row-actions">
- <button className="btn primary" onClick={() => void allowThisSite(selected)}>
+ {looksLikeIP(selected.host) ? (
+ <p className="muted" style={{ margin: 0 }}>
+ Raw IPs cannot be always-allowed here. Under Protect computer, many public IPs are
+ allowed; some blocks still depend on the reason.
+ </p>
+ ) : (
+ <button className="btn primary" onClick={() => requestAlwaysAllow(selected)}>
  Allow this site
  </button>
- <button className="btn" onClick={() => void alwaysAllow(selected)}>
- Always allow host
- </button>
+ )}
  <button className="btn" onClick={() => copy(selected.url || selected.host)}>
  Copy URL
  </button>
  </div>
  <p className="muted drawer-note">
- Secrets in URLs are shown as ***. Allow this site matches the toast.
+ Secrets in URLs are redacted in the UI. Allow this site matches the in-app prompt.
  </p>
  <details className="tech-details">
  <summary>Technical details</summary>
@@ -268,10 +371,14 @@ export function Activity({
  <dd className="mono" title={selected.reasons?.join(", ")}>
  {selected.reasons?.join(", ") || " - "}
  </dd>
+ <dt>Primary</dt>
+ <dd className="mono">{selected.primary_reason || " - "}</dd>
  <dt>Method</dt>
  <dd>{selected.method || " - "}</dd>
  <dt>Process</dt>
  <dd className="mono">{selected.process || " - "}</dd>
+ <dt>Policy</dt>
+ <dd className="mono">{selected.policy_profile || " - "}</dd>
  <dt>Detectors</dt>
  <dd className="mono">{selected.detectors?.join(", ") || " - "}</dd>
  <dt>When</dt>
@@ -285,11 +392,48 @@ export function Activity({
  </aside>
  </div>
  )}
+
+ {allowRow ? (
+ <ConfirmModal
+ title={`Allow ${allowRow.host}?`}
+ body={
+ (allowRow.process || "").startsWith("wrap:")
+ ? snap?.mode === "safe" && snap?.protection_on
+   ? `Allow this site for Protect computer and this agent?\n\nDenyOut will stop blocking this host.`
+   : `Always allow for this agent (and on the global allow list). DenyOut will stop blocking this host.`
+ : `DenyOut will stop blocking this host.`
+ }
+ busy={allowBusy}
+ error={err}
+ confirmLabel="Allow this site"
+ onCancel={() => setAllowRow(null)}
+ onConfirm={() => void confirmAlwaysAllow()}
+ />
+ ) : null}
  </div>
  );
 }
 
 function formatTime(ts: string): string {
- if (ts.length >= 19) return ts.slice(11, 19);
- return ts || " - ";
+  const t = Date.parse(ts || "");
+  if (Number.isNaN(t)) return ts || " - ";
+  const d = new Date(t);
+  const now = new Date();
+  const sameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+  if (sameDay) {
+    return d.toLocaleTimeString(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  }
+  return d.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }

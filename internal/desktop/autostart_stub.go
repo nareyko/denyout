@@ -15,6 +15,9 @@ func registerAutostartWindows(string) error {
 func unregisterAutostartLinux() error   { return nil }
 func unregisterAutostartDarwin() error  { return nil }
 func unregisterAutostartWindows() error { return nil }
+func autostartRegisteredLinux() bool    { return false }
+func autostartRegisteredDarwin() bool   { return false }
+func autostartRegisteredWindows() bool  { return false }
 
 func updateMacAutostartEnv(string, string) error { return nil }
 func writeWindowsUserProxy(string, string) error { return nil }

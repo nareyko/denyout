@@ -20,6 +20,7 @@ var clearPostBlockReasons = map[string]bool{
 	"host_denied":      true,
 	"threat_list":      true,
 	"unsafe_ip":        true,
+	"ip_literal":       true,
 }
 
 func primaryPostBlockReason(reasons []string) string {
@@ -96,6 +97,35 @@ func (a *App) forgetKeep(host, reason string) {
 	_ = SaveState(st)
 }
 
+// forgetKeepsForHost clears all silenced Keep keys and timed denies for a host.
+func (a *App) forgetKeepsForHost(host string) {
+	h := strings.ToLower(strings.TrimSpace(host))
+	if h == "" {
+		return
+	}
+	prefix := h + "|"
+	a.mu.Lock()
+	out := a.state.RememberedKeeps[:0]
+	for _, k := range a.state.RememberedKeeps {
+		if k == h || strings.HasPrefix(strings.ToLower(k), prefix) {
+			continue
+		}
+		out = append(out, k)
+	}
+	a.state.RememberedKeeps = out
+	td := a.state.TimedDenies[:0]
+	for _, t := range a.state.TimedDenies {
+		if strings.ToLower(strings.TrimSpace(t.Host)) == h {
+			continue
+		}
+		td = append(td, t)
+	}
+	a.state.TimedDenies = td
+	st := a.state
+	a.mu.Unlock()
+	_ = SaveState(st)
+}
+
 func (a *App) addTimedDeny(host, reason string, d time.Duration) {
 	exp := time.Now().Add(d).UTC().Format(time.RFC3339)
 	key := postBlockKey(host, reason)
@@ -128,7 +158,56 @@ func (a *App) addTimedAllow(host string, d time.Duration) {
 	st := a.state
 	a.mu.Unlock()
 	_ = SaveState(st)
-	_ = a.allowHostOnce(host)
+	// Timed only — never persist into AlwaysAllowHosts (that made "15 minutes" permanent).
+	_ = a.applyLiveAllows(host)
+}
+
+// liveAllowHostsLocked returns permanent + still-active timed allow hosts.
+func liveAllowHostsLocked(st State) []string {
+	now := time.Now()
+	seen := map[string]bool{}
+	out := make([]string, 0, len(st.AlwaysAllowHosts)+len(st.TimedAllows))
+	for _, h := range st.AlwaysAllowHosts {
+		h = strings.ToLower(strings.TrimSpace(h))
+		if h == "" || seen[h] {
+			continue
+		}
+		seen[h] = true
+		out = append(out, h)
+	}
+	for _, t := range st.TimedAllows {
+		exp, err := time.Parse(time.RFC3339, t.ExpiresAt)
+		if err != nil || !now.Before(exp) {
+			continue
+		}
+		h := strings.ToLower(strings.TrimSpace(t.Host))
+		if h == "" || seen[h] {
+			continue
+		}
+		seen[h] = true
+		out = append(out, h)
+	}
+	return out
+}
+
+// applyLiveAllows pushes permanent+timed allows into the running protector.
+func (a *App) applyLiveAllows(justHost string) error {
+	a.mu.Lock()
+	sess := a.session
+	wasProxy := a.proxyd != nil
+	a.mu.Unlock()
+	if sess != nil {
+		host := strings.TrimSpace(justHost)
+		if host != "" {
+			sess.AllowHost(host, "user_timed")
+		}
+		return nil
+	}
+	if wasProxy {
+		_ = a.stopComputerOpts(true, false)
+		return a.startComputer()
+	}
+	return nil
 }
 
 var postBlockMu sync.Mutex
@@ -136,20 +215,26 @@ var postBlockQuietAt = map[string]time.Time{}
 var decisionBusy bool
 
 type queuedDecision struct {
-	Host   string
-	Reason string
-	URL    string
+	Host      string
+	Reason    string
+	URL       string
+	ProfileID string // wrap profile when deny came from My agents
 }
 
 var decisionQueue []queuedDecision
 
 // handlePostBlockDeny runs after a clear Safe-desktop deny (request already blocked).
 func (a *App) handlePostBlockDeny(host string, reasons []string, redactedURL string) {
+	a.handlePostBlockDenyProfile("", host, reasons, redactedURL)
+}
+
+// handlePostBlockDenyProfile is the wrap-aware post-block path (Allow must hit the session).
+func (a *App) handlePostBlockDenyProfile(profileID, host string, reasons []string, redactedURL string) {
 	reason := primaryPostBlockReason(reasons)
 	if reason == "" {
 		return
 	}
-	if reason == "unsafe_ip" || isIPLiteral(host) {
+	if reason == "unsafe_ip" || reason == "ip_literal" || isIPLiteral(host) {
 		if a.asks == nil {
 			a.asks = newAskFlight()
 		}
@@ -177,12 +262,10 @@ func (a *App) handlePostBlockDeny(host string, reasons []string, redactedURL str
 		}
 		postBlockQuietAt[key] = time.Now()
 		postBlockMu.Unlock()
-		msg := fmt.Sprintf("Blocked %s again - %s", host, notify.HumanReasons([]string{reason}))
-		if urlLine != "" {
-			msg += "\n" + urlLine
+		// Keep-repeat must never flood the OS (lock screen). Away/fullscreen: bump tray unread.
+		if a.isAway() || a.isFullscreenQuiet() {
+			a.noteAwayUnread(host, awayUnreadBlock)
 		}
-		msg += "\nOpen DenyOut -> History if you need to change this later."
-		notify.Emit(notify.KindKeepRepeat, "DenyOut", msg)
 		return
 	}
 
@@ -190,7 +273,7 @@ func (a *App) handlePostBlockDeny(host string, reasons []string, redactedURL str
 		return
 	}
 
-	item := queuedDecision{Host: host, Reason: reason, URL: urlLine}
+	item := queuedDecision{Host: host, Reason: reason, URL: urlLine, ProfileID: profileID}
 	postBlockMu.Lock()
 	if decisionBusy {
 		// Same dialog session: queue; next presentment is site-grouped list.
@@ -245,14 +328,15 @@ func (a *App) runDecisionBatch(batch []queuedDecision, taught bool) {
 		it := seen[order[0]]
 		why := notify.HumanReasons([]string{it.Reason})
 		action := a.presentHardBlockDecision(DecisionPrompt{
-			Host:    it.Host,
-			Reason:  it.Reason,
-			Why:     why,
-			URL:     it.URL,
-			Timeout: decisionTimeout(a),
-			Taught:  taught,
+			Host:      it.Host,
+			Reason:    it.Reason,
+			Why:       why,
+			URL:       it.URL,
+			Timeout:   decisionTimeout(a),
+			Taught:    taught,
+			ProfileID: it.ProfileID,
 		})
-		a.applyHardBlockDecision(it.Host, it.Reason, action)
+		a.applyHardBlockDecisionProfile(it.ProfileID, it.Host, it.Reason, action)
 		return
 	}
 	// Multi-site list (group by site).
@@ -271,38 +355,91 @@ func (a *App) runDecisionBatch(batch []queuedDecision, taught bool) {
 		body.WriteByte('\n')
 	}
 	_ = hosts
+	// Any wrap in the batch → agent Allow copy (PC timed Allow labels lie for wraps).
+	firstProfile := ""
+	profiles := map[string]struct{}{}
+	for _, k := range order {
+		pid := strings.TrimSpace(seen[k].ProfileID)
+		if pid == "" {
+			continue
+		}
+		profiles[pid] = struct{}{}
+		if firstProfile == "" {
+			firstProfile = pid
+		}
+	}
 	action := a.presentHardBlockDecision(DecisionPrompt{
-		Host:    fmt.Sprintf("%d sites", len(hostKeys)),
-		Reason:  "batch",
-		Why:     strings.TrimSpace(body.String()),
-		Timeout: decisionTimeout(a),
-		Taught:  true,
+		Host:       fmt.Sprintf("%d sites", len(hostKeys)),
+		Reason:     "batch",
+		Why:        strings.TrimSpace(body.String()),
+		Timeout:    decisionTimeout(a),
+		Taught:     true,
+		Batch:      true,
+		ProfileID:  firstProfile,
+		MultiAgent: len(profiles) > 1,
 	})
 	// Apply same action to every pending item (bulk Keep / Allow / later).
 	for _, k := range order {
 		it := seen[k]
-		a.applyHardBlockDecision(it.Host, it.Reason, action)
+		a.applyHardBlockDecisionProfile(it.ProfileID, it.Host, it.Reason, action)
 	}
 }
 
 func (a *App) applyHardBlockDecision(host, reason, action string) {
+	a.applyHardBlockDecisionProfile("", host, reason, action)
+}
+
+func (a *App) applyHardBlockDecisionProfile(profileID, host, reason, action string) {
 	key := postBlockKey(host, reason)
 	switch {
 	case action == DecisionAllow:
 		clearPromptIgnore(key)
 		a.forgetKeep(host, reason)
+		if profileID != "" {
+			a.allowWrapHostLive(profileID, host, true)
+			a.emitAllowUndoBanner(host, "Allowed this site: "+host, func() {
+				a.revokeWrapHostLive(profileID, host, true)
+			})
+			break
+		}
 		if err := a.persistAlwaysHost(host); err != nil {
-			_ = a.allowHostOnce(host)
-			a.emitAllowUndoBanner(host, "Undid block for now: "+host, false)
+			AppendDesktopLog("WARN always-allow persist %s: %v", host, err)
+			// Live session-only if possible — never claim a saved Allow when disk write failed.
+			a.mu.Lock()
+			sess := a.session
+			a.mu.Unlock()
+			if sess != nil {
+				sess.AllowHost(host, "user_once")
+				a.emitAllowUndoBanner(host, "Allowed for this session only (could not save): "+host, func() {
+					a.revokeHostEverywhere(host)
+				})
+			} else {
+				notify.Info("DenyOut", "Could not save Allow for "+host+": "+err.Error())
+			}
 		} else {
-			a.emitAllowUndoBanner(host, "Allowed this site: "+host, true)
+			a.allowHostOnRunningWraps(host)
+			a.emitAllowUndoBanner(host, "Allowed this site: "+host, func() {
+				_ = a.removeAlwaysHost(host)
+			})
 		}
 	case strings.HasPrefix(action, DecisionAllowTimed):
 		clearPromptIgnore(key)
 		if d, ok := parseTimedSuffix(action, DecisionAllowTimed); ok {
 			a.forgetKeep(host, reason)
+			if profileID != "" {
+				// Wrap sessions have no timed allow clock — Allow for this run only.
+				a.allowWrapHostLive(profileID, host, false)
+				a.emitAllowUndoBanner(host, fmt.Sprintf("Allowed %s for this agent run", host), func() {
+					a.revokeWrapHostLive(profileID, host, false)
+				})
+				break
+			}
 			a.addTimedAllow(host, d)
-			a.emitAllowUndoBanner(host, fmt.Sprintf("Allowed %s for a while", host), false)
+			a.allowHostOnRunningWraps(host)
+			a.emitAllowUndoBanner(host, fmt.Sprintf("Allowed %s for a while", host), func() {
+				_ = a.UIRemoveTimedAllow(host)
+				a.revokeHostEverywhere(host)
+			})
 		}
 	case action == DecisionKeep:
 		clearPromptIgnore(key)
@@ -320,20 +457,60 @@ func (a *App) applyHardBlockDecision(host, reason, action string) {
 	}
 }
 
+var (
+	undoBannerMu   sync.Mutex
+	undoBannerHost string
+	undoBannerAt   time.Time
+)
+
+const undoBannerCooldown = 2 * time.Minute
+
 // emitAllowUndoBanner shows ~10s OS toast with Undo (whitelist allow_undo).
-func (a *App) emitAllowUndoBanner(host, body string, removeAlways bool) {
-	notify.EmitAction(notify.KindAllowUndo, "DenyOut", body+"\nUndo within 10 seconds.", 10*time.Second,
+// Same host within undoBannerCooldown does not get a second banner (U6).
+func (a *App) emitAllowUndoBanner(host, body string, onUndo func()) {
+	host = strings.TrimSpace(strings.ToLower(host))
+	undoBannerMu.Lock()
+	if host != "" && host == undoBannerHost && time.Since(undoBannerAt) < undoBannerCooldown {
+		undoBannerMu.Unlock()
+		return
+	}
+	undoBannerHost = host
+	undoBannerAt = time.Now()
+	undoBannerMu.Unlock()
+
+	wait := notify.ExpireFor(notify.KindAllowUndo)
+	notify.EmitAction(notify.KindAllowUndo, "DenyOut", body+"\nUndo within 10 seconds.", wait,
 		[]notify.Action{{ID: "undo", Label: "Undo"}},
 		func(id string) {
-			if id != "undo" {
+			if id != "undo" || onUndo == nil {
 				return
 			}
-			if removeAlways {
-				a.removeAlwaysHost(host)
-			}
-			_ = a.UIRemoveTimedAllow(host)
+			onUndo()
 		},
 	)
+}
+
+// revokeHostEverywhere drops a live allow from Protect session and running wraps.
+func (a *App) revokeHostEverywhere(host string) {
+	host = strings.TrimSpace(host)
+	if host == "" {
+		return
+	}
+	a.mu.Lock()
+	sess := a.session
+	wraps := make([]*wrapProc, 0, len(a.wraps))
+	for _, wp := range a.wraps {
+		wraps = append(wraps, wp)
+	}
+	a.mu.Unlock()
+	if sess != nil {
+		sess.RevokeHost(host)
+	}
+	for _, wp := range wraps {
+		if wp != nil && wp.sess != nil {
+			wp.sess.RevokeHost(host)
+		}
+	}
 }
 
 // isClearPostBlock reports whether reasons warrant post-block confirm on Safe desktop.

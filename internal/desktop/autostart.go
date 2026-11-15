@@ -18,6 +18,7 @@ func RegisterAutostart() error {
 	if resolved, err := filepath.EvalSymlinks(self); err == nil {
 		self = resolved
 	}
+	self = preferStableDesktopBinary(self)
 	switch runtime.GOOS {
 	case "linux":
 		return registerAutostartLinux(self)
@@ -28,6 +29,37 @@ func RegisterAutostart() error {
 	default:
 		return fmt.Errorf("autostart: unsupported OS %s", runtime.GOOS)
 	}
+}
+
+// preferStableDesktopBinary avoids writing go-test /tmp/go-build paths into login autostart.
+func preferStableDesktopBinary(self string) string {
+	base := filepath.Base(self)
+	dir := filepath.Dir(self)
+	tmp := filepath.Clean(os.TempDir())
+	unstable := strings.HasSuffix(base, ".test") ||
+		strings.Contains(base, ".test.") ||
+		dir == tmp ||
+		strings.HasPrefix(dir, tmp+string(os.PathSeparator))
+	if !unstable {
+		return self
+	}
+	// Prefer installed denyout-desktop on PATH or under ~/.local/bin.
+	if p, err := exec.LookPath("denyout-desktop"); err == nil {
+		if resolved, err2 := filepath.EvalSymlinks(p); err2 == nil {
+			return resolved
+		}
+		return p
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		cand := filepath.Join(home, ".local", "bin", "denyout-desktop")
+		if runtime.GOOS == "windows" {
+			cand += ".exe"
+		}
+		if st, err := os.Stat(cand); err == nil && !st.IsDir() {
+			return cand
+		}
+	}
+	return self
 }
 
 // UnregisterAutostart removes login launch entries.
@@ -44,6 +76,21 @@ func UnregisterAutostart() error {
 	}
 }
 
+// AutostartRegistered reports whether a login-launch entry is present on disk.
+// Used so Settings reflects reality, not only the last saved preference.
+func AutostartRegistered() bool {
+	switch runtime.GOOS {
+	case "linux":
+		return autostartRegisteredLinux()
+	case "darwin":
+		return autostartRegisteredDarwin()
+	case "windows":
+		return autostartRegisteredWindows()
+	default:
+		return false
+	}
+}
+
 // autostartExecLine returns the Exec=/ExecStart= value for login launch.
 // Prefers sibling denyout-desktop when present (same rule as DetachDesktop).
 func autostartExecLine(self string) string {
@@ -56,6 +103,15 @@ func autostartExecLine(self string) string {
 
 // DetachDesktop starts denyout-desktop (preferred) or `denyout desktop` in the background.
 func DetachDesktop() error {
+	return detachDesktop(false)
+}
+
+// DetachDesktopOpen starts the desktop shell and asks it to show the window (install path).
+func DetachDesktopOpen() error {
+	return detachDesktop(true)
+}
+
+func detachDesktop(openUI bool) error {
 	self, err := os.Executable()
 	if err != nil {
 		return err
@@ -64,12 +120,22 @@ func DetachDesktop() error {
 		self = resolved
 	}
 	bin, args := desktopLaunchArgs(self)
+	if openUI {
+		base := filepath.Base(bin)
+		if strings.Contains(base, "denyout-desktop") {
+			args = append(args, "--open")
+		}
+	}
 	cmd := exec.Command(bin, args...)
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	cmd.Stdin = nil
 	// Drop ephemeral XDG_* from test/agent shells so the tray uses ~/.local/state.
-	cmd.Env = sanitizeDesktopEnv(os.Environ())
+	env := sanitizeDesktopEnv(os.Environ())
+	if openUI {
+		env = append(env, "DENYOUT_OPEN_UI=1")
+	}
+	cmd.Env = env
 	detachCmd(cmd)
 	return cmd.Start()
 }

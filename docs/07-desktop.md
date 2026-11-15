@@ -53,7 +53,7 @@ What the user **sees** during install (terminal lines, silent tray, Your setup):
 | Safe desktop | Post-block Keep blocked / Allow this site ~15s + remember | Allow (browse) |
 | Wrap / Agents only | Coalesced deny toast | Pre-act Ask |
 
-Clear Safe threats: `secret_in_url` / header-body (when denied), `canary_detected`, `host_denied`, `unsafe_ip`. Normal API auth to ordinary web stays allowed (0.2.1 `blocklistHostOK`).
+Clear Safe threats: `secret_in_url` / header-body (when denied), `canary_detected`, `host_denied`, `unsafe_ip` (private/metadata). Public IP literals are allowed on Safe browse (`allow_ip_literals: true`). Normal API auth to ordinary web stays allowed.
 
 ## 5. Diagnostics paths
 
