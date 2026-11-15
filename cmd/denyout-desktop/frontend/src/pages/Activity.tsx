@@ -234,13 +234,15 @@ export function Activity({
 
  {err && <p className="warn-box">{err}</p>}
  {info && !err ? <p className="muted">{info}</p> : null}
- {snap && !snap.problems_alert && snap.mode !== "safe" && (
+ {snap && (snap.problems_alert || snap.mode !== "safe") && (
  <p className="notice-box">
- {snap.mode === "agents"
- ? "Agents only is on — everyday browsing is not protected like Protect computer. History may show agent blocks. Switch from Home when you want Protect computer."
- : snap.mode === "session"
-   ? "Session protection is limited. Switch to Protect computer from Home for everyday browsing."
-   : "Everyday browsing is not protected right now. History may be empty or only show My agents blocks. Turn on Protect computer from Home when you want that."}
+ {snap.problems_alert
+ ? "Needs attention — protection may not be working. History can look empty even when you expect blocks. Open Problems or try again from Home."
+ : snap.mode === "agents"
+   ? "Agents only is on — everyday browsing is not protected like Protect computer. History may show agent blocks. Switch from Home when you want Protect computer."
+   : snap.mode === "session"
+     ? "Session protection is limited. Switch to Protect computer from Home for everyday browsing."
+     : "Everyday browsing is not protected right now. History may be empty or only show My agents blocks. Turn on Protect computer from Home when you want that."}
  </p>
  )}
  {displayRows.length === 0 ? (
@@ -250,9 +252,11 @@ export function Activity({
  </p>
  <p>
  Every block is recorded here.
- {snap?.protection_on || snap?.mode === "safe" || snap?.mode === "agents" || snap?.mode === "session"
- ? " When you are at the computer, DenyOut asks Keep blocked / Allow this site in the app. With Stay quiet while away on (default), it stays quiet while you are away and shows one summary when you return."
- : " Turn on Protect computer (or run My agents) to start recording blocks here."}
+ {snap?.problems_alert
+ ? " Fix Needs attention from Home or Problems first — until then, DenyOut may not be asking about blocks as usual."
+ : snap?.mode === "safe" || snap?.mode === "agents" || snap?.mode === "session"
+   ? " When you are at the computer, DenyOut asks Keep blocked / Allow this site in the app. With Stay quiet while away on (default), it stays quiet while you are away and shows one summary when you return."
+   : " Turn on Protect computer (or run My agents) to start recording blocks here."}
  </p>
  <div className="row-actions">
  <button
