@@ -15,6 +15,17 @@ import (
 	"github.com/nareyko/denyout/internal/proxy"
 )
 
+func logQuicDropStats(reason string) {
+	uid, _ := hostguard.CurrentUID()
+	st := hostguard.QUICDropStatsBestEffort(uid)
+	LogEvent("quic_drop_stats", map[string]any{
+		"reason":  reason,
+		"packets": st.Packets,
+		"bytes":   st.Bytes,
+		"present": st.Present,
+	})
+}
+
 func (a *App) startComputer() error {
 	a.mu.Lock()
 	if a.session != nil || a.proxyd != nil {
@@ -218,6 +229,8 @@ func (a *App) stopComputerOpts(keepRestore, elevateRemove bool) error {
 	// Session mode also stores proxyPort - must not trigger ElevateRemove/pkexec.
 	if shouldRemove {
 		uid, _ := hostguard.CurrentUID()
+		// Snapshot QUIC drops before Remove deletes the nft table (otherwise counters vanish).
+		logQuicDropStats("protect_off")
 		if err := hostguard.ElevateRemove(port, uid); err != nil {
 			// Restore leave-on so we do not pretend Protect is gone (D19).
 			a.mu.Lock()

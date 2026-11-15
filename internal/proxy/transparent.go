@@ -104,14 +104,17 @@ func (s *Server) serveTransparentTLS(conn net.Conn, host string, port int) {
 		s.logDecision(rv, d, start)
 		return
 	}
-	if s.cfg.TLSMode == TLSPassthrough || s.cfg.CA == nil {
+	if s.useTLSPassthrough(host) {
+		rv.Inspection = "passthrough"
 		ips, _ := lookupIPs(host)
+		rv.DestIPs = ips
 		s.tunnel(conn, host, fmt.Sprintf("%d", port), ips, s.cfg.Engine.Cfg.AllowPrivate)
 		s.logDecision(rv, d, start)
 		return
 	}
 	leaf, err := s.cfg.CA.Leaf(host)
 	if err != nil {
+		s.logMitmError(rv, "mitm_leaf_error", start)
 		return
 	}
 	tlsClient := tls.Server(conn, &tls.Config{
@@ -119,12 +122,18 @@ func (s *Server) serveTransparentTLS(conn net.Conn, host string, port int) {
 		MinVersion:   tls.VersionTLS12,
 	})
 	if err := tlsClient.Handshake(); err != nil {
+		s.logMitmError(rv, "mitm_handshake_failed", start)
 		_ = tlsClient.Close()
 		return
 	}
 	defer tlsClient.Close()
 	ips, _ := lookupIPs(host)
 	br := bufio.NewReader(tlsClient)
+	if peek, perr := br.Peek(24); perr == nil && isHTTP2ClientPreface(peek) {
+		// HTTP/2 after MITM is not supported yet — would previously fail with no audit line.
+		s.logMitmError(rv, "mitm_http2_unsupported", start)
+		return
+	}
 	for {
 		req, err := http.ReadRequest(br)
 		if err != nil {

@@ -34,8 +34,11 @@ func TestRenderRulesContainsPort(t *testing.T) {
 		if !strings.Contains(out, "meta mark") {
 			t.Fatalf("linux rules missing mark skip:\n%s", out)
 		}
-		if !strings.Contains(out, "udp dport 443 drop") {
-			t.Fatalf("linux rules missing QUIC drop by default:\n%s", out)
+		if !strings.Contains(out, "udp dport 443 counter drop") {
+			t.Fatalf("linux rules missing QUIC drop counter by default:\n%s", out)
+		}
+		if !strings.Contains(out, "denyout-block-quic") {
+			t.Fatalf("linux rules missing QUIC comment:\n%s", out)
 		}
 	case "darwin":
 		if !strings.Contains(out, "user 1000") {

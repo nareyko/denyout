@@ -162,7 +162,9 @@ func Scan(rawURL string, body []byte, opt Options) []Hit {
 				if dec, err := url.QueryUnescape(blob); err == nil && dec != blob {
 					blob = blob + " " + dec
 				}
-				hits = append(hits, scanTokenShapes(blob, "secret_in_url")...)
+				// Browser Google APIs put public AIza… keys in ?key=; that is not agent exfil.
+				skipGoogleAPIKey := isGoogleBrowserAPIHost(u.Hostname())
+				hits = append(hits, scanTokenShapes(blob, "secret_in_url", skipGoogleAPIKey)...)
 				if awsAccessKeySecretPair(blob) {
 					hits = append(hits, Hit{Detector: "aws_key_secret_pair", Reason: "secret_in_url", Evidence: "***"})
 				}
@@ -170,7 +172,7 @@ func Scan(rawURL string, body []byte, opt Options) []Hit {
 		}
 	}
 	if len(body) > 0 {
-		hits = append(hits, scanTokenShapes(string(body), "secret_in_body")...)
+		hits = append(hits, scanTokenShapes(string(body), "secret_in_body", false)...)
 	}
 
 	_ = opt.HighEntropy
@@ -182,7 +184,7 @@ func valueLooksLikeSecret(v string) bool {
 	if dec, err := url.QueryUnescape(v); err == nil {
 		v = dec
 	}
-	return len(scanTokenShapes(v, "secret_in_url")) > 0
+	return len(scanTokenShapes(v, "secret_in_url", false)) > 0
 }
 
 // vendorShapedNamedValue catches datadog-like 32-hex under app_key / token only (not bare "key").
@@ -279,36 +281,70 @@ func isValidSigV4Query(q url.Values) bool {
 	return q.Get("X-Amz-Algorithm") == "AWS4-HMAC-SHA256"
 }
 
-func scanTokenShapes(blob, reason string) []Hit {
+// isGoogleBrowserAPIHost reports first-party Google hosts that routinely put
+// public browser API keys (AIza…) in query strings. Attacker-controlled hosts
+// must still match reGoogle.
+func isGoogleBrowserAPIHost(host string) bool {
+	host = strings.ToLower(strings.TrimSpace(host))
+	if host == "" {
+		return false
+	}
+	switch host {
+	case "google.com", "googleapis.com", "gstatic.com", "googleusercontent.com",
+		"ggpht.com", "withgoogle.com", "googlezip.net":
+		return true
+	}
+	suffixes := []string{
+		".google.com",
+		".googleapis.com",
+		".gstatic.com",
+		".googleusercontent.com",
+		".ggpht.com",
+		".withgoogle.com",
+		".googlezip.net",
+	}
+	for _, s := range suffixes {
+		if strings.HasSuffix(host, s) {
+			return true
+		}
+	}
+	return false
+}
+
+func scanTokenShapes(blob, reason string, skipGoogleAPIKey bool) []Hit {
 	var hits []Hit
 	checks := []struct {
-		det string
-		re  *regexp.Regexp
+		det   string
+		re    *regexp.Regexp
+		skip  bool // when skipGoogleAPIKey
 	}{
-		{"known_token_prefixes", reOpenAI},
-		{"known_token_prefixes", reStripe},
-		{"known_token_prefixes", reGitHub},
-		{"known_token_prefixes", reGitLab},
-		{"known_token_prefixes", reAWS},
-		{"known_token_prefixes", reGoogle},
-		{"known_token_prefixes", reSlack},
-		{"known_token_prefixes", reSlackHook},
-		{"known_token_prefixes", reSendGrid},
-		{"known_token_prefixes", reHuggingFace},
-		{"known_token_prefixes", reNPM},
-		{"known_token_prefixes", rePyPI},
-		{"known_token_prefixes", reTelegram},
-		{"known_token_prefixes", reDiscord},
-		{"known_token_prefixes", reDigitalOcean},
-		{"known_token_prefixes", reShopify},
-		{"basic_auth", reBasicAuth},
-		{"db_connection_string", reDBURI},
-		{"azure_storage", reAzureConn},
-		{"jwt_ish", reJWT},
-		{"known_token_prefixes", rePEM},
+		{"known_token_prefixes", reOpenAI, false},
+		{"known_token_prefixes", reStripe, false},
+		{"known_token_prefixes", reGitHub, false},
+		{"known_token_prefixes", reGitLab, false},
+		{"known_token_prefixes", reAWS, false},
+		{"known_token_prefixes", reGoogle, true},
+		{"known_token_prefixes", reSlack, false},
+		{"known_token_prefixes", reSlackHook, false},
+		{"known_token_prefixes", reSendGrid, false},
+		{"known_token_prefixes", reHuggingFace, false},
+		{"known_token_prefixes", reNPM, false},
+		{"known_token_prefixes", rePyPI, false},
+		{"known_token_prefixes", reTelegram, false},
+		{"known_token_prefixes", reDiscord, false},
+		{"known_token_prefixes", reDigitalOcean, false},
+		{"known_token_prefixes", reShopify, false},
+		{"basic_auth", reBasicAuth, false},
+		{"db_connection_string", reDBURI, false},
+		{"azure_storage", reAzureConn, false},
+		{"jwt_ish", reJWT, false},
+		{"known_token_prefixes", rePEM, false},
 	}
 	seen := map[string]struct{}{}
 	for _, c := range checks {
+		if skipGoogleAPIKey && c.skip {
+			continue
+		}
 		if c.re.MatchString(blob) {
 			key := c.det + ":" + reason
 			if _, ok := seen[key]; ok {

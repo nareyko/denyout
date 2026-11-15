@@ -37,7 +37,8 @@ func renderLinuxNFT(spec Spec) string {
 		fmt.Fprintf(&b, "  chain output_filter {\n")
 		fmt.Fprintf(&b, "    type filter hook output priority 0; policy accept;\n")
 		fmt.Fprintf(&b, "    meta mark %d return\n", mark)
-		fmt.Fprintf(&b, "    meta skuid %d udp dport 443 drop comment \"denyout-block-quic\"\n", spec.UID)
+		// counter makes silent UDP/443 drops visible via `nft list` / hostctl quic-stats.
+		fmt.Fprintf(&b, "    meta skuid %d udp dport 443 counter drop comment \"denyout-block-quic\"\n", spec.UID)
 		fmt.Fprintf(&b, "  }\n")
 	}
 	fmt.Fprintf(&b, "}\n")

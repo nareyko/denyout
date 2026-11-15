@@ -164,6 +164,37 @@ func TestPrefixPackCheapWins(t *testing.T) {
 	}
 }
 
+func TestGoogleBrowserAPIKeyExemptOnFirstPartyHosts(t *testing.T) {
+	// AIza + 35 chars (Google browser API key shape).
+	aiza := "AIza" + strings.Repeat("A", 35)
+	if len(aiza) != 39 {
+		t.Fatalf("fixture len=%d want 39", len(aiza))
+	}
+	exempt := []string{
+		"https://chat.google.com/punctual/v1/chooseServer?key=" + aiza,
+		"https://signaler-pa.clients6.google.com/punctual/v1/chooseServer?key=" + aiza,
+		"https://safebrowsing.googleapis.com/v4/threatListUpdates:fetch?key=" + aiza,
+		"https://www.gstatic.com/x?key=" + aiza,
+	}
+	for _, u := range exempt {
+		hits := secrets.ScanURL(u, nil, 6, true)
+		if len(hits) != 0 {
+			t.Fatalf("expected no hit on Google host url=%s hits=%v", u, hits)
+		}
+	}
+	// Same key on a non-Google host must still deny.
+	evil := "https://evil.example/exfil?key=" + aiza
+	hits := secrets.ScanURL(evil, nil, 6, true)
+	if len(hits) == 0 {
+		t.Fatal("expected hit for AIza on non-Google host")
+	}
+	// Other secrets on Google hosts still deny.
+	sk := secrets.ScanURL("https://chat.google.com/x?api_key=sk-denyouttest000000000000000", nil, 6, true)
+	if len(sk) == 0 {
+		t.Fatal("expected sk- on Google host to still deny")
+	}
+}
+
 func TestAWSSecretAloneNotPaired(t *testing.T) {
 	// Bare 40-char secret without access key id must not trip pairing.
 	u := qURL("denyoutAWSsecret0000000000000000xxxx")

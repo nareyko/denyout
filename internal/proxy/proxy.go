@@ -176,7 +176,8 @@ func (s *Server) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 	_, _ = bufrw.WriteString("HTTP/1.1 200 Connection Established\r\n\r\n")
 	_ = bufrw.Flush()
 
-	if s.cfg.TLSMode == TLSPassthrough {
+	if s.useTLSPassthrough(host) {
+		rv.Inspection = "passthrough"
 		s.tunnel(clientConn, host, port, ips, s.cfg.Engine.Cfg.AllowPrivate)
 		s.logDecision(rv, d, start)
 		return
@@ -188,6 +189,7 @@ func (s *Server) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 	}
 	leaf, err := s.cfg.CA.Leaf(host)
 	if err != nil {
+		s.logMitmError(rv, "mitm_leaf_error", start)
 		_ = clientConn.Close()
 		return
 	}
@@ -196,12 +198,17 @@ func (s *Server) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 		MinVersion:   tls.VersionTLS12,
 	})
 	if err := tlsClient.Handshake(); err != nil {
+		s.logMitmError(rv, "mitm_handshake_failed", start)
 		_ = tlsClient.Close()
 		return
 	}
 	defer tlsClient.Close()
 
 	br := bufio.NewReader(tlsClient)
+	if peek, perr := br.Peek(24); perr == nil && isHTTP2ClientPreface(peek) {
+		s.logMitmError(rv, "mitm_http2_unsupported", start)
+		return
+	}
 	for {
 		req, err := http.ReadRequest(br)
 		if err != nil {
@@ -432,6 +439,18 @@ func (s *Server) tunnel(client net.Conn, host, port string, ips []net.IP, allowP
 	<-errCh
 }
 
+func (s *Server) useTLSPassthrough(host string) bool {
+	if s.cfg.TLSMode == TLSPassthrough || s.cfg.CA == nil {
+		return true
+	}
+	return TLSPassthroughHost(host)
+}
+
+func (s *Server) logMitmError(rv policy.RequestView, reason string, start time.Time) {
+	rv.Inspection = "intercept"
+	s.logDecision(rv, policy.Decision{Verdict: "error", Reasons: []string{reason}}, start)
+}
+
 func (s *Server) logDecision(rv policy.RequestView, d policy.Decision, start time.Time) {
 	redURL := secrets.RedactURL(rv.RawURL)
 	if s.cfg.Audit == nil {
@@ -440,6 +459,8 @@ func (s *Server) logDecision(rv policy.RequestView, d policy.Decision, start tim
 			if s.cfg.OnDeny != nil {
 				s.cfg.OnDeny(rv.DestHost, append([]string(nil), d.Reasons...), redURL)
 			}
+		} else if d.Verdict == "error" {
+			fmt.Fprintf(os.Stderr, "denyout: MITM %s reasons=%s host=%s\n", redURL, strings.Join(d.Reasons, ","), rv.DestHost)
 		}
 		return
 	}
