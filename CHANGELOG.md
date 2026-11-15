@@ -6,6 +6,10 @@
 
 - **Google browser API keys:** `AIza...` in query on first-party Google hosts (`*.google.com`, `*.googleapis.com`, `*.gstatic.com`, ...) no longer trips `secret_in_url`. Same key on a non-Google host still denies.
 
+### Added
+
+- **QUIC drop counters:** nft UDP/443 drop rule now has a `counter`; `denyout-cli hostctl quic-stats` and an `events.jsonl` `quic_drop_stats` line on Protect Off (before rules are removed).
+
 ## 0.4.6 - Block browser QUIC + diagnostics (2026-11-15)
 
 ### Added

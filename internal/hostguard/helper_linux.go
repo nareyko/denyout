@@ -65,6 +65,31 @@ func helperCall(verb string, proxyPort int, caCert string, uid int, allowQUIC bo
 	return fmt.Errorf("helper %s: %s", verb, resp)
 }
 
+func helperQUICStats(uid int) (QUICDropStats, error) {
+	c, err := net.Dial("unix", helperSockPath)
+	if err != nil {
+		return QUICDropStats{}, fmt.Errorf("%w: %v", ErrHelperUnavailable, err)
+	}
+	defer c.Close()
+	// quic-stats PORT UID — port unused; keep 3-field shape for the helper parser.
+	line := fmt.Sprintf("quic-stats 0 %d -\n", uid)
+	if _, err := c.Write([]byte(line)); err != nil {
+		return QUICDropStats{}, err
+	}
+	resp, err := bufio.NewReader(c).ReadString('\n')
+	if err != nil {
+		return QUICDropStats{}, err
+	}
+	resp = strings.TrimSpace(resp)
+	if !strings.HasPrefix(resp, "OK") {
+		if strings.Contains(resp, "unknown verb") {
+			return QUICDropStats{}, fmt.Errorf("%w: helper lacks quic-stats", ErrHelperUnavailable)
+		}
+		return QUICDropStats{}, fmt.Errorf("helper quic-stats: %s", resp)
+	}
+	return ParseQUICDropStatsLine(resp)
+}
+
 // InstallHelper installs and starts the systemd helper (must run as root).
 func InstallHelper(ownerUID int) error {
 	if os.Geteuid() != 0 {
@@ -236,6 +261,14 @@ func handleHelperConn(c net.Conn, ownerUID int) {
 		opErr = Teardown(spec)
 	case "uninstall-helper":
 		opErr = UninstallHelper()
+	case "quic-stats":
+		st, rerr := ReadQUICDropStats()
+		if rerr != nil {
+			_, _ = c.Write([]byte("ERR " + rerr.Error() + "\n"))
+			return
+		}
+		_, _ = c.Write([]byte("OK quic1 " + FormatQUICDropStatsLine(st) + "\n"))
+		return
 	default:
 		_, _ = c.Write([]byte("ERR unknown verb\n"))
 		return

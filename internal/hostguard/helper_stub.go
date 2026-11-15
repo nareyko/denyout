@@ -13,6 +13,11 @@ func helperCall(verb string, proxyPort int, caCert string, uid int, allowQUIC bo
 	return ErrHelperUnavailable
 }
 
+func helperQUICStats(uid int) (QUICDropStats, error) {
+	_ = uid
+	return QUICDropStats{}, ErrHelperUnavailable
+}
+
 // InstallHelper is a no-op outside Linux (macOS/Windows helpers are a later platform track).
 func InstallHelper(ownerUID int) error {
 	_ = ownerUID

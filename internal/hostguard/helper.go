@@ -31,3 +31,8 @@ func HelperTeardown(proxyPort int, uid int) error {
 func HelperUninstallHelper() error {
 	return helperCall("uninstall-helper", 0, "", 0, false)
 }
+
+// HelperQUICStats asks the helper to read nft QUIC-drop counters (Linux).
+func HelperQUICStats(uid int) (QUICDropStats, error) {
+	return helperQUICStats(uid)
+}
