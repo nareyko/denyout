@@ -109,10 +109,11 @@ func elevateLinux(exe string, args []string) error {
 	}
 	var cmd *exec.Cmd
 	if _, err := exec.LookPath("pkexec"); err == nil {
+		// Never pass a polkit action flag to pkexec: modern pkexec has no such option and
+		// treats the flag token as PROGRAM ("Cannot run program …: No such file"), which
+		// broke Protect whenever com.denyout.hostctl.policy was installed.
+		// Custom auth copy still comes from that policy when exec.path is annotated.
 		cmd = exec.Command("pkexec", append([]string{exe}, args...)...)
-		if _, err := os.Stat("/usr/share/polkit-1/actions/com.denyout.hostctl.policy"); err == nil {
-			cmd = exec.Command("pkexec", append([]string{"--action-id=com.denyout.hostctl", exe}, args...)...)
-		}
 	} else {
 		cmd = exec.Command("sudo", append([]string{"-n", exe}, args...)...)
 	}
