@@ -198,7 +198,16 @@ export function Problems({
             >
               {retryLabel}
             </button>
-            <button className="btn danger" disabled={pauseBusy || pauseBlocked} onClick={() => setPauseOpen(true)}>
+            <button
+              className="btn danger"
+              disabled={pauseBusy || pauseBlocked}
+              title={
+                pauseBlocked
+                  ? "Finish the open Ask/block or tray pause first."
+                  : undefined
+              }
+              onClick={() => setPauseOpen(true)}
+            >
               {brokenIntent ? "Clear intent / turn off…" : "Pause / turn off…"}
             </button>
             {hasError && (
@@ -230,7 +239,16 @@ export function Problems({
               {intentAgents ? "Turn on Agents only" : "Turn on Protect computer"}
             </button>
             {canChangePause ? (
-              <button className="btn" disabled={pauseBusy || pauseBlocked} onClick={() => setPauseOpen(true)}>
+              <button
+                className="btn"
+                disabled={pauseBusy || pauseBlocked}
+                title={
+                  pauseBlocked
+                    ? "Finish the open Ask/block or tray pause first."
+                    : undefined
+                }
+                onClick={() => setPauseOpen(true)}
+              >
                 Change pause…
               </button>
             ) : null}
@@ -251,7 +269,16 @@ export function Problems({
             >
               Switch to Protect computer
             </button>
-            <button className="btn danger" disabled={pauseBusy || pauseBlocked} onClick={() => setPauseOpen(true)}>
+            <button
+              className="btn danger"
+              disabled={pauseBusy || pauseBlocked}
+              title={
+                pauseBlocked
+                  ? "Finish the open Ask/block or tray pause first."
+                  : undefined
+              }
+              onClick={() => setPauseOpen(true)}
+            >
               Pause / turn off…
             </button>
           </div>
@@ -262,11 +289,25 @@ export function Problems({
                 Open Threat lists
               </button>
             ) : null}
-            <button className="btn danger" disabled={pauseBusy || pauseBlocked} onClick={() => setPauseOpen(true)}>
+            <button
+              className="btn danger"
+              disabled={pauseBusy || pauseBlocked}
+              title={
+                pauseBlocked
+                  ? "Finish the open Ask/block or tray pause first."
+                  : undefined
+              }
+              onClick={() => setPauseOpen(true)}
+            >
               Pause / turn off…
             </button>
           </div>
         )}
+        {pauseBlocked ? (
+          <p className="muted" style={{ marginTop: "0.35rem" }}>
+            Pause is busy — finish the open Ask/block or tray pause first.
+          </p>
+        ) : null}
         {unhealthy && hasError && (
           <pre className="mono" style={{ whiteSpace: "pre-wrap", marginTop: "0.75rem" }}>
             {p.last_error}
