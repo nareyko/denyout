@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.4 - pkexec Protect fix (2026-11-15)
+
+### Fixed
+
+- **Protect computer elevate:** when `com.denyout.hostctl.policy` is installed, DenyOut no longer passes invalid `pkexec --action-id=…` (polkit treats it as the program → “Cannot run program --action-id=…”). Plain `pkexec <denyout> hostctl …` again shows the password dialog.
+
 ## 0.4.3 - Elevate-skip honesty + URLhaus mirror (2026-11-15)
 
 ### Fixed
