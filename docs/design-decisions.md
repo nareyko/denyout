@@ -15,6 +15,7 @@ Updated: 2026-11-13.
 | UX | GUI primary for P1. CLI for power users |
 | GUI stack (MVP) | **`denyout desktop`**: **Protect this computer** (transparent HTTP/HTTPS redirect + CA trust) + tray + notifications + simple settings. Advanced = protect one program. `denyout gui` = technical panel. |
 | Hostguard | Linux nftables + pkexec. MacOS pf + admin Keychain. Windows WinDivert companion + UAC (`denyout hostctl`) |
+| TUN egress | **Spike only** ([`design-tun-egress.md`](design-tun-egress.md)). Default Protect stays nft redirect + QUIC drop until T1 VM dogfood. `internal/tun` is closed-loop plan code (no `/dev/net/tun` in CI). |
 | Whole-device policy | Default **allow web** + secret/canary/SSRF hard denies + notify. Optional **Ask before new sites** |
 | Platforms (MVP) | Ubuntu, macOS, Windows **desktop** (computer mode on all three. Mark OS unsupported if divert missing - no fake On) |
 | Install (MVP) | Releases + SHA256SUMS. `Install.sh` -> `~/.local/bin` (Linux/macOS). Windows zip + short EN doc. CA installed when Protect computer is enabled. Homebrew/winget stretch - [`07-desktop.md`](07-desktop.md) §3 |

@@ -64,6 +64,12 @@ Locked recipes: [`07-desktop.md`](07-desktop.md) §3.
 - [x] `denyout serve` (`--listen`, `--health-listen`, `--metrics-listen`, `--ca-dir`. `DENYOUT_KILL=1`)
 - [x] Examples in `examples/k8s/` + `examples/compose/` + NetworkPolicy docs ([`08-server.md`](08-server.md))
 
+## H. TUN egress (post-MVP spike)
+
+- [x] Design + closed-loop plan package: [`design-tun-egress.md`](design-tun-egress.md), `internal/tun` (no real TUN in CI)
+- [ ] T1 VM dogfood: UDP/443 via TUN drop+log with rollback to nft-only
+- [ ] T2+ only after T1 coexistence matrix (VPN/Docker) is written up
+
 ## Non-goals for MVP code
 
 Phone clients - MCP tool firewall - credential vault injection - hosted SaaS - OPA requirement - mandatory OS sandbox - paywalled binary.
