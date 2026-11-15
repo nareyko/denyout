@@ -2,10 +2,12 @@
 
 ## Unreleased
 
+## 0.4.9 - TUN reasons + closed-loop CI smoke (2026-11-16)
+
 ### Added
 
 - **TUN helper reasons:** `tun-start|stop|stats` replies include `reason=flag_off` (default) or `reason=stub_no_device` when `DENYOUT_TUN_E2E=1` but no real device yet.
-- **Closed-loop release smoke:** `scripts/closed-loop-release-smoke.sh` verifies a release tree (or local build) without touching `~/.local` or elevating Protect.
+- **Closed-loop release smoke:** `scripts/closed-loop-release-smoke.sh` (supports `DENYOUT_BIN`) verifies a release tree or local build without touching `~/.local` or elevating Protect; wired into CI.
 
 ## 0.4.8 - TUN T1 closed-loop (no device) (2026-11-16)
 
