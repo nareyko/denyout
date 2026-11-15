@@ -13,6 +13,8 @@ type QUICDropStats struct {
 	Bytes   uint64 `json:"bytes"`
 	// Present is false when the filter chain/rule is missing (AllowQUIC or Protect Off).
 	Present bool `json:"present"`
+	// Source is nft (T0 drop) or tun (T1 userspace); empty formats as nft.
+	Source string `json:"source,omitempty"`
 }
 
 var reNFTCounterPacketsBytes = regexp.MustCompile(`(?i)counter\s+packets\s+(\d+)\s+bytes\s+(\d+)`)
@@ -39,7 +41,11 @@ func ParseQUICDropCounters(nftList string) QUICDropStats {
 
 // FormatQUICDropStatsLine is the helper/hostctl response payload after OK.
 func FormatQUICDropStatsLine(st QUICDropStats) string {
-	return fmt.Sprintf("packets=%d bytes=%d present=%t", st.Packets, st.Bytes, st.Present)
+	src := st.Source
+	if src == "" {
+		src = "nft"
+	}
+	return fmt.Sprintf("packets=%d bytes=%d present=%t source=%s", st.Packets, st.Bytes, st.Present, src)
 }
 
 // QUICDropStatsBestEffort prefers the privileged helper, then a direct nft read (root).
@@ -61,6 +67,7 @@ func ParseQUICDropStatsLine(resp string) (QUICDropStats, error) {
 	if !strings.HasPrefix(resp, "OK") {
 		return st, fmt.Errorf("quic-stats: %s", resp)
 	}
+	st.Source = "nft" // default for T0-shaped lines without source=
 	for _, f := range strings.Fields(resp) {
 		switch {
 		case strings.HasPrefix(f, "packets="):
@@ -69,6 +76,8 @@ func ParseQUICDropStatsLine(resp string) (QUICDropStats, error) {
 			st.Bytes, _ = strconv.ParseUint(strings.TrimPrefix(f, "bytes="), 10, 64)
 		case strings.HasPrefix(f, "present="):
 			st.Present = strings.TrimPrefix(f, "present=") == "true" || strings.TrimPrefix(f, "present=") == "1"
+		case strings.HasPrefix(f, "source="):
+			st.Source = strings.TrimPrefix(f, "source=")
 		}
 	}
 	return st, nil

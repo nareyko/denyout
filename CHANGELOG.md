@@ -5,6 +5,7 @@
 ### Added
 
 - **TUN T1 closed-loop:** `internal/tun` IPv4/IPv6 UDP classify, DropLog counter (`source=tun`), nft steer table render + helper verb lines — still no `/dev/net/tun` or Protect default change ([design](docs/design-tun-egress.md)).
+- **TUN helper stubs:** `hostctl tun-start|tun-stop|tun-stats` and helper verbs reply `OK tun1 enabled=false` (no device). `quic-stats` lines now include `source=nft`.
 
 ## 0.4.7 - AIza FP, QUIC stats, Cursor passthrough (2026-11-15)
 

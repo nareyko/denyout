@@ -78,6 +78,8 @@ Code under `internal/tun` may only:
 
 Landed (string/unit only): `ClassifyIPPacket`, `Engine.Handle`, `RenderT1SteerTable`, `FormatDropStatsLine`.
 
+Landed (helper protocol, still no device): helper verbs `tun-start` / `tun-stop` / `tun-stats` reply `OK tun1 enabled=false` (or `present=false source=tun`); `hostctl` exposes the same; `quic-stats` lines include `source=nft`.
+
 Opening a real TUN requires an explicit `DENYOUT_TUN_E2E=1` test tag and root — not CI default.
 
 ## 8. Decision lock (pending owner)
