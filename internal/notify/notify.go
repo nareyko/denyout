@@ -319,36 +319,57 @@ func levelAllows(kind Kind) bool {
 	}
 }
 
-func emitAllowed(kind Kind) bool {
+// emitAllowedLocked requires mu held. Returns ok and suppress reason when !ok.
+func emitAllowedLocked(kind Kind) (ok bool, reason string) {
+	if !AllowedKind(kind) {
+		return false, "kind_not_allowed"
+	}
 	if !levelAllows(kind) {
-		return false
+		if level == "quiet" {
+			return false, "quiet"
+		}
+		return false, "level"
 	}
 	critical := kind == KindProtectFailed
 	trayHint := kind == KindTrayHidden
 	if !bannersAllowed && !critical && !trayHint {
-		return false
+		return false, "banners_off"
 	}
 	if !snoozeUntil.IsZero() && time.Now().Before(snoozeUntil) && !critical && !trayHint {
-		return false
+		return false, "snooze"
 	}
 	focusSuppress := uiFocused && silentWhenOpen
 	fsSuppress := fullscreen && respectFullscreen
-	if (focusSuppress || away || fsSuppress) && !critical && !trayHint {
-		return false
+	if focusSuppress && !critical && !trayHint {
+		return false, "ui_focused"
 	}
-	return true
+	if away && !critical && !trayHint {
+		return false, "away"
+	}
+	if fsSuppress && !critical && !trayHint {
+		return false, "fullscreen"
+	}
+	return true, ""
+}
+
+func emitAllowed(kind Kind) bool {
+	ok, _ := emitAllowedLocked(kind)
+	return ok
 }
 
 // Emit shows an OS notification only for a whitelisted kind (and when level allows).
 func Emit(kind Kind, title, body string) {
 	mu.Lock()
-	ok := emitAllowed(kind)
+	ok, reason := emitAllowedLocked(kind)
+	lvl, isAway, focused, fs := level, away, uiFocused, fullscreen
+	snoozed := !snoozeUntil.IsZero() && time.Now().Before(snoozeUntil)
 	mu.Unlock()
-	if !ok {
-		return
-	}
 	if title == "" {
 		title = "DenyOut"
+	}
+	logAttempt(kind, title, body, ok, reason, lvl, isAway, focused, fs, snoozed)
+	if !ok {
+		return
 	}
 	if runtime.GOOS == "linux" {
 		if _, err := exec.LookPath("notify-send"); err == nil {
@@ -373,13 +394,16 @@ type Action struct {
 // onAction is called asynchronously with the chosen id when non-empty.
 func EmitAction(kind Kind, title, body string, wait time.Duration, actions []Action, onAction func(id string)) {
 	mu.Lock()
-	ok := emitAllowed(kind)
+	ok, reason := emitAllowedLocked(kind)
+	lvl, isAway, focused, fs := level, away, uiFocused, fullscreen
+	snoozed := !snoozeUntil.IsZero() && time.Now().Before(snoozeUntil)
 	mu.Unlock()
-	if !ok {
-		return
-	}
 	if title == "" {
 		title = "DenyOut"
+	}
+	logAttempt(kind, title, body, ok, reason, lvl, isAway, focused, fs, snoozed)
+	if !ok {
+		return
 	}
 	if wait <= 0 {
 		wait = ExpireFor(kind)

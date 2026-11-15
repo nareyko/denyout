@@ -17,6 +17,8 @@ const (
 	DecisionOpen       = "open"
 	DecisionKeepTimed  = "keep_timed:"  // suffix duration e.g. keep_timed:1h
 	DecisionAllowTimed = "allow_timed:" // suffix duration
+	// decisionLaterTimeout is internal — mapped to DecisionLater with source=timeout.
+	decisionLaterTimeout = "later_timeout"
 )
 
 // DecisionPrompt is one hard-block decision (compact dialog / in-app modal).
@@ -121,17 +123,34 @@ func (a *App) presentHardBlockDecision(p DecisionPrompt) string {
 	if p.ID == "" {
 		p.ID = fmt.Sprintf("%d", time.Now().UnixNano())
 	}
+	LogBlock("hardblock_shown", map[string]any{
+		"host": p.Host, "reason": p.Reason, "batch": p.Batch, "profile_id": p.ProfileID,
+	})
 	// Away or fullscreen quiet: do not steal focus; safe default = Decide later.
 	if a != nil && (a.isAway() || a.isFullscreenQuiet()) {
 		a.noteAwayUnread(p.Host, awayUnreadWaiting)
 		key := postBlockKey(p.Host, p.Reason)
 		notePromptIgnore(key)
+		LogBlock("hardblock_answered", map[string]any{
+			"host": p.Host, "reason": p.Reason, "action": DecisionLater, "source": "away_or_fullscreen",
+		})
 		return DecisionLater
 	}
+	var action string
+	source := "ui"
 	if fn := getDecisionPresenter(); fn != nil {
-		return fn(p)
+		action = fn(p)
+	} else {
+		action = nativeDecisionDialog(p)
 	}
-	return nativeDecisionDialog(p)
+	if action == decisionLaterTimeout {
+		source = "timeout"
+		action = DecisionLater
+	}
+	LogBlock("hardblock_answered", map[string]any{
+		"host": p.Host, "reason": p.Reason, "action": action, "source": source, "profile_id": p.ProfileID,
+	})
+	return action
 }
 
 func decisionBody(p DecisionPrompt) string {
@@ -178,7 +197,7 @@ func nativeDecisionDialog(p DecisionPrompt) string {
 		}
 		return a
 	case <-time.After(timeout):
-		return DecisionLater
+		return decisionLaterTimeout
 	}
 }
 

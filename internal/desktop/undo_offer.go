@@ -88,8 +88,13 @@ func (a *App) UITakeUndoOffer() error {
 		return fmt.Errorf("Nothing to undo (expired or already used)")
 	}
 	fn := u.onUndo
+	kind := u.kind
+	host := u.host
 	a.clearUndoOfferLocked()
 	a.mu.Unlock()
+	if kind == undoOfferAllow {
+		LogBlock("undo_allow", map[string]any{"host": host, "source": "ui"})
+	}
 	if fn != nil {
 		fn()
 	}

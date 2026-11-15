@@ -105,6 +105,7 @@ type UISnapshot struct {
 	SoundOnlyAnswer     bool            `json:"sound_only_answer"`
 	SystemBanners       bool            `json:"system_banners"`
 	RespectFullscreen   bool            `json:"respect_fullscreen"`
+	BlockBrowserQUIC    bool            `json:"block_browser_quic"` // inverse of AllowBrowserQUIC; default on
 	FullscreenDetect    bool            `json:"fullscreen_detect"`  // can see fullscreen apps right now
 	FullscreenNow       bool            `json:"fullscreen_now"`     // active window fullscreen (only if detect)
 	FullscreenWayland   bool            `json:"fullscreen_wayland"` // session looks Wayland (copy hint)
@@ -302,6 +303,7 @@ func (a *App) GetUISnapshot() UISnapshot {
 		SoundOnlyAnswer:    !a.state.SoundOnlyAnswerOff,
 		SystemBanners:      !a.state.SystemBannersOff,
 		RespectFullscreen:  !a.state.RespectFullscreenOff,
+		BlockBrowserQUIC:   !a.state.AllowBrowserQUIC,
 		FullscreenDetect:   a.fullscreenDetectOK(),
 		FullscreenNow: func() bool {
 			a.presence.mu.Lock()
@@ -555,6 +557,7 @@ func (a *App) UIPauseAsks() string {
 		a.asks = newAskFlight()
 	}
 	a.asks.SetPaused(askPauseDefault)
+	LogBlock("ask_paused", map[string]any{"until": until})
 	return "Asks paused for 15 minutes. New sites stay blocked."
 }
 
@@ -568,6 +571,7 @@ func (a *App) UIResumeAsks() string {
 	if a.asks != nil {
 		a.asks.ClearPause()
 	}
+	LogBlock("ask_resumed", nil)
 	return "Asks resumed."
 }
 
@@ -611,6 +615,9 @@ func (a *App) UIBulkAlwaysAllow(hosts []string) (string, error) {
 			continue
 		}
 		okN++
+	}
+	if okN > 0 {
+		LogBlock("bulk_always_allow", map[string]any{"count_ok": okN, "failed": failed})
 	}
 	if len(failed) == 0 {
 		if okN == 0 {
@@ -757,7 +764,7 @@ func (a *App) UIAlwaysAllowHostFrom(host, reason, process string) error {
 	} else {
 		a.forgetKeepsForHost(host)
 	}
-	if err := a.persistAlwaysHost(host); err != nil {
+	if err := a.persistAlwaysHostFrom(host, "history"); err != nil {
 		return err
 	}
 	// Also unblock any running My agents wraps for this host.
@@ -784,6 +791,7 @@ func (a *App) UIClearAllKeeps() error {
 	a.state.RememberedKeeps = nil
 	st := a.state
 	a.mu.Unlock()
+	LogBlock("forget_keep", map[string]any{"all": true})
 	return SaveState(st)
 }
 
@@ -970,6 +978,26 @@ func (a *App) UISetRespectFullscreen(on bool) error {
 	return SaveState(st)
 }
 
+// UISetBlockBrowserQUIC toggles dropping UDP/443 while Protect is on (default on).
+// When Protect is live, re-applies hostguard so nft/pf match the new choice.
+func (a *App) UISetBlockBrowserQUIC(on bool) error {
+	a.mu.Lock()
+	a.state.AllowBrowserQUIC = !on
+	live := a.proxyd != nil
+	st := a.state
+	a.mu.Unlock()
+	if err := SaveState(st); err != nil {
+		return err
+	}
+	LogEvent("block_quic_setting", map[string]any{"block": on, "live": live})
+	if live {
+		if err := a.restartActiveProtector(); err != nil {
+			return fmt.Errorf("Saved, but could not refresh Protect rules: %w", err)
+		}
+	}
+	return nil
+}
+
 // UISetSilentWhenOpen toggles silent OS while DenyOut is open (default on).
 func (a *App) UISetSilentWhenOpen(on bool) error {
 	a.mu.Lock()
@@ -1025,6 +1053,7 @@ func (a *App) UIRemoveTimedAllow(host string) error {
 	sess := a.session
 	wasProxy := a.proxyd != nil
 	a.mu.Unlock()
+	LogBlock("timed_allow_remove", map[string]any{"host": host, "source": "ui"})
 	if err := SaveState(st); err != nil {
 		return err
 	}
@@ -1094,6 +1123,7 @@ func (a *App) UIRemoveTimedDeny(host, reason string) error {
 	a.state.TimedDenies = out
 	st := a.state
 	a.mu.Unlock()
+	LogBlock("timed_deny_remove", map[string]any{"host": host, "reason": reason, "source": "ui"})
 	return SaveState(st)
 }
 
@@ -1121,7 +1151,7 @@ func effectiveReaskIntervalSec(st State) int {
 	return 60
 }
 
-// UISetAutostart toggles login autostart for denyout-desktop when available.
+// UISetAutostart toggles login autostart for denyout (GUI) when available.
 func (a *App) UISetAutostart(on bool) error {
 	a.mu.Lock()
 	if !a.state.SetupDone {
@@ -1331,6 +1361,9 @@ func (a *App) UIApplyAllowPack(profileID, packID string) ([]string, error) {
 	if err := a.reapplyRunningProfile(profileID); err != nil {
 		return added, err
 	}
+	if len(added) > 0 {
+		LogBlock("pack_allow", map[string]any{"profile_id": profileID, "pack_id": packID, "hosts": added})
+	}
 	return added, nil
 }
 
@@ -1349,6 +1382,9 @@ func (a *App) UIUndoAllowPack(profileID, packID string) ([]string, error) {
 	}
 	if err := a.reapplyRunningProfile(profileID); err != nil {
 		return removed, err
+	}
+	if len(removed) > 0 {
+		LogBlock("pack_undo", map[string]any{"profile_id": profileID, "pack_id": packID, "hosts": removed})
 	}
 	return removed, nil
 }

@@ -122,6 +122,13 @@ const ADVANCED_FIND_KEYS = [
   "auto-resume",
   "protect resumed",
   "agents resumed",
+  "quic",
+  "http3",
+  "http/3",
+  "udp",
+  "chrome bypass",
+  "block quic",
+  "browser quic",
 ];
 
 function findKeysMatch(keys: string[], findQ: string): boolean {
@@ -1314,9 +1321,9 @@ export function Settings({
  dismissed={tipGone(dismissed, "settings-advanced")}
  onDismiss={onChanged}
  >
- Advanced: system banners (including Detailed), allowed/silenced sites, optional lists,
- Asks, diagnostics, account, and whole-PC Agents only. Allowed/silenced hosts are the
- permanent allow controls — other cards here are prefs and tools.
+ Advanced: system banners (including Detailed), Browser QUIC, allowed/silenced sites,
+ optional lists, Asks, diagnostics, account, and whole-PC Agents only. Allowed/silenced
+ hosts are the permanent allow controls — other cards here are prefs and tools.
  </Tip>
  )}
 
@@ -1458,6 +1465,46 @@ export function Settings({
  How long banners live: Protect failed stays · soft Open ~12s (banners on + A bit
  more+; not while snoozed/focused/fullscreen quiet) · in-app Undo ~10s after Allow
  (~5s after auto-resume) · tray-hidden ~8s.
+ </p>
+ </section>
+ )}
+
+ {showSection(
+ [
+ "quic",
+ "http3",
+ "http/3",
+ "udp",
+ "chrome bypass",
+ "block quic",
+ "browser quic",
+ ],
+ "block-quic",
+ ) && (
+ <section className="card" id="settings-block-quic">
+ <h2>Browser QUIC</h2>
+ <p className="muted">
+ Chrome and some apps prefer HTTP/3 over UDP port 443. That path skips DenyOut's
+ HTTPS inspection. While Protect is on, DenyOut can drop UDP/443 for your user so
+ browsers fall back to TCP (which Protect can see).
+ </p>
+ <label style={{ display: "block" }}>
+ <input
+ type="checkbox"
+ checked={snap.block_browser_quic !== false}
+ onChange={(e) =>
+ void api
+ .setBlockBrowserQUIC(e.target.checked)
+ .then(reload)
+ .catch((err) => fail(err))
+ }
+ />{" "}
+ Block browser QUIC (UDP 443) while Protect is on
+ </label>
+ <p className="muted" style={{ marginTop: "0.25rem" }}>
+ On by default. Turn off if a site or app needs HTTP/3 and you accept that Protect
+ may miss that traffic. Off/Quit always clears the drop. Changing this while Protect
+ is live re-applies network rules (helper or password prompt).
  </p>
  </section>
  )}

@@ -1,4 +1,4 @@
-# Builds denyout-desktop (Wails + CGO) and attaches archives to the same tag release.
+# Builds denyout (Wails + CGO GUI) and attaches archives to the same tag release.
 name: release-desktop
 
 on:
@@ -59,18 +59,18 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: cmd/denyout-desktop/frontend/package-lock.json
+          cache-dependency-path: cmd/denyout/frontend/package-lock.json
       - name: Install Linux WebKit
         if: matrix.deps != ''
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq ${{ matrix.deps }}
       - name: Build frontend
-        working-directory: cmd/denyout-desktop/frontend
+        working-directory: cmd/denyout/frontend
         run: |
           npm ci
           npm run build
-      - name: Build denyout-desktop
+      - name: Build denyout (Wails GUI)
         env:
           CGO_ENABLED: "1"
           TAG: ${{ steps.meta.outputs.tag }}
@@ -85,12 +85,12 @@ jobs:
           fi
           EXT=""
           if [ "${{ matrix.goos }}" = "windows" ]; then EXT=".exe"; fi
-          # Binary inside the archive must be denyout-desktop(.exe) — install.sh
-          # installs that name next to denyout. Archive filename stays tagged.
-          BIN="denyout-desktop${EXT}"
-          ARCHIVE="denyout-desktop_${TAG}_${{ matrix.goos }}_${{ matrix.goarch }}.tar.gz"
+          # Binary inside the archive must be denyout(.exe) — install.sh
+          # installs that name next to denyout-cli. Archive filename stays tagged.
+          BIN="denyout${EXT}"
+          ARCHIVE="denyout_${TAG}_${{ matrix.goos }}_${{ matrix.goarch }}.tar.gz"
           go build -tags "${{ matrix.tags }}" -ldflags "-s -w -X main.version=${TAG}" \
-            -o "$BIN" ./cmd/denyout-desktop
+            -o "$BIN" ./cmd/denyout
           mkdir -p dist
           tar -czf "dist/${ARCHIVE}" "$BIN"
         shell: bash

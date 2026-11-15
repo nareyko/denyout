@@ -58,7 +58,7 @@ Restart=on-failure
 [Install]
 WantedBy=default.target
 `, execLine)
-	_ = os.WriteFile(filepath.Join(unitDir, "denyout-desktop.service"), []byte(unit), 0o644)
+	_ = os.WriteFile(filepath.Join(unitDir, "denyout.service"), []byte(unit), 0o644)
 	return nil
 }
 
@@ -69,8 +69,8 @@ func unregisterAutostartLinux() error {
 	}
 	_ = os.Remove(filepath.Join(cfg, "autostart", "denyout.desktop"))
 	unitDir := filepath.Join(cfg, "systemd", "user")
-	_ = os.Remove(filepath.Join(unitDir, "denyout-desktop.service"))
-	_ = os.Remove(filepath.Join(unitDir, "denyout-desktop.service.off"))
+	_ = os.Remove(filepath.Join(unitDir, "denyout.service"))
+	_ = os.Remove(filepath.Join(unitDir, "denyout.service.off"))
 	return nil
 }
 

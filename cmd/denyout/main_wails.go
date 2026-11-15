@@ -36,8 +36,10 @@ type Bridge struct {
 	mu        sync.Mutex
 	presentMu sync.Mutex // one in-app Ask / hard-block decision at a time
 	ctx       context.Context
+	cancel    context.CancelFunc // cancels tray RunTray when quitting
 	hideToast bool
 	pending   string
+	quitting  bool // true after UIQuit — OnBeforeClose must not Hide-to-tray
 	decisions map[string]chan string
 }
 
@@ -87,7 +89,13 @@ func (b *Bridge) presentDecision(p desktop.DecisionPrompt) string {
 	if ctx == nil {
 		return desktop.PresentDecisionNative(p)
 	}
+	runtime.WindowUnminimise(ctx)
 	runtime.WindowShow(ctx)
+	runtime.WindowSetAlwaysOnTop(ctx, true)
+	go func() {
+		time.Sleep(80 * time.Millisecond)
+		runtime.WindowSetAlwaysOnTop(ctx, false)
+	}()
 	kind := strings.TrimSpace(p.Kind)
 	if kind == "" {
 		kind = "hard"
@@ -157,8 +165,21 @@ func (b *Bridge) openUI(route string) {
 		b.mu.Unlock()
 		return
 	}
+	raiseAndNavigate(ctx, route)
+}
+
+// raiseAndNavigate shows a hidden/minimised window then emits navigate.
+// Mutter/GNOME often ignores a bare WindowShow after HideWindowOnClose; a brief
+// always-on-top pulse + delayed emit makes Home/Quit from the tray reliable.
+func raiseAndNavigate(ctx context.Context, route string) {
+	runtime.WindowUnminimise(ctx)
 	runtime.WindowShow(ctx)
-	runtime.EventsEmit(ctx, "navigate", route)
+	runtime.WindowSetAlwaysOnTop(ctx, true)
+	go func() {
+		time.Sleep(80 * time.Millisecond)
+		runtime.WindowSetAlwaysOnTop(ctx, false)
+		runtime.EventsEmit(ctx, "navigate", route)
+	}()
 }
 
 func (b *Bridge) GetUISnapshot() desktop.UISnapshot { return b.app.GetUISnapshot() }
@@ -189,6 +210,7 @@ func (b *Bridge) UISetQuietOvernight(on bool) error     { return b.app.UISetQuie
 func (b *Bridge) UISetSoundOnlyAnswer(on bool) error    { return b.app.UISetSoundOnlyAnswer(on) }
 func (b *Bridge) UISetSystemBanners(on bool) error      { return b.app.UISetSystemBanners(on) }
 func (b *Bridge) UISetRespectFullscreen(on bool) error  { return b.app.UISetRespectFullscreen(on) }
+func (b *Bridge) UISetBlockBrowserQUIC(on bool) error   { return b.app.UISetBlockBrowserQUIC(on) }
 func (b *Bridge) UISetSilentWhenOpen(on bool) error     { return b.app.UISetSilentWhenOpen(on) }
 func (b *Bridge) UISetDecisionTimeoutSec(sec int) error { return b.app.UISetDecisionTimeoutSec(sec) }
 func (b *Bridge) UISetReaskIntervalSec(sec int) error   { return b.app.UISetReaskIntervalSec(sec) }
@@ -211,7 +233,10 @@ func (b *Bridge) UIStopProtectionWithChoice(choice string) error {
 	return b.app.UIStopProtectionWithChoice(choice)
 }
 func (b *Bridge) GetProblems() desktop.ProblemsView { return b.app.GetProblems() }
-func (b *Bridge) UIOpenLogs() error                 { return b.app.UIOpenLogs() }
+func (b *Bridge) GetLocalAnalytics(days int) desktop.LocalAnalytics {
+	return b.app.GetLocalAnalytics(days)
+}
+func (b *Bridge) UIOpenLogs() error { return b.app.UIOpenLogs() }
 func (b *Bridge) UICopyLastError() (string, error)  { return b.app.UICopyLastError() }
 func (b *Bridge) UIRetryProtect() error             { return b.app.UIRetryProtect() }
 func (b *Bridge) ListProfileViews() ([]desktop.ProfileView, error) {
@@ -286,27 +311,46 @@ func (b *Bridge) UIQuit(choice string) error {
 		return err
 	}
 	b.mu.Lock()
+	b.quitting = true
 	ctx := b.ctx
+	cancel := b.cancel
 	b.mu.Unlock()
+	// Stop tray first so the icon disappears even if Wails Quit is slow/swallowed.
+	if cancel != nil {
+		cancel()
+	}
 	if ctx != nil {
 		runtime.Quit(ctx)
-	} else {
-		os.Exit(0)
 	}
+	// OnBeforeClose used to treat Quit like window-close (Hide-to-tray). Even with
+	// the quitting flag, belt-and-suspenders so the process cannot strand in tray.
+	go func() {
+		time.Sleep(400 * time.Millisecond)
+		os.Exit(0)
+	}()
 	return nil
 }
 
 func main() {
 	noTray := flag.Bool("no-tray", false, "disable system tray (debug)")
 	openUI := flag.Bool("open", false, "show window on start (install / first run)")
+	foreground := flag.Bool("foreground", false, "keep attached to this terminal (do not detach)")
+	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
+	if *showVersion {
+		fmt.Printf("denyout %s\n", version)
+		os.Exit(0)
+	}
 	if os.Getenv("DENYOUT_OPEN_UI") == "1" {
 		*openUI = true
 	}
+	// Direct `denyout` in a shell must return the prompt; tray stays up.
+	desktop.ReexecDetachedIfTTY(*foreground || *noTray)
 
 	bridge := &Bridge{}
 	appCtx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
+	bridge.cancel = cancel
 
 	opts := desktop.Options{
 		Version:             version,
@@ -317,20 +361,21 @@ func main() {
 	core := desktop.NewApp(opts)
 	bridge.app = core
 	if err := core.Bootstrap(appCtx); err != nil {
-		fmt.Fprintf(os.Stderr, "denyout-desktop: bootstrap: %v\n", err)
+		fmt.Fprintf(os.Stderr, "denyout: bootstrap: %v\n", err)
 		os.Exit(1)
 	}
 
 	if !*noTray {
 		go func() {
 			if err := core.RunTray(appCtx); err != nil {
-				fmt.Fprintf(os.Stderr, "denyout-desktop: tray: %v\n", err)
+				fmt.Fprintf(os.Stderr, "denyout: tray: %v\n", err)
 			}
 			cancel()
 		}()
 	}
 
-	startHidden := !*noTray && !*openUI
+	// Always show the window on launch (Protect offer / Home). Close still hides to tray.
+	_ = openUI
 	err := wails.Run(&options.App{
 		Title:             "DenyOut",
 		Width:             1100,
@@ -340,7 +385,7 @@ func main() {
 		DisableResize:     false,
 		Fullscreen:        false,
 		Frameless:         false,
-		StartHidden:       startHidden,
+		StartHidden:       false,
 		HideWindowOnClose: false,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
@@ -348,6 +393,13 @@ func main() {
 		BackgroundColour: &options.RGBA{R: 246, G: 247, B: 249, A: 255},
 		OnStartup:        bridge.startup,
 		OnBeforeClose: func(ctx context.Context) (prevent bool) {
+			bridge.mu.Lock()
+			quitting := bridge.quitting
+			bridge.mu.Unlock()
+			if quitting {
+				// Real Quit (tray modal / UIQuit) — allow Wails to exit.
+				return false
+			}
 			if *noTray {
 				// No tray: hiding would strand the only UI. Unload and allow the window to close.
 				if err := bridge.app.UIQuit("off"); err != nil {
@@ -377,7 +429,7 @@ func main() {
 		},
 	})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "denyout-desktop: %v\n", err)
+		fmt.Fprintf(os.Stderr, "denyout: %v\n", err)
 		os.Exit(1)
 	}
 }

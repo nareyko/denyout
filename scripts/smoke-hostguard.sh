@@ -2,9 +2,9 @@
 # CI-friendly hostguard dry-run (no root).
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
-BIN="${DENYOUT_BIN:-$ROOT/bin/denyout}"
+BIN="${DENYOUT_BIN:-$ROOT/bin/denyout-cli}"
 if [ ! -x "$BIN" ]; then
-  (cd "$ROOT" && go build -o "$BIN" ./cmd/denyout)
+  (cd "$ROOT" && go build -o "$BIN" ./cmd/denyout-cli)
 fi
 echo "== hostctl render =="
 "$BIN" hostctl render --port 18443 --uid 1000

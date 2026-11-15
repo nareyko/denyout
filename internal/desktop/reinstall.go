@@ -29,9 +29,9 @@ func stopPreviousUnix(selfPID int) {
 	out, err := exec.Command("ps", "-eo", "pid=,args=").Output()
 	if err != nil {
 		// Best-effort fallbacks.
-		_ = exec.Command("pkill", "-f", `denyout[[:space:]]+desktop`).Run()
-		_ = exec.Command("pkill", "-f", `[d]enyout-desktop`).Run()
-		_ = exec.Command("pkill", "-f", `denyout[[:space:]]+hostctl[[:space:]]+proxyd`).Run()
+		_ = exec.Command("pkill", "-f", `denyout-cli[[:space:]]+desktop`).Run()
+		_ = exec.Command("pkill", "-x", `denyout`).Run()
+		_ = exec.Command("pkill", "-f", `denyout-cli[[:space:]]+hostctl[[:space:]]+proxyd`).Run()
 		return
 	}
 	for _, pid := range matchDenyoutPIDs(string(out), selfPID) {
@@ -101,12 +101,14 @@ func isDenyoutDesktopOrProxyd(args string) bool {
 	parts := strings.Fields(strings.ToLower(args))
 	for i, p := range parts {
 		base := filepath.Base(p)
-		// Strip occasional argv noise (e.g. "denyout-desktop:").
+		// Strip occasional argv noise (e.g. "denyout:").
 		base = strings.Trim(base, ":")
-		if base == "denyout-desktop" || base == "denyout-desktop.exe" {
+		base = strings.TrimSuffix(base, ".exe")
+		// Wails GUI binary is named exactly "denyout".
+		if base == "denyout" {
 			return true
 		}
-		if base != "denyout" && base != "denyout.exe" {
+		if base != "denyout-cli" {
 			continue
 		}
 		if i+1 >= len(parts) {
@@ -116,7 +118,7 @@ func isDenyoutDesktopOrProxyd(args string) bool {
 		if next == "desktop" {
 			return true
 		}
-		// `denyout hostctl proxyd ...`
+		// `denyout-cli hostctl proxyd ...`
 		if next == "hostctl" && i+2 < len(parts) && parts[i+2] == "proxyd" {
 			return true
 		}
@@ -129,17 +131,17 @@ func stopPreviousWindows(selfPID int) {
 	script := `
 $me = ` + strconv.Itoa(selfPID) + `
 Get-CimInstance Win32_Process | Where-Object {
-  $_.Name -eq 'denyout.exe' -or $_.Name -eq 'denyout-desktop.exe'
+  $_.Name -eq 'denyout.exe' -or $_.Name -eq 'denyout-cli.exe'
 } | ForEach-Object {
   if ($_.ProcessId -eq $me) { return }
   $cmd = $_.CommandLine
   $name = $_.Name
-  if ($name -eq 'denyout-desktop.exe') {
+  if ($name -eq 'denyout.exe') {
     Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
     return
   }
   if ($null -eq $cmd) { return }
-  if ($cmd -match 'denyout(\.exe)?\s+desktop' -or $cmd -match 'denyout(\.exe)?\s+hostctl\s+proxyd') {
+  if ($cmd -match 'denyout-cli(\.exe)?\s+desktop' -or $cmd -match 'denyout-cli(\.exe)?\s+hostctl\s+proxyd') {
     Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
   }
 }
@@ -147,7 +149,7 @@ Get-CimInstance Win32_Process | Where-Object {
 	_ = exec.Command("powershell", "-NoProfile", "-Command", script).Run()
 }
 
-// WarnStaleBinariesOnPATH reports denyout / denyout-desktop executables on PATH
+// WarnStaleBinariesOnPATH reports denyout / denyout-cli executables on PATH
 // that are outside installDir (common cause of "second version" after upgrade).
 // Does not delete anything.
 func WarnStaleBinariesOnPATH(installDir string) {
@@ -159,9 +161,9 @@ func WarnStaleBinariesOnPATH(installDir string) {
 	if pathEnv == "" {
 		return
 	}
-	names := []string{"denyout", "denyout-desktop"}
+	names := []string{"denyout", "denyout-cli"}
 	if runtime.GOOS == "windows" {
-		names = []string{"denyout.exe", "denyout-desktop.exe"}
+		names = []string{"denyout.exe", "denyout-cli.exe"}
 	}
 	seen := map[string]bool{}
 	for _, dir := range filepath.SplitList(pathEnv) {

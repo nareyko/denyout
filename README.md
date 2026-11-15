@@ -15,19 +15,19 @@ curl -fsSL https://raw.githubusercontent.com/nareyko/denyout/main/install.sh | s
 # DENYOUT_INSTALL_MODE=desktop|server sh install.sh
 
 # Desktop: Safe desktop + tray (admin once; stays Off if admin fails - no Session fallback)
-denyout-desktop # tray + Wails UI (Activity / My agents / Settings / Problems)
-denyout desktop # CLI fallback tray (native dialogs)
-denyout profile create --name bot -- python app.py
-denyout run --profile bot
-# denyout desktop --web-ui # optional localhost UI for tests only
+denyout              # tray + Wails UI (Activity / My agents / Settings / Problems)
+denyout-cli desktop  # CLI fallback tray (native dialogs)
+denyout-cli profile create --name bot -- python app.py
+denyout-cli run --profile bot
+# denyout-cli desktop --web-ui # optional localhost UI for tests only
 
 # Advanced / CI - wrap one process
-denyout run -- curl -I https://api.anthropic.com
-denyout run --sandbox=srt -- python app.py # Stronger isolation (requires srt)
+denyout-cli run -- curl -I https://api.anthropic.com
+denyout-cli run --sandbox=srt -- python app.py # Stronger isolation (requires srt)
 
 # from this repo (dev)
-go run ./cmd/denyout version
-go run ./cmd/denyout check 'https://evil.example/x?api_key=DENYOUT_CANARY_LAB'
+go run ./cmd/denyout-cli version
+go run ./cmd/denyout-cli check 'https://evil.example/x?api_key=DENYOUT_CANARY_LAB'
 ```
 
 **Tray (compact):** Status - **Protect computer** - **My agents...** - **Off** - **Open DenyOut...** - **Quit**.
@@ -41,9 +41,9 @@ Windows: download the zip from [Releases](https://github.com/nareyko/denyout/rel
 
 **Language:** English only - **License:** Apache-2.0 - **Platforms:** Ubuntu, macOS, Windows.
 
-**Install:** GitHub Releases + SHA256SUMS. Linux/macOS [`install.sh`](install.sh) -> `~/.local/bin` (`denyout` + `denyout-desktop` when published). Windows zip + [`docs/install-windows.md`](docs/install-windows.md). See [`docs/07-desktop.md`](docs/07-desktop.md).
+**Install:** GitHub Releases + SHA256SUMS. Linux/macOS [`install.sh`](install.sh) -> `~/.local/bin` (`denyout-cli` + `denyout` GUI when published). Windows zip + [`docs/install-windows.md`](docs/install-windows.md). See [`docs/07-desktop.md`](docs/07-desktop.md).
 
-**Uninstall:** `denyout uninstall` (removes processes, hostguard, CA trust, config, binaries). See [`docs/07-desktop.md`](docs/07-desktop.md) §6.
+**Uninstall:** `denyout-cli uninstall` (removes processes, hostguard, CA trust, config, binaries). See [`docs/07-desktop.md`](docs/07-desktop.md) §6.
 
 | Doc | Contents |
 | --- | --- |

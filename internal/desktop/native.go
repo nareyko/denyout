@@ -273,7 +273,7 @@ func (a *App) nativeShowActivity() {
 			if reason != "" {
 				a.forgetKeep(host, reason)
 			}
-			if err := a.persistAlwaysHost(host); err != nil {
+			if err := a.persistAlwaysHostFrom(host, "native"); err != nil {
 				notify.Info("DenyOut", "Always allow failed: "+err.Error())
 				continue
 			}
@@ -289,7 +289,7 @@ func (a *App) nativeShowActivity() {
 			if reason != "" {
 				a.forgetKeep(host, reason)
 			}
-			if err := a.persistAlwaysHost(host); err != nil {
+			if err := a.persistAlwaysHostFrom(host, "native"); err != nil {
 				notify.Info("DenyOut", "Undo failed: "+err.Error())
 				continue
 			}
@@ -376,7 +376,7 @@ func (a *App) showDenialDetails(e audit.Event) {
 		if code != "" {
 			a.forgetKeep(host, code)
 		}
-		if err := a.persistAlwaysHost(host); err != nil {
+		if err := a.persistAlwaysHostFrom(host, "native"); err != nil {
 			notify.Info("DenyOut", "Allow failed: "+err.Error())
 			return
 		}

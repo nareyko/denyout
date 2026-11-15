@@ -34,9 +34,15 @@ func TestRenderRulesContainsPort(t *testing.T) {
 		if !strings.Contains(out, "meta mark") {
 			t.Fatalf("linux rules missing mark skip:\n%s", out)
 		}
+		if !strings.Contains(out, "udp dport 443 drop") {
+			t.Fatalf("linux rules missing QUIC drop by default:\n%s", out)
+		}
 	case "darwin":
 		if !strings.Contains(out, "user 1000") {
 			t.Fatalf("darwin rules missing user:\n%s", out)
+		}
+		if !strings.Contains(out, "proto udp") {
+			t.Fatalf("darwin rules missing QUIC block by default:\n%s", out)
 		}
 	case "windows":
 		if !strings.Contains(out, "tcp.DstPort") {
@@ -52,5 +58,19 @@ func TestDryRunApply(t *testing.T) {
 	}
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestRenderAllowQUICSkipsUDPDrop(t *testing.T) {
+	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
+		t.Skip("QUIC drop is Unix-oriented")
+	}
+	spec := hostguard.Spec{ProxyPort: 18443, UID: 1000, AllowQUIC: true}
+	out, err := hostguard.Render(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "udp dport 443 drop") || strings.Contains(out, "proto udp") {
+		t.Fatalf("AllowQUIC should omit UDP drop:\n%s", out)
 	}
 }

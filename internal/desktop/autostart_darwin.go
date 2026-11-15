@@ -22,7 +22,8 @@ func registerAutostartDarwin(self string) error {
 	}
 	args := fmt.Sprintf(` <string>%s</string>
  <string>desktop</string>`, self)
-	if strings.Contains(filepath.Base(self), "denyout-desktop") {
+	name := strings.TrimSuffix(filepath.Base(self), filepath.Ext(filepath.Base(self)))
+	if strings.EqualFold(name, "denyout") {
 		args = fmt.Sprintf(` <string>%s</string>`, self)
 	}
 	plist := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>

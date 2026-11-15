@@ -22,7 +22,8 @@ func registerAutostartWindows(self string) error {
 	}
 	cmdPath := filepath.Join(startup, "DenyOut.cmd")
 	line := fmt.Sprintf("start \"\" \"%s\" desktop", self)
-	if strings.Contains(filepath.Base(self), "denyout-desktop") {
+	name := strings.TrimSuffix(filepath.Base(self), filepath.Ext(filepath.Base(self)))
+	if strings.EqualFold(name, "denyout") {
 		line = fmt.Sprintf("start \"\" \"%s\"", self)
 	}
 	content := fmt.Sprintf("@echo off\r\n%s\r\n", line)

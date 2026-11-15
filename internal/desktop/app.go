@@ -10,11 +10,13 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/nareyko/denyout/internal/hostguard"
 	"github.com/nareyko/denyout/internal/notify"
 	"github.com/nareyko/denyout/internal/run"
 	"github.com/nareyko/denyout/internal/threatlists"
@@ -127,8 +129,10 @@ func (a *App) Bootstrap(ctx context.Context) error {
 	}
 
 	clearObsoleteLastError()
+	notify.SetLogPath(filepath.Join(LogDir(), "notify.jsonl"))
 	a.maybePromptCrashLeftovers()
 	a.normalizePersistedState()
+	a.clearLegacySessionScope()
 	a.reconcileAutostart()
 
 	needSetup := a.opts.ForceSetup || !a.state.SetupDone
@@ -180,15 +184,11 @@ func (a *App) Bootstrap(ctx context.Context) error {
 		}
 	}
 
-	// Restore Computer after login; never silently fall back to Session.
-	// Wails: always defer until UIReady so SetDecisionPresenter is registered
-	// (and the window can show before elevate). Non-Wails restores here.
-	if a.state.SetupDone && (!a.opts.WebUI || a.state.ProtectionOn) {
-		if a.opts.OpenUI != nil {
-			// UIReadyRestore starts Protect once the shell + decision UI are up.
-		} else {
-			a.restoreProtection()
-		}
+	// Wails: UIReadyRestore offers Protect once the shell mounts.
+	// Native tray: same offer via Protect confirm (no silent leave-on restore).
+	// Skip NoTray/headless — there is no interactive shell to confirm.
+	if a.state.SetupDone && a.opts.OpenUI == nil && !a.opts.WebUI && !a.opts.NoTray {
+		go a.offerProtectNativeOnLaunch()
 	}
 
 	// install.sh / --install skips first-run wizard; still show Your setup once (GUI tray only).
@@ -203,27 +203,82 @@ func (a *App) Bootstrap(ctx context.Context) error {
 }
 
 // UIReadyRestore runs after the Wails shell mounts (decision presenter registered).
-// Restores Protect deferred from Bootstrap so first blocks use the in-app modal.
+// Offers Protect when SetupDone and not live; does not silent-restore without the offer.
 func (a *App) UIReadyRestore() {
 	a.uiReadyOnce.Do(func() {
 		if a.opts.OpenUI == nil {
 			return
 		}
 		a.mu.Lock()
-		want := a.state.SetupDone && (a.state.ProtectionOn || a.state.ComputerEnabled)
+		setupDone := a.state.SetupDone
 		live := a.proxyd != nil || a.session != nil
-		// Respect an explicit pause / forever-off — do not surprise-elevate.
 		paused := activeProtectPausedUntil(a.state.ProtectPausedUntil) != "" ||
 			strings.TrimSpace(a.state.ProtectPauseLast) == "forever"
+		pauseLast := strings.TrimSpace(a.state.ProtectPauseLast)
 		a.mu.Unlock()
-		if want && !live && !paused {
-			// Show window before elevate so a password prompt is not a mystery.
-			if !hostguardHelperOK() {
-				a.RequestOpenUI("home")
-			}
-			a.restoreProtection()
+
+		LogEvent("launch_show_window", map[string]any{"setup_done": setupDone, "live": live, "paused": paused})
+
+		if !setupDone {
+			LogEvent("restore_skipped", map[string]any{"reason": "!setup_done"})
+			return
 		}
+		if paused {
+			reason := "pause_active"
+			if pauseLast == "forever" {
+				reason = "pause_forever"
+			}
+			LogEvent("restore_skipped", map[string]any{"reason": reason})
+			a.RequestOpenUI("home")
+			return
+		}
+		if live {
+			LogEvent("restore_skipped", map[string]any{"reason": "already_live"})
+			a.RequestOpenUI("home")
+			return
+		}
+		// Always offer Protect when Off (no silent leave-on restore).
+		LogEvent("launch_offer_protect", nil)
+		a.RequestOpenUI("enable-protect")
 	})
+}
+
+// offerProtectNativeOnLaunch mirrors Wails enable-protect for denyout-cli desktop.
+func (a *App) offerProtectNativeOnLaunch() {
+	a.mu.Lock()
+	setupDone := a.state.SetupDone
+	live := a.proxyd != nil || a.session != nil
+	paused := activeProtectPausedUntil(a.state.ProtectPausedUntil) != "" ||
+		strings.TrimSpace(a.state.ProtectPauseLast) == "forever"
+	pauseLast := strings.TrimSpace(a.state.ProtectPauseLast)
+	a.mu.Unlock()
+	if !setupDone {
+		LogEvent("restore_skipped", map[string]any{"reason": "!setup_done", "shell": "native"})
+		return
+	}
+	if paused {
+		reason := "pause_active"
+		if pauseLast == "forever" {
+			reason = "pause_forever"
+		}
+		LogEvent("restore_skipped", map[string]any{"reason": reason, "shell": "native"})
+		return
+	}
+	if live {
+		LogEvent("restore_skipped", map[string]any{"reason": "already_live", "shell": "native"})
+		return
+	}
+	LogEvent("launch_offer_protect", map[string]any{"shell": "native"})
+	title, body := ProtectConfirmText(hostguard.HelperAvailable())
+	if !dialogToolkitAvailable() {
+		LogEvent("launch_offer_protect_skipped", map[string]any{"shell": "native", "reason": "no_dialog"})
+		return
+	}
+	if !nativeConfirm(title, body, "Continue", "Cancel") {
+		LogEvent("launch_offer_protect_cancelled", map[string]any{"shell": "native"})
+		return
+	}
+	_ = a.enableSafeDesktop()
 }
 
 // UIQuitNeedsChoice reports whether Quit should confirm unload (Cancel keeps DenyOut running).
@@ -251,6 +306,7 @@ func (a *App) UIQuit(choice string) error {
 	// Always unload: never leave proxyd/intent running after Quit.
 	if live {
 		if err := a.quitUnload(); err != nil {
+			LogEvent("quit", map[string]any{"ok": false, "err": err.Error()})
 			return err
 		}
 	} else {
@@ -263,6 +319,8 @@ func (a *App) UIQuit(choice string) error {
 		a.mu.Unlock()
 		_ = SaveState(st)
 	}
+	LogEvent("protect_off", map[string]any{"source": "quit"})
+	LogEvent("quit", map[string]any{"ok": true, "was_live": live})
 	a.stopAllWrapsOpts("Quit", true)
 	a.stopProtect()
 	return nil

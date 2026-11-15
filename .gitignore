@@ -4,6 +4,7 @@
 /target/
 *.exe
 /denyout
+/denyout-cli
 /denyout-desktop
 !docs/
 !examples/
@@ -36,7 +37,10 @@
 .env.*
 
 # Wails / frontend
+cmd/denyout/frontend/node_modules/
+cmd/denyout/frontend/*.tsbuildinfo
 cmd/denyout-desktop/frontend/node_modules/
+cmd/denyout-desktop/frontend/*.tsbuildinfo
 /build/bin/
 *.syso
 

@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased
+
+## 0.4.6 - Block browser QUIC + diagnostics (2026-11-15)
+
+### Added
+
+- **Protect offer on every launch:** window always shows; if Protect is Off (and not paused / first-run), opens the existing enable-protect confirm.
+- **Diagnostics JSONL:** `notify.jsonl` (every toast attempt, shown or suppressed), `events.jsonl` (lifecycle: protect on/off, pause, restore skip, quit, setup), `blocks.jsonl` (every deny from proxyd/session/wrap + user Ask/Keep/Allow/timed/undo decisions - not routine allows). Mirrored as `INFO event=` / `INFO block=` in `desktop.log`.
+- **History "This week":** local analytics from `blocks.jsonl` / `events.jsonl` (blocked / you allowed / asked, Protect timeline, banner quieting) - stays on this computer.
+- **Block browser QUIC:** Protect On drops UDP/443 (IPv4+IPv6) for the user UID so Chrome falls back to TCP MITM; cleared on Off/Quit. Default on; **Settings → Advanced → Browser QUIC** to allow HTTP/3. Pre-QUIC helpers are refreshed on the next elevated Protect On (password once).
+
+### Changed
+
+- **Binary names:** Wails tray/UI is now **`denyout`**; CLI/proxy/hostctl is **`denyout-cli`** (was `denyout` + `denyout-desktop`). Fallback shell: `denyout-cli desktop`.
+- **Linux Protect CA paths:** `denyout.crt` / `denyout.pem` (was `denyout-desktop.*`); NSS nickname `DenyOut CA`. User systemd unit `denyout.service`.
+
+### Fixed
+
+- **Tray Open / Quit:** raise hidden window (Unminimise + brief always-on-top) before navigate so Home and Quit modal appear after the window was closed to tray.
+- **Quit while Ask is open:** toast instead of silent no-op; Quit modal notes when the helper means no password.
+- **Tray menu:** Open DenyOut... first (GNOME often maps left-click to the menu, not OnClick).
+- **Quit left tray icon:** `runtime.Quit` was caught by Hide-to-tray `OnBeforeClose` after unload succeeded - process stayed. Quit now sets a flag, cancels the tray loop, allows close, and `os.Exit` fallback.
+- **Terminal launch:** `denyout` from a TTY now detaches to the background (tray) and returns the shell; use `--foreground` to keep logs in the terminal.
+
 ## 0.4.5 - Upgrade install + obsolete last-error (2026-11-15)
 
 ### Fixed

@@ -3,7 +3,7 @@ package hostguard
 import "testing"
 
 func TestDesktopCANickname(t *testing.T) {
-	if DesktopCANickname != "DenyOut Desktop CA" {
+	if DesktopCANickname != "DenyOut CA" {
 		t.Fatalf("nickname=%q", DesktopCANickname)
 	}
 	if LinuxSystemCACert == "" || LinuxSystemCAHashLink == "" {

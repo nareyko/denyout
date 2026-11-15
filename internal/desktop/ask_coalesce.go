@@ -203,17 +203,29 @@ func (a *App) coalescedAskProfile(host, reason, profileName, profileID string) s
 		a.asks = newAskFlight()
 	}
 	if a.state.AskPaused() || a.asks.Paused() {
+		LogBlock("ask_answered", map[string]any{
+			"host": host, "action": AskDeny, "source": "paused", "reason": reason, "profile_id": profileID,
+		})
 		return "deny"
 	}
 	if net.ParseIP(strings.TrimSpace(host)) != nil {
 		a.asks.notifyIPBlocked(host)
+		LogBlock("ask_answered", map[string]any{
+			"host": host, "action": AskDeny, "source": "ip", "reason": reason, "profile_id": profileID,
+		})
 		return "deny"
 	}
 	// Away or fullscreen quiet: keep blocked without Ask popup; tray unread grows.
 	if a.isAway() || a.isFullscreenQuiet() {
 		a.noteAwayUnread(host, awayUnreadBlock)
+		LogBlock("ask_answered", map[string]any{
+			"host": host, "action": AskDeny, "source": "away_or_fullscreen", "reason": reason, "profile_id": profileID,
+		})
 		return AskDeny
 	}
+	LogBlock("ask_shown", map[string]any{
+		"host": host, "reason": reason, "profile": profileName, "profile_id": profileID,
+	})
 	action, storm := a.asks.Do(host, func() string {
 		// Prefer in-app Wails Ask when the DecisionPresenter is registered.
 		if fn := getDecisionPresenter(); fn != nil {
@@ -238,6 +250,10 @@ func (a *App) coalescedAskProfile(host, reason, profileName, profileID string) s
 			return normalizeAskAction(act)
 		}
 		return askViaToastThenDialog(host, reason, profileName)
+	})
+	LogBlock("ask_answered", map[string]any{
+		"host": host, "action": action, "storm": storm, "profile_id": profileID,
+		"reason": reason, "source": "ui",
 	})
 	if storm {
 		go a.maybeOfferAskPause()

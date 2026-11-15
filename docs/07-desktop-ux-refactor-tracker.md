@@ -26,7 +26,7 @@ All plan units Done (P0-P3). Research notes: [`docs/ux-iters/`](ux-iters/).
 | Item | Status | Note |
 | --- | --- | --- |
 | Residual EN copy (native/fallback toasts) | Done | Allowed this site. Home/History. Protected label |
-| Local desktop rebuild | Done | Installed `~/.local/bin/denyout-desktop` |
+| Local desktop rebuild | Done | Installed `~/.local/bin/denyout` |
 | Home requirements v2 (max simplicity) | Done | [`ux-iters/home.md`](ux-iters/home.md) - Home primary. Others additional |
 | Home v2 implement + QA | Done | Plan [`ux-iters/home-v2-plan.md`](ux-iters/home-v2-plan.md). Blocked_today. Footer doors |
 | Compact layout pass | Done | Quieter topbar. Denser cards. Media query ≤720 (MinWidth 860 keeps sidebar) |

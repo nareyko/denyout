@@ -33,8 +33,8 @@ node "$PH" typography --check --strict --ext=.go internal/desktop internal/notif
 
 echo "== typography: Wails frontend + static =="
 node "$PH" typography --check --strict --ext=.tsx,.ts,.html \
-  cmd/denyout-desktop/frontend/src \
-  cmd/denyout-desktop/frontend/index.html \
+  cmd/denyout/frontend/src \
+  cmd/denyout/frontend/index.html \
   internal/desktop/static
 
 echo "== prose-hygiene patterns (docs blockers) =="

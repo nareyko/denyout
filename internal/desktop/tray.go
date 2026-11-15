@@ -59,6 +59,13 @@ func (a *App) runTray(ctx context.Context) error {
 	statusItem.SetDisabled(true)
 	menu.AddSeparator()
 
+	// Open first: on GNOME/AppIndicator left-click often opens the menu instead of
+	// OnClick — make Home one click from the menu.
+	menu.Add("Open DenyOut...", func() {
+		go a.RequestOpenUI("home")
+	})
+	menu.AddSeparator()
+
 	computerItem := menu.Add("Protect computer", func() {
 		go a.trayEnableProtectComputer()
 	})
@@ -70,9 +77,6 @@ func (a *App) runTray(ctx context.Context) error {
 	})
 	menu.AddSeparator()
 
-	menu.Add("Open DenyOut...", func() {
-		go a.RequestOpenUI("home")
-	})
 	snooze1h := menu.Add("Snooze notifications 1 hour", func() {
 		go func() { _ = a.UISetNotifySnooze("1h") }()
 	})
@@ -95,7 +99,7 @@ func (a *App) runTray(ctx context.Context) error {
 			return // cancel
 		}
 		notify.CloseAll()
-		// Quit always fully unloads (password OK if needed).
+		// Quit always fully unloads (password if helper is not installed).
 		if err := a.quitUnload(); err != nil {
 			fmt.Fprintf(os.Stderr, "denyout desktop: quit cancelled or failed: %v\n", err)
 			return
@@ -293,7 +297,7 @@ func (a *App) runTray(ctx context.Context) error {
 		}
 	}()
 
-	fmt.Fprintln(os.Stderr, "denyout desktop: tray ready - left-click opens DenyOut")
+	fmt.Fprintln(os.Stderr, "denyout desktop: tray ready - left-click opens DenyOut (on some Linux desktops left-click opens the menu — use Open DenyOut…)")
 	errCh := make(chan error, 1)
 	go func() { errCh <- tray.Run() }()
 
