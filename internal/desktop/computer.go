@@ -15,17 +15,6 @@ import (
 	"github.com/nareyko/denyout/internal/proxy"
 )
 
-func logQuicDropStats(reason string) {
-	uid, _ := hostguard.CurrentUID()
-	st := hostguard.QUICDropStatsBestEffort(uid)
-	LogEvent("quic_drop_stats", map[string]any{
-		"reason":  reason,
-		"packets": st.Packets,
-		"bytes":   st.Bytes,
-		"present": st.Present,
-	})
-}
-
 func (a *App) startComputer() error {
 	a.mu.Lock()
 	if a.session != nil || a.proxyd != nil {

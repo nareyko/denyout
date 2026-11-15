@@ -77,3 +77,24 @@ func TestRenderAllowQUICSkipsUDPDrop(t *testing.T) {
 		t.Fatalf("AllowQUIC should omit UDP drop:\n%s", out)
 	}
 }
+
+func TestRenderWithTUNPreview(t *testing.T) {
+	spec := hostguard.Spec{ProxyPort: 18443, UID: 1000}
+	out, err := hostguard.RenderWithTUNPreview(spec)
+	if err != nil {
+		if err == hostguard.ErrUnsupported {
+			t.Skip(err)
+		}
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "T1 TUN preview") {
+		t.Fatalf("missing preview banner:\n%s", out)
+	}
+	if !strings.Contains(out, "denyout-tun-quic") {
+		t.Fatalf("missing T1 table:\n%s", out)
+	}
+	// Preview must not replace the T0 apply path content.
+	if runtime.GOOS == "linux" && !strings.Contains(out, "denyout-block-quic") {
+		t.Fatalf("T0 QUIC drop missing from preview render:\n%s", out)
+	}
+}
