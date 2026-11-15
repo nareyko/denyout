@@ -202,14 +202,14 @@ func (a *App) runTray(ctx context.Context) error {
 				}
 				if unread > 0 {
 					if unread == 1 {
-						tooltip += " · 1 waiting"
+						tooltip += " · 1 quiet"
 						if !needsAttention {
-							statusItem.SetLabel(label + " · 1 waiting")
+							statusItem.SetLabel(label + " · 1 quiet")
 						}
 					} else {
-						tooltip += fmt.Sprintf(" · %d waiting", unread)
+						tooltip += fmt.Sprintf(" · %d quiet", unread)
 						if !needsAttention {
-							statusItem.SetLabel(fmt.Sprintf("%s · %d waiting", label, unread))
+							statusItem.SetLabel(fmt.Sprintf("%s · %d quiet", label, unread))
 						}
 					}
 				}
@@ -237,13 +237,13 @@ func (a *App) runTray(ctx context.Context) error {
 							statusItem.SetLabel("Off (unavailable) · agents running")
 							tip := "DenyOut - Off (unavailable) · agents running"
 							if unread > 0 {
-								tip += fmt.Sprintf(" · %d waiting", unread)
+								tip += fmt.Sprintf(" · %d quiet", unread)
 							}
 							tray.SetTooltip(tip)
 						} else if mode == ModeOff && pauseUntil == "" && pauseLast != "forever" {
 							tip := "DenyOut - Off · agents running"
 							if unread > 0 {
-								tip += fmt.Sprintf(" · %d waiting", unread)
+								tip += fmt.Sprintf(" · %d quiet", unread)
 							}
 							tray.SetTooltip(tip)
 							statusItem.SetLabel("Off · agents running")

@@ -489,7 +489,8 @@ export default function App() {
  // Threat warn is a chip; keep Off/Paused detail on the muted line when not Home.
  const unreadAway = snap?.away_unread && snap.away_unread > 0 ? snap.away_unread : 0;
  const unreadSuffix =
- unreadAway === 1 ? " · 1 waiting" : unreadAway > 1 ? ` · ${unreadAway} waiting` : "";
+ unreadAway === 1 ? " · 1 quiet" : unreadAway > 1 ? ` · ${unreadAway} quiet` : "";
+ const snoozeSuffix = snap?.notify_snooze_active ? " · snoozed" : "";
  const statusTextBase =
  snap?.threat_lists_warn && !snap?.problems_alert
  ? modeStatusText
@@ -497,12 +498,14 @@ export default function App() {
  : "Threat lists need a refresh"
  : modeStatusText;
  const statusText = statusTextBase
- ? `${statusTextBase}${unreadSuffix}`
+ ? `${statusTextBase}${snoozeSuffix}${unreadSuffix}`
  : unreadAway
    ? unreadAway === 1
-     ? "1 waiting"
-     : `${unreadAway} waiting`
-   : "";
+     ? `1 quiet${snoozeSuffix}`
+     : `${unreadAway} quiet${snoozeSuffix}`
+   : snoozeSuffix
+     ? "Snoozed"
+     : "";
  const pillLabelBase = !snap
  ? "Setup pending"
  : snap.problems_alert
@@ -528,7 +531,7 @@ export default function App() {
                : agentsOnlyOff
                  ? "Off · agents running"
                  : snap.mode_label || "Off";
- const pillLabel = `${pillLabelBase}${snap?.problems_alert ? "" : unreadSuffix}`;
+ const pillLabel = `${pillLabelBase}${snap?.problems_alert ? "" : `${snoozeSuffix}${unreadSuffix}`}`;
 
  type JumpItem = {
  label: string;
@@ -578,9 +581,16 @@ export default function App() {
  {
  label: "Notifications",
  route: "settings",
- hint: "Banners & timeouts",
+ hint: "Quiet, snooze, timeouts",
  settingsTab: "basic",
  focus: "notifications",
+ },
+ {
+ label: "System banners",
+ route: "settings",
+ hint: "Advanced OS banners & Detailed",
+ settingsTab: "advanced",
+ focus: "system-banners",
  },
  {
  label: "Autostart",

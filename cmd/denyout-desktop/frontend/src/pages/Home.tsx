@@ -189,6 +189,22 @@ export function Home({
  <section className={`home-hero card ${needsHelp ? "home-hero-alert" : ""}`}>
  <h1 className="home-headline">{headline}</h1>
  <p className="muted">{support}</p>
+ {(snap?.notify_snooze_active ||
+ snap?.away ||
+ (typeof snap?.away_unread === "number" && snap.away_unread > 0) ||
+ snap?.system_banners === false) && (
+ <p className="notice-box" style={{ marginTop: "0.35rem" }}>
+ {snap?.notify_snooze_active ? "Notifications snoozed. " : ""}
+ {snap?.away ? "Away — quiet for now. " : ""}
+ {typeof snap?.away_unread === "number" && snap.away_unread > 0
+ ? `${snap.away_unread} quiet while away. `
+ : ""}
+ {snap?.system_banners === false
+ ? "System banners off (Protect failed can still show). "
+ : ""}
+ Open Settings → Notifications to change.
+ </p>
+ )}
  <div className="row-actions">
       {needsHelp ? (
         <>

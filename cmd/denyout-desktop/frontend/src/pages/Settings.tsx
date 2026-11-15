@@ -470,7 +470,8 @@ export function Settings({
  dismissed={tipGone(dismissed, "settings-basic")}
  onDismiss={onChanged}
  >
- Basic is On/Off, notifications, and autostart. Allowed sites and rare options live
+ Basic is Protect on/off, how chatty DenyOut is, snooze, threat lists, and autostart.
+ Block timeouts live here too. Allowed sites, system banner master, and Detailed live
  under Advanced.
  </Tip>
  )}
@@ -598,29 +599,73 @@ export function Settings({
  <section className="card" id="settings-notifications">
  <h2>Notifications</h2>
  <p className="muted">
- Blocks always go to History. The system stays mostly quiet. The tray shows a
- count. When you return, DenyOut shows one summary.
+ Blocks always go to History. The tray shows a count. When you return, DenyOut
+ shows one summary. Ask and Keep blocked / Allow this site stay inside DenyOut.
  </p>
+          {(snap.notify_snooze_active ||
+            snap.system_banners === false ||
+            snap.away ||
+            (typeof snap.away_unread === "number" && snap.away_unread > 0) ||
+            snap.away_digest?.pending) && (
+            <p className="notice-box" style={{ marginBottom: "0.65rem" }}>
+              {snap.notify_snooze_active
+                ? `Snoozed${
+                    snap.notify_snooze_until
+                      ? ` until ${new Date(snap.notify_snooze_until).toLocaleString()}`
+                      : ""
+                  }. `
+                : ""}
+              {snap.system_banners === false
+                ? "System banners off (Protect failed can still show). "
+                : ""}
+              {snap.away ? "Away right now. " : ""}
+              {typeof snap.away_unread === "number" && snap.away_unread > 0
+                ? `${snap.away_unread} quiet while away (summary when you return). `
+                : ""}
+              {snap.away_digest?.pending ? "Return summary is ready. " : ""}
+              Protection stays on.
+            </p>
+          )}
           <label>
             How chatty{" "}
             <select
-              value={snap.notify_level === "quiet" ? "quiet" : "normal"}
-              onChange={(e) =>
-                void api
-                  .setNotifyLevel(e.target.value)
-                  .then(reload)
-                  .catch((err) => fail(err))
+              value={
+                snap.notify_level === "quiet"
+                  ? "quiet"
+                  : snap.notify_level === "detailed"
+                    ? "detailed"
+                    : "normal"
               }
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "detailed") {
+                  // Detailed lives under Advanced — jump to the full control.
+                  setTab("advanced");
+                  window.setTimeout(() => {
+                    document
+                      .getElementById("settings-system-banners")
+                      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }, 50);
+                  return;
+                }
+                void api
+                  .setNotifyLevel(v)
+                  .then(reload)
+                  .catch((err) => fail(err));
+              }}
             >
               <option value="quiet">Quiet (recommended)</option>
               <option value="normal">A bit more</option>
+              {snap.notify_level === "detailed" ? (
+                <option value="detailed">Detailed — open Advanced…</option>
+              ) : null}
             </select>
           </label>
-          {snap.notify_level === "detailed" ? (
-            <p className="muted" style={{ marginTop: "0.25rem" }}>
-              Detailed is on — change it under Advanced → System banners.
-            </p>
-          ) : null}
+          <p className="muted" style={{ marginTop: "0.25rem" }}>
+            {snap.notify_level === "detailed"
+              ? "Detailed is on. Pick Quiet or A bit more here, or change Detailed under Advanced → System banners."
+              : "Detailed (more status banners) is under Advanced → System banners."}
+          </p>
           <label style={{ display: "block", marginTop: "0.65rem" }}>
             <input
               type="checkbox"
@@ -635,26 +680,28 @@ export function Settings({
             Stay quiet while away
           </label>
           <p className="muted" style={{ marginTop: "0.25rem" }}>
-            No system banners. No Ask popups. Tray count grows. One summary when you
-            return. Protect stays on.
+            {snap.quiet_while_away === false
+              ? "Off: Ask and block dialogs can appear while the screen is locked or idle."
+              : "When on: no Ask popups while locked or idle. Tray count grows. One summary when you return. Protect stays on."}
             {typeof snap.away_unread === "number" && snap.away_unread > 0
-              ? ` Currently waiting: ${snap.away_unread}.`
+              ? ` Quiet so far: ${snap.away_unread}.`
               : ""}
             {snap.away ? " Away right now." : ""}
           </p>
           <div style={{ marginTop: "0.65rem" }}>
             <div style={{ fontWeight: 500, marginBottom: "0.35rem" }}>Snooze</div>
             {snap.notify_snooze_active ? (
-              <p className="muted" style={{ marginBottom: "0.35rem" }}>
+              <p className="notice-box" style={{ marginBottom: "0.35rem" }}>
                 Notifications snoozed
                 {snap.notify_snooze_until
                   ? ` until ${new Date(snap.notify_snooze_until).toLocaleString()}`
                   : ""}
-                . Protection stays on.
+                . Soft OS banners stay off until then. Protection stays on.
               </p>
             ) : (
               <p className="muted" style={{ marginBottom: "0.35rem" }}>
-                Temporarily quiet OS banners. Protection stays on.
+                Temporarily quiet OS banners without changing How chatty. Protection
+                stays on.
               </p>
             )}
             <div className="row-actions" style={{ gap: "0.4rem", flexWrap: "wrap" }}>
@@ -684,7 +731,7 @@ export function Settings({
               {snap.notify_snooze_active ? (
                 <button
                   type="button"
-                  className="btn"
+                  className="btn primary"
                   onClick={() =>
                     void api
                       .setNotifySnooze("clear")
@@ -860,6 +907,14 @@ export function Settings({
  {!threats && (
  <p className="warn-box" style={{ marginTop: "0.5rem" }}>
  Couldn’t load threat lists yet. Prefer Refresh — don’t treat the checkboxes below as live prefs.
+ {snap?.threat_lists_warn
+ ? " The top bar still shows they need attention."
+ : ""}
+ </p>
+ )}
+ {snap?.threat_lists_warn && !threats?.needs_attention && (
+ <p className="warn-box" style={{ marginTop: "0.5rem" }}>
+ Threat lists need a refresh (same as Home / Problems). Use Refresh now when you can.
  </p>
  )}
  {threats?.needs_attention && (
@@ -879,10 +934,10 @@ export function Settings({
  setThreatBusy(true);
  void api
  .setBlockPhishing(on)
- .then(reloadThreats)
+ .then(reload)
  .catch((err) => {
  fail(err);
- return reloadThreats();
+ return reload();
  })
  .finally(() => setThreatBusy(false));
  }}
@@ -899,10 +954,10 @@ export function Settings({
  setThreatBusy(true);
  void api
  .setBlockMalware(on)
- .then(reloadThreats)
+ .then(reload)
  .catch((err) => {
  fail(err);
- return reloadThreats();
+ return reload();
  })
  .finally(() => setThreatBusy(false));
  }}
@@ -926,10 +981,10 @@ export function Settings({
  setThreatBusy(true);
  try {
  await api.setBlockStronger(on);
- await reloadThreats();
+ await reload();
  } catch (err) {
  fail(err);
- await reloadThreats();
+ await reload();
  } finally {
  setThreatBusy(false);
  }
@@ -969,7 +1024,7 @@ export function Settings({
                     setThreatBusy(true);
                     void api
                       .setThreatPollHours(h)
-                      .then(reloadThreats)
+                      .then(reload)
                       .catch((err) => fail(err))
                       .finally(() => setThreatBusy(false));
                   }}
@@ -1058,8 +1113,9 @@ export function Settings({
  dismissed={tipGone(dismissed, "settings-advanced")}
  onDismiss={onChanged}
  >
- Advanced lists, diagnostics, and the whole-PC Agents only mode. Changes here affect what
- DenyOut allows permanently.
+ Advanced: system banners (including Detailed), allowed/silenced sites, optional lists,
+ diagnostics, and whole-PC Agents only. Changes here affect what DenyOut allows
+ permanently.
  </Tip>
  )}
 
@@ -1118,7 +1174,7 @@ export function Settings({
  }
  >
  <option value="quiet">Quiet</option>
- <option value="normal">Normal</option>
+ <option value="normal">A bit more (Normal)</option>
  <option value="detailed">Detailed</option>
  </select>
  </label>
@@ -1574,9 +1630,10 @@ export function Settings({
  setThreatBusy(true);
  try {
  await api.setAdvancedThreatFeed(feedID, on);
- await reloadThreats();
+ await reload();
  } catch (err) {
  fail(err);
+ await reload();
  } finally {
  setThreatBusy(false);
  }
