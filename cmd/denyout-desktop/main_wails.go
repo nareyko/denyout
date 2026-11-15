@@ -353,8 +353,9 @@ func main() {
 			bridge.mu.Unlock()
 			if !shown {
 				// Info is a no-op; tray-hidden must reach the OS even on Quiet.
+				// Mode-neutral: do not claim protection stays on when already Off.
 				notify.Emit(notify.KindTrayHidden, "DenyOut",
-					"Still running in the tray — protection stays on until you Quit from the tray menu.")
+					"Still running in the tray — closing the window is not Quit. Use Quit in the tray menu to exit (that turns protection off).")
 			}
 			return true
 		},

@@ -247,21 +247,25 @@ func (a *App) runTray(ctx context.Context) error {
 					// Protect computer is Off — don't imply whole-PC Protect with the on icon.
 					tray.SetIcon(iconIdlePNG)
 					if !paused && !needsAttention && !threatWarn {
+						snoozeBit := ""
+						if snoozeUntil != "" {
+							snoozeBit = " · snoozed"
+						}
+						quietBit := ""
+						if unread == 1 {
+							quietBit = " · 1 quiet"
+						} else if unread > 1 {
+							quietBit = fmt.Sprintf(" · %d quiet", unread)
+						}
 						if mode == ModeOff && !avail {
-							// Match chrome: unavailable wins, agents still visible.
-							statusItem.SetLabel("Off (unavailable) · agents running")
-							tip := "DenyOut - Off (unavailable) · agents running"
-							if unread > 0 {
-								tip += fmt.Sprintf(" · %d quiet", unread)
-							}
-							tray.SetTooltip(tip)
+							// Match chrome: unavailable wins, agents still visible; keep snooze+quiet.
+							base := "Off (unavailable) · agents running"
+							statusItem.SetLabel(base + snoozeBit + quietBit)
+							tray.SetTooltip("DenyOut - " + base + snoozeBit + quietBit)
 						} else if mode == ModeOff && pauseUntil == "" && pauseLast != "forever" {
-							tip := "DenyOut - Off · agents running"
-							if unread > 0 {
-								tip += fmt.Sprintf(" · %d quiet", unread)
-							}
-							tray.SetTooltip(tip)
-							statusItem.SetLabel("Off · agents running")
+							base := "Off · agents running"
+							statusItem.SetLabel(base + snoozeBit + quietBit)
+							tray.SetTooltip("DenyOut - " + base + snoozeBit + quietBit)
 						}
 					}
 				default:

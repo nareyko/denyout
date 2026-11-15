@@ -24,20 +24,15 @@ export default function App() {
  const [onboardMsg, setOnboardMsg] = useState("");
  /** false = success/notice (notice-box); true = failure (warn-box). */
  const [onboardMsgWarn, setOnboardMsgWarn] = useState(false);
- /** First-run chatty choice on the same mode screen (Quiet recommended). */
- const [onboardChatty, setOnboardChatty] = useState<"quiet" | "normal">("quiet");
+ /** First-run chatty choice. "keep" = Detailed already on, no Quiet/A bit more pick yet. */
+ const [onboardChatty, setOnboardChatty] = useState<"quiet" | "normal" | "keep">("quiet");
  function setOnboardToast(msg: string, warn = true) {
  setOnboardMsg(msg);
  setOnboardMsgWarn(!!msg && warn);
  }
  async function applyOnboardChatty() {
- // Do not silently downgrade an existing Detailed preference.
- try {
-  const s = snap ?? (await api.snapshot());
-  if ((s?.notify_level || "") === "detailed") return;
- } catch {
-  /* preview / first paint */
- }
+ // Preserve Detailed only until the user explicitly picks Quiet or A bit more.
+ if (onboardChatty === "keep") return;
  await api.setNotifyLevel(onboardChatty);
  }
  const [openNewProfile, setOpenNewProfile] = useState(false);
@@ -90,11 +85,13 @@ export default function App() {
  deferYourSetupRef.current = deferYourSetup;
 
  // Keep first-run Quiet / A bit more aligned with saved level when snapshot arrives.
- // Detailed is Advanced-only — do not map it to "A bit more" in the chooser.
+ // Detailed is Advanced-only — neither button selected until user picks Quiet / A bit more.
  useEffect(() => {
  if (!snap || snap.setup_done) return;
  if (snap.notify_level === "normal") {
  setOnboardChatty("normal");
+ } else if (snap.notify_level === "detailed") {
+ setOnboardChatty("keep");
  } else if (snap.notify_level === "quiet") {
  setOnboardChatty("quiet");
  }
@@ -605,16 +602,30 @@ export default function App() {
  {
  label: "Notifications",
  route: "settings",
- hint: "Quiet, snooze, timeouts",
+ hint: "Quiet, Stay quiet, snooze, timeouts",
  settingsTab: "basic",
  focus: "notifications",
  },
  {
  label: "System banners",
  route: "settings",
- hint: "Advanced OS banners & Detailed",
+ hint: "OS banners, Detailed, fullscreen",
  settingsTab: "advanced",
  focus: "system-banners",
+ },
+ {
+ label: "Respect fullscreen",
+ route: "settings",
+ hint: "Fullscreen / games quiet",
+ settingsTab: "advanced",
+ focus: "system-banners",
+ },
+ {
+ label: "Stay quiet while away",
+ route: "settings",
+ hint: "Locked or idle quiet",
+ settingsTab: "basic",
+ focus: "notifications",
  },
  {
  label: "Autostart",
@@ -1446,8 +1457,8 @@ export default function App() {
               </div>
               {snap?.notify_level === "detailed" ? (
                 <p className="muted" style={{ marginTop: "0.45rem", fontSize: "0.9em" }}>
-                  Detailed is already on (more status banners). Quiet / A bit more apply only if
-                  you pick one above; otherwise Detailed stays. Change Detailed later under
+                  Detailed is already on (same OS banner kinds as A bit more today). Quiet / A bit
+                  more apply only if you pick one above; otherwise Detailed stays. Change under
                   Settings → Advanced → System banners.
                 </p>
               ) : null}
@@ -1634,6 +1645,7 @@ export default function App() {
  {snap.quiet_while_away === false
   ? "- Stay quiet while away is off — Ask and block dialogs can still appear while locked or idle (about 5 minutes). Everything is in History."
   : "- Stay quiet while away is on: Ask and block dialogs stay off while locked or idle (about 5 minutes). One summary when you return. Everything is in History."}
+
  <br />- Respect fullscreen (Settings → Advanced) separately avoids dialogs while a fullscreen app is in front.
  <br />- Open Home to see if you are protected. If Protect failed, open Problems.
  </p>
