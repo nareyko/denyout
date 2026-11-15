@@ -662,8 +662,10 @@ export default function App() {
  (!!(snap?.protect_paused_until || "").trim() ||
  (snap?.protect_pause_last || "") === "forever");
  if (protectLive || snap?.problems_alert || protectPaused) {
+ const intentAgentsJump =
+  (snap?.policy_profile || "").toLowerCase() === "agent";
  const pauseNoun =
-  snap?.mode === "agents"
+  snap?.mode === "agents" || (protectPaused && intentAgentsJump)
    ? "Agents only"
    : snap?.mode === "session"
      ? "Session protection"
@@ -672,7 +674,7 @@ export default function App() {
  label: protectPaused
  ? `Change ${pauseNoun} pause…`
  : snap?.problems_alert && (snap?.mode === "off" || !snap?.mode)
-   ? (snap?.policy_profile || "").toLowerCase() === "agent"
+   ? intentAgentsJump
      ? "Clear Agents only intent…"
      : "Clear Protect intent…"
    : `Pause / turn off ${pauseNoun}…`,
@@ -959,7 +961,9 @@ export default function App() {
  snap?.problems_alert &&
  !hideSetupAlertBanner ? (
  <p className="notice-box" style={{ marginTop: 0 }}>
- Protect needs attention before Your setup.{" "}
+ {(snap?.policy_profile || "").toLowerCase() === "agent"
+  ? "Agents only needs attention before Your setup. "
+  : "Protect needs attention before Your setup. "}
  <button
  type="button"
  className="btn subtle"
@@ -1222,7 +1226,14 @@ export default function App() {
  return refreshSnap();
  })
  .catch((e) => {
- setTrayToast(String(e) || "Could not turn Protect off. Try again.", true);
+ const offNoun =
+  snap?.mode === "agents" ||
+  (snap?.policy_profile || "").toLowerCase() === "agent"
+   ? "Agents only"
+   : snap?.mode === "session"
+     ? "Session protection"
+     : "Protect";
+ setTrayToast(String(e) || `Could not turn ${offNoun} off. Try again.`, true);
  return refreshSnap();
  })
  .finally(() => setTrayPauseBusy(false));
@@ -1258,7 +1269,13 @@ export default function App() {
  void api
  .quit("off")
  .catch((e) => {
- setQuitMsg(String(e) || "Could not turn Protect off.");
+ const offNoun =
+  snap?.mode === "agents"
+   ? "Agents only"
+   : snap?.mode === "session"
+     ? "Session protection"
+     : "Protect";
+ setQuitMsg(String(e) || `Could not turn ${offNoun} off.`);
  setQuitBusy(false);
  });
  }}

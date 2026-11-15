@@ -162,7 +162,14 @@ func (a *App) showYourSetup(mode string) {
 func YourSetupText(mode string, autostart bool, unhealthy bool) string {
 	var status string
 	if unhealthy {
-		status = "Protect needs your attention.\nOpen Problems to fix it, then come back to Home."
+		switch mode {
+		case "agents", "agents_only":
+			status = "Agents only needs your attention.\nOpen Problems to fix it, then come back to Home."
+		case "session":
+			status = "Session protection needs your attention.\nOpen Problems to fix it, then come back to Home."
+		default:
+			status = "Protect needs your attention.\nOpen Problems to fix it, then come back to Home."
+		}
 	} else {
 		switch mode {
 		case "safe":
@@ -177,10 +184,19 @@ func YourSetupText(mode string, autostart bool, unhealthy bool) string {
 			status = "Protection is off.\nTurn on Protect computer from Home or the tray when you are ready."
 		}
 	}
+	homeBullet := "- Open DenyOut (Home) to see if you are protected and what was blocked.\n"
+	switch mode {
+	case "agents_only":
+		homeBullet = "- Open DenyOut (Home) to see Agents only status and what was blocked.\n"
+	case "session":
+		homeBullet = "- Open DenyOut (Home) to see Session status and what was blocked.\n"
+	case "agents", "off":
+		homeBullet = "- Open DenyOut (Home) for mode status and what was blocked.\n"
+	}
 	body := status + "\n\n" +
 		"- When something is blocked: Keep blocked or Allow this site.\n" +
-		"- Open DenyOut (Home) to see if you are protected and what was blocked.\n" +
-		"- If Protect failed, open Problems.\n\n"
+		homeBullet +
+		"- If Protect or Agents only failed, open Problems.\n\n"
 	if autostart {
 		body += "DenyOut will open when you log in. You can turn that off in Settings.\n\n"
 	} else {

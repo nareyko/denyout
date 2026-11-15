@@ -26,6 +26,7 @@ type ThreatFeedView struct {
 
 // ThreatListsView is Settings -> Threat lists payload.
 type ThreatListsView struct {
+	Available             bool             `json:"available"`
 	PollHours             int              `json:"poll_hours"`
 	BlockPhishing         bool             `json:"block_phishing"`
 	BlockMalware          bool             `json:"block_malware"`
@@ -65,6 +66,7 @@ func (a *App) GetThreatLists() ThreatListsView {
 	if st == nil {
 		return out
 	}
+	out.Available = true
 	_ = st.EnsureCatalogDefaults()
 	status := st.Status()
 	out.PollHours = status.PollHours

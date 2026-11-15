@@ -19,7 +19,6 @@ const BASIC_FIND_KEYS = [
   "notify",
   "toast",
   "quiet",
-  "banner",
   "normal",
   "level",
   "chatty",
@@ -303,6 +302,8 @@ export function Settings({
  // Proxyd restart (password possible) only for whole-PC computer mode — not session.
  // Live computer proxy (safe / agents). Session is separate below.
  const computerLive = snap.mode === "safe" || snap.mode === "agents";
+ // available === false means store failed; omit field (older bridge) still counts as ready.
+ const threatsReady = !!threats && threats.available !== false;
  const showTurnOnProtect =
  snap?.mode === "agents" || snap?.mode === "session"
  ? false // Switch button handles this
@@ -388,7 +389,13 @@ export function Settings({
         const advHit = findKeysMatch(ADVANCED_FIND_KEYS, q);
         // Prefer Advanced when only Advanced matches (e.g. remembered, login, helper).
         // "pause asks" / ask / resume stay Advanced; plain "pause" stays Basic.
-        if (/\basks?\b/.test(q) || q.includes("resume")) {
+        if (
+          /\basks?\b/.test(q) ||
+          q.includes("resume") ||
+          q.includes("system banner") ||
+          q.includes("system banners") ||
+          (q.includes("banner") && !q.includes("notification"))
+        ) {
           setTab("advanced");
         } else if (advHit && !basicHit) {
           setTab("advanced");
@@ -604,8 +611,9 @@ export function Settings({
  <section className="card" id="settings-notifications">
  <h2>Notifications</h2>
  <p className="muted">
- Blocks always go to History. The tray shows a count. When you return, DenyOut
- shows one summary. Ask and Keep blocked / Allow this site stay inside DenyOut.
+ Blocks always go to History. The tray shows a count. With Stay quiet while away
+ on, DenyOut shows one summary when you return. Ask and Keep blocked / Allow this
+ site stay inside DenyOut.
  </p>
           {(snap.notify_snooze_active ||
             snap.system_banners === false ||
@@ -636,7 +644,7 @@ export function Settings({
                   : ""}
                 {snap.quiet_overnight === false ? "Night quiet sound off. " : ""}
                 {snap.sound_only_answer === false
-                  ? "Sound may play for passive blocks. "
+                  ? "Sound may play for soft OS banners (Undo / Open / status). "
                   : ""}
                 {snap.away ? "Away right now. " : ""}
                 {typeof snap.away_unread === "number" && snap.away_unread > 0
@@ -733,12 +741,8 @@ export function Settings({
           </label>
           <p className="muted" style={{ marginTop: "0.25rem" }}>
             {snap.quiet_while_away === false
-              ? "Off: Ask dialogs can appear while the screen is locked or idle (soft OS banners still follow Quiet/Normal)."
-              : `When on: no Ask popups while locked or idle. Tray count grows. One summary when you return. ${protectionContinuityNow(snap)}`}
-            {typeof snap.away_unread === "number" && snap.away_unread > 0
-              ? ` Quiet so far: ${snap.away_unread}.`
-              : ""}
-            {snap.away ? " Away right now." : ""}
+              ? "Off: Ask and block dialogs can appear while the screen is locked or idle."
+              : `When on: no Ask or block dialogs while locked or idle; soft OS banners stay off. Tray count grows. One summary when you return. ${protectionContinuityNow(snap)} Live Away / quiet count stay in the notice above when active.`}
           </p>
           <div style={{ marginTop: "0.65rem" }}>
             <div style={{ fontWeight: 500, marginBottom: "0.35rem" }}>Snooze</div>
@@ -931,18 +935,18 @@ export function Settings({
             {threats?.about_note ||
               "Block domains on known phishing and malware lists. Downloads stay on this computer."}{" "}
             DenyOut refreshes threat lists about every {(threats?.poll_hours || 24)} hours while it
-            is running, and when Protect starts.
+            is running, and when Protect or Agents only starts.
             {computerLive && !snap.problems_alert ? (
               <>
                 {" "}
-                Changing lists or Refresh now while Protect is on restarts protection (may ask for a
-                password).
+                Changing lists or Refresh now while {computerLiveNoun} is on restarts protection (may
+                ask for a password).
               </>
             ) : computerLive && snap.problems_alert ? (
               <>
                 {" "}
-                Changing lists or Refresh now may restart the computer proxy (Protect needs attention;
-                may ask for a password).
+                Changing lists or Refresh now may restart the computer proxy ({computerLiveNoun}{" "}
+                needs attention; may ask for a password).
               </>
             ) : snap?.mode === "session" && snap?.protection_on ? (
               <> Lists update in place for Session — no system restart.</>
@@ -952,9 +956,10 @@ export function Settings({
               <> Changes apply the next time Protect turns on.</>
             )}
           </p>
- {!threats && (
+ {!threatsReady && (
  <p className="warn-box" style={{ marginTop: "0.5rem" }}>
- Couldn’t load threat lists yet. Use Refresh now below — don’t treat the checkboxes as live prefs until that works.
+ Couldn’t load threat lists yet. Use Refresh now below — list choices stay hidden until that
+ works (not shown as all off).
  {snap?.threat_lists_warn
  ? " The top bar still shows they need attention."
  : ""}
@@ -972,11 +977,13 @@ export function Settings({
  : "Threat lists look outdated (over a week). Use Refresh now, or check your network."}
  </p>
  )}
+ {threatsReady && threats ? (
+ <>
  <label style={{ display: "block", marginTop: "0.5rem" }}>
  <input
  type="checkbox"
- checked={!!threats?.block_phishing}
- disabled={threatBusy || !threats}
+ checked={!!threats.block_phishing}
+ disabled={threatBusy}
  onChange={(e) => {
  const on = e.target.checked;
  setThreatBusy(true);
@@ -995,8 +1002,8 @@ export function Settings({
  <label style={{ display: "block", marginTop: "0.35rem" }}>
  <input
  type="checkbox"
- checked={!!threats?.block_malware}
- disabled={threatBusy || !threats}
+ checked={!!threats.block_malware}
+ disabled={threatBusy}
  onChange={(e) => {
  const on = e.target.checked;
  setThreatBusy(true);
@@ -1021,8 +1028,13 @@ export function Settings({
  >
  <input
  type="checkbox"
- checked={!!threats?.block_stronger}
- disabled={threatBusy || !threats || !threats?.block_malware}
+ checked={!!threats.block_stronger}
+ disabled={threatBusy || !threats.block_malware}
+ title={
+ !threats.block_malware
+ ? "Turn on Block known malware first"
+ : undefined
+ }
  onChange={(e) => {
  const on = e.target.checked;
  const apply = async () => {
@@ -1041,7 +1053,7 @@ export function Settings({
  setExtraConfirm({
  title: "Enable stronger threat list?",
  body:
- threats?.stronger_warning ||
+ threats.stronger_warning ||
  "Stronger adds a large extra list and may break sites. Continue?",
  danger: true,
  confirmLabel: "Enable",
@@ -1056,6 +1068,9 @@ export function Settings({
  </label>
  <p className="muted" style={{ marginLeft: "1.25rem", marginTop: "0.15rem" }}>
  Optional HaGeZi list - larger, may block more. Use Allow if something breaks.
+ {!threats.block_malware
+ ? " Turn on Block known malware first to enable this."
+ : ""}
  </p>
               <label style={{ display: "block", marginTop: "0.65rem" }}>
                 Update every (hours){" "}
@@ -1063,11 +1078,11 @@ export function Settings({
                   type="number"
                   min={6}
                   max={168}
-                  value={pollHoursDraft ?? (threats?.poll_hours || 24)}
-                  disabled={threatBusy || !threats}
+                  value={pollHoursDraft ?? (threats.poll_hours || 24)}
+                  disabled={threatBusy}
                   onChange={(e) => setPollHoursDraft(Number(e.target.value) || 24)}
                   onBlur={() => {
-                    const h = pollHoursDraft ?? (threats?.poll_hours || 24);
+                    const h = pollHoursDraft ?? (threats.poll_hours || 24);
                     setPollHoursDraft(null);
                     setThreatBusy(true);
                     void api
@@ -1081,6 +1096,8 @@ export function Settings({
                   }}
                 />
               </label>
+ </>
+ ) : null}
  <div className="row-actions" style={{ marginTop: "0.65rem" }}>
  <button
  type="button"
@@ -1108,11 +1125,11 @@ export function Settings({
  {threatBusy ? "Working..." : "Refresh now"}
  </button>
  </div>
- {!threats ? (
+ {!threatsReady ? (
  <p className="muted" style={{ marginTop: "0.5rem" }}>
  Couldn’t load threat lists. Protect still works for secrets.
  </p>
- ) : (threats.feeds || []).length > 0 ? (
+ ) : (threats!.feeds || []).length > 0 ? (
  <ul style={{ marginTop: "0.75rem" }}>
  {threats.feeds.map((f) => (
  <li key={f.id} className="muted" style={{ marginBottom: "0.35rem" }}>
@@ -1569,8 +1586,9 @@ export function Settings({
                         if (computerLive) {
                           setExtraConfirm({
                             title: `Undo timed allow for ${host}?`,
-                            body:
-                              "Removing this timed allow while Protect is on restarts protection (may ask for a password).",
+                            body: `Removing this timed allow while ${
+                              snap.mode === "agents" ? "Agents only" : "Protect"
+                            } is on restarts protection (may ask for a password).`,
                             confirmLabel: "Undo and restart",
                             run: () => api.removeTimedAllow(host).then(() => reload()),
                           });
@@ -1809,13 +1827,7 @@ export function Settings({
  </section>
  )}
 
-        {showSection(["ask", "resume"], "asks") &&
-          (snap.mode === "agents" ||
-            intentAgents ||
-            (snap.agents_running || 0) > 0 ||
-            !!snap.ask_paused ||
-            focusSection === "asks" ||
-            (!!findQ && (/\basks?\b/.test(findQ) || findQ.includes("resume")))) && (
+        {showSection(["ask", "resume"], "asks") && (
           <section className="card" id="settings-asks">
             <h2>Asks</h2>
             <p className="muted">
@@ -1828,6 +1840,7 @@ export function Settings({
             !snap.ask_paused ? (
               <p className="muted" style={{ marginBottom: "0.5rem" }}>
                 No agent asks right now — this applies when My agents or Agents only is in use.
+                Pause stays available here once an agent is running.
               </p>
             ) : null}
             {snap.ask_paused ? (

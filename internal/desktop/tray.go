@@ -148,19 +148,28 @@ func (a *App) runTray(ctx context.Context) error {
 
 				label := userModeLabel(mode, profile)
 				paused := mode == ModeOff && (pauseUntil != "" || pauseLast == "forever")
+				agentsIntent := profile == PolicyProfileAgent
+				pausePrefix := ""
+				if agentsIntent {
+					pausePrefix = "Agents only "
+				}
 				if mode == ModeOff && pauseUntil != "" {
-					label = "Paused"
+					label = pausePrefix + "Paused"
 					if t, err := time.Parse(time.RFC3339, pauseUntil); err == nil {
 						local := t.Local()
 						// Prefer 12h clock to match typical chrome toLocaleTimeString.
 						if local.Format("2006-01-02") == time.Now().Local().Format("2006-01-02") {
-							label = "Paused until " + local.Format("3:04 PM")
+							label = pausePrefix + "paused until " + local.Format("3:04 PM")
 						} else {
-							label = "Paused until " + local.Format("Jan 2, 3:04 PM")
+							label = pausePrefix + "paused until " + local.Format("Jan 2, 3:04 PM")
 						}
 					}
 				} else if mode == ModeOff && pauseLast == "forever" {
-					label = "Off until you turn it on"
+					if agentsIntent {
+						label = "Agents only off until you turn it on"
+					} else {
+						label = "Off until you turn it on"
+					}
 				} else if mode == ModeOff && !avail {
 					label = "Off (unavailable)"
 				}
