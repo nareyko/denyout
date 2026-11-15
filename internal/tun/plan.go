@@ -1,5 +1,7 @@
-// Package tun holds closed-loop planning types for a future TUN egress path.
-// It must not open /dev/net/tun or change routing; see docs/design-tun-egress.md.
+// Package tun holds the T1 closed-loop path for a future TUN egress.
+// It classifies packets, decides DropLog, formats helper/stats lines, and
+// renders nft steer tables as strings. It must not open /dev/net/tun or
+// change routing; see docs/design-tun-egress.md.
 package tun
 
 import (
