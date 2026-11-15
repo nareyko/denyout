@@ -458,8 +458,9 @@ export function Profiles({
  Show Ask and block dialogs for this agent
  </label>
  <p className="muted" style={{ marginTop: 4 }}>
- When on, prompts appear while you are at the computer. With Stay quiet while away
- (Settings), they stay quiet while you are away and show in the return summary.
+ {snap?.quiet_while_away === false
+  ? "When on, prompts appear while you are at the computer. Stay quiet while away is off (Settings) — Ask and block dialogs can still appear while locked or idle."
+  : "When on, prompts appear while you are at the computer. With Stay quiet while away on (Settings), they stay quiet while you are away and show in the return summary."}
  </p>
  <label style={{ display: "block", marginTop: 8 }}>
  <input

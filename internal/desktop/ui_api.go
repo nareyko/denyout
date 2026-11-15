@@ -1378,13 +1378,20 @@ func (a *App) UIDiscardLearning(id string) error {
 	if err != nil {
 		return err
 	}
+	return a.discardLearningPending(id, &p)
+}
+
+// discardLearningPending clears pending Allow-once hosts and revokes them on a
+// live wrap so Discard's "stay blocked this run" promise holds (Wails + tray).
+func (a *App) discardLearningPending(id string, p *AgentProfile) error {
+	if p == nil {
+		return fmt.Errorf("profile required")
+	}
 	hosts := append([]string{}, p.PendingOnce...)
 	p.DiscardPending()
-	if err := SaveProfile(p); err != nil {
+	if err := SaveProfile(*p); err != nil {
 		return err
 	}
-	// Allow-once was applied live on the wrap session; revoke so Discard's
-	// "stay blocked" promise holds for this run too.
 	for _, h := range hosts {
 		a.revokeWrapHostLive(id, h, false)
 	}

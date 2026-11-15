@@ -42,8 +42,7 @@ func (a *App) pinLearningUI(id string) {
 		a.applyPinnedLive(id, hosts)
 		notify.Info("DenyOut", fmt.Sprintf("Pinned %d site(s) for %s.", len(hosts), p.Name))
 	case "Discard pending":
-		p.DiscardPending()
-		if err := SaveProfile(p); err != nil {
+		if err := a.discardLearningPending(id, &p); err != nil {
 			notify.Info("DenyOut", err.Error())
 			return
 		}
