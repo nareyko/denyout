@@ -41,7 +41,7 @@ func TestSwitchToSafeFlipsProfileWithoutStartingProtect(t *testing.T) {
 	}
 }
 
-func TestSwitchToSafeFromSessionLeavesComputerScope(t *testing.T) {
+func TestSwitchToSafeFromSessionLeavesSessionBehind(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, "config"))
@@ -52,12 +52,16 @@ func TestSwitchToSafeFromSessionLeavesComputerScope(t *testing.T) {
 	a.state.Scope = ScopeSession
 	a.state.ProtectionOn = true
 	a.state.PolicyProfile = PolicyProfileBrowse
-	// ElevateApply will fail in this sandbox — still must leave Session behind.
+	// ElevateApply fails without helper/admin — Session must still be torn down.
+	// On failure enableComputerFromTray clears Scope to Off (honest: Protect did not start).
 	_ = a.switchToSafeDesktopFromTray()
 	if a.session != nil {
 		t.Fatal("expected session stopped")
 	}
-	if a.state.Scope != ScopeComputer {
-		t.Fatalf("scope=%s want %s", a.state.Scope, ScopeComputer)
+	if a.currentMode() == ModeSession {
+		t.Fatal("must not remain in Session after switch to Safe")
+	}
+	if normalizePolicyProfile(a.state.PolicyProfile) != PolicyProfileBrowse {
+		t.Fatalf("profile=%s", a.state.PolicyProfile)
 	}
 }

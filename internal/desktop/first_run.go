@@ -72,9 +72,11 @@ func (a *App) runFirstRunWizard() {
 }
 
 func (a *App) finishSetupNotNow(extra string) error {
-	// Peek-mode Protect may already be live — unload before claiming Off.
+	// Peek-mode Protect may already be live — best-effort unload before claiming Off.
+	// If admin Remove fails (cancelled pkexec / no helper), still clear leave-on so
+	// Not now cannot trap the user in Needs attention.
 	if err := a.stopProtectionErr(); err != nil {
-		return err
+		AppendDesktopLog("WARN setup Not now unload: %v (clearing Off intent anyway)", err)
 	}
 	a.mu.Lock()
 	a.state.SetupDone = true

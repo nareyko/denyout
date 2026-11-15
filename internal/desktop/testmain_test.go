@@ -22,6 +22,8 @@ func TestMain(m *testing.M) {
 	_ = os.Setenv("HOME", dir)
 	_ = os.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, "config"))
 	_ = os.Setenv("XDG_STATE_HOME", filepath.Join(dir, "state"))
+	// Never block desktop tests on pkexec/sudo GUI (local or CI).
+	_ = os.Setenv("DENYOUT_TEST_NO_ELEVATE", "1")
 
 	stub := filepath.Join(dir, "bin")
 	if err := os.MkdirAll(stub, 0o755); err != nil {
