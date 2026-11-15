@@ -86,6 +86,8 @@ Landed (Protect Off lifecycle): `logQuicDropStats` emits `source=nft`, `tun_drop
 
 Opening a real TUN requires an explicit `DENYOUT_TUN_E2E=1` test tag and root — not CI default.
 
+Release verify without dogfood: `scripts/closed-loop-release-smoke.sh /path/to/extracted/release` (or no arg to build local CLI).
+
 ## 8. Decision lock (pending owner)
 
 - Default Protect stays **nft redirect + QUIC drop** until T1 VM dogfood passes.

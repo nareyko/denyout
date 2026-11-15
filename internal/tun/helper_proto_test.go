@@ -8,6 +8,7 @@ import (
 )
 
 func TestHelperReplyStartStopDisabled(t *testing.T) {
+	t.Setenv(tun.EnvE2E, "")
 	for _, verb := range []string{"tun-start", "tun-stop"} {
 		line, err := tun.HelperReply(verb)
 		if err != nil {
@@ -23,6 +24,9 @@ func TestHelperReplyStartStopDisabled(t *testing.T) {
 		if st.Verb != verb {
 			t.Fatalf("verb=%q", st.Verb)
 		}
+		if st.Reason != "flag_off" {
+			t.Fatalf("reason=%q line=%q", st.Reason, line)
+		}
 		if !strings.Contains(line, tun.CapTag) {
 			t.Fatalf("missing cap: %q", line)
 		}
@@ -30,6 +34,7 @@ func TestHelperReplyStartStopDisabled(t *testing.T) {
 }
 
 func TestHelperReplyStatsDisabled(t *testing.T) {
+	t.Setenv(tun.EnvE2E, "")
 	line, err := tun.HelperReply("tun-stats")
 	if err != nil {
 		t.Fatal(err)
@@ -43,6 +48,24 @@ func TestHelperReplyStatsDisabled(t *testing.T) {
 	}
 	if st.Enabled {
 		t.Fatal("stats stub must not claim enabled")
+	}
+	if st.Reason != "flag_off" {
+		t.Fatalf("reason=%q", st.Reason)
+	}
+}
+
+func TestHelperReplyReasonStubWhenE2E(t *testing.T) {
+	t.Setenv(tun.EnvE2E, "1")
+	line, err := tun.HelperReply("tun-start")
+	if err != nil {
+		t.Fatal(err)
+	}
+	st, err := tun.ParseHelperReply(line)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Enabled || st.Reason != "stub_no_device" {
+		t.Fatalf("%+v from %q", st, line)
 	}
 }
 
