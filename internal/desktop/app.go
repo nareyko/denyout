@@ -221,8 +221,8 @@ func (a *App) UIReadyRestore() {
 	})
 }
 
-// UIQuitNeedsChoice reports whether Quit should ask keep-vs-off.
-// True for live proxyd/session, or broken leave-on (explicit Off vs Cancel).
+// UIQuitNeedsChoice reports whether Quit should confirm unload (Cancel keeps DenyOut running).
+// True for live proxyd/session, or broken leave-on (Clear intent vs Cancel).
 func (a *App) UIQuitNeedsChoice() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -232,28 +232,14 @@ func (a *App) UIQuitNeedsChoice() bool {
 	return problemsUnhealthyLocked(a)
 }
 
-// UIQuit finishes the tray Quit flow. choice: "off" | "keep".
+// UIQuit finishes the tray Quit flow. choice is ignored except for logging;
+// Quit always fully unloads (no leave-on / keep protection).
 func (a *App) UIQuit(choice string) error {
-	choice = strings.TrimSpace(strings.ToLower(choice))
+	_ = strings.TrimSpace(strings.ToLower(choice))
 	a.mu.Lock()
-	hasProxyd := a.proxyd != nil
-	hasSession := a.session != nil
-	live := hasProxyd || hasSession
+	live := a.proxyd != nil || a.session != nil
 	a.mu.Unlock()
-	if choice == "keep" {
-		// Session lives in-process — Exit always tears it down. Refuse a false promise.
-		if hasSession && !hasProxyd {
-			return fmt.Errorf("Session protection cannot stay on after Quit. Choose Turn off and quit, or Cancel.")
-		}
-		if hasProxyd {
-			a.quitLeaveProtectionOn()
-		}
-		// Unhealthy leave-on with no live proxyd: Keep leaves intent for next restore.
-		a.stopAllWrapsOpts("Quit", true)
-		a.stopProtect()
-		return nil
-	}
-	// Default / "off": unload protection then quit.
+	// Always unload: never leave proxyd/intent running after Quit.
 	if live {
 		if err := a.quitUnload(); err != nil {
 			return err

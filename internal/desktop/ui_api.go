@@ -108,7 +108,7 @@ type UISnapshot struct {
 	SilentWhenOpen      bool            `json:"silent_when_open"`
 }
 
-// AwayDigestView is the one-shot "While you were away" card (Phase C).
+	// AwayDigestView is the one-shot "Quiet items waiting" card (Away or fullscreen).
 type AwayDigestView struct {
 	Pending      bool     `json:"pending"`
 	Blocks       int      `json:"blocks"`  // auto-kept / keep-repeat while Away

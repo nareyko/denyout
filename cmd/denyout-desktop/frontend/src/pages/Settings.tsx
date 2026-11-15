@@ -843,8 +843,8 @@ export function Settings({
                     snap.notify_snooze_until
                       ? ` until ${new Date(snap.notify_snooze_until).toLocaleString()}`
                       : ""
-                  }. Soft OS banners stay off until then. Clear below or see the notice at the top.`
-                : "Temporarily quiet OS banners without changing How chatty. Continuity (what stays on) is in the notice above when snooze or Away is active."}
+                  }. Soft OS banners stay off until then (Protect failed can still show). Clear below or see the notice at the top.`
+                : "Temporarily quiet OS banners without changing How chatty (Protect failed can still show). Continuity (what stays on) is in the notice above when snooze or Away is active."}
             </p>
             <div className="row-actions" style={{ gap: "0.4rem", flexWrap: "wrap" }}>
               <button

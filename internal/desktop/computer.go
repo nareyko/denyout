@@ -83,7 +83,7 @@ func (a *App) startComputer() error {
 		args = append(args, "--allow-base", strings.TrimRight(wizard, "/"))
 	}
 	cmd := exec.Command(self, args...)
-	// Detached so "Quit but keep protection" can leave proxyd running after tray exits.
+	// Detached process group: hostguard/proxyd lifecycle is owned by ElevateRemove on Quit unload.
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	detachCmd(cmd)
@@ -259,65 +259,33 @@ func (a *App) stopProtectionErr() error {
 }
 
 // quitUnload fully tears down protection and clears leave-on state so the next
-// login does not auto-restore. Used by tray Quit when user chooses turn off.
+// login does not auto-restore. Used by every Quit path (no leave-on).
 // Prefer helper; if password is required and the user cancels, return error and
 // do not exit — never leave half-running protection with tray gone.
 func (a *App) quitUnload() error {
 	return a.stopProtectionErr()
 }
 
-// quitLeaveProtectionOn keeps hostguard + proxyd running and persists leave-on
-// so protection continues after the tray process exits.
-func (a *App) quitLeaveProtectionOn() {
-	a.mu.Lock()
-	cmd := a.proxyd
-	a.proxyd = nil // do not Signal/Wait — process stays up (started with Setsid)
-	if cmd != nil {
-		a.state.ProtectionOn = true
-		a.state.ComputerEnabled = true
-		a.state.Scope = ScopeComputer
-	}
-	st := a.state
-	a.mu.Unlock()
-	_ = SaveState(st)
-	AppendDesktopLog("INFO quit: leaving protection on (proxyd kept)")
-}
-
-// trayQuitChoice asks whether to unload protection when quitting the tray.
-// Returns "off", "keep", or "" (cancel).
+// trayQuitChoice confirms full unload when quitting the tray.
+// Returns "off" or "" (cancel). Keep-protection-on was removed (Quit always unloads).
 func (a *App) trayQuitChoice() string {
 	a.mu.Lock()
-	on := a.proxyd != nil || a.state.ProtectionOn || a.state.ComputerEnabled
+	hasProxyd := a.proxyd != nil
+	hasSession := a.session != nil
+	on := hasProxyd || hasSession || a.state.ProtectionOn || a.state.ComputerEnabled ||
+		problemsUnhealthyLocked(a)
 	a.mu.Unlock()
 	if !on {
-		return "off" // nothing to leave on
+		return "off" // nothing live — exit
 	}
-	if !dialogToolkitAvailable() {
-		// No dialog toolkit: safest default is full unload (ask via notify is weak).
-		if nativeConfirm(
-			"Quit DenyOut?",
-			"Turn off protection and quit?\n\nCancel keeps DenyOut running.",
-			"Turn off and quit",
-			"Cancel",
-		) {
-			return "off"
-		}
+	body := "Turn off protection and quit?\n\nCancel keeps DenyOut running."
+	primary := "Turn off and quit"
+	if hasSession && !hasProxyd {
+		body = "Session protection stops when you quit. Quit and turn off?\n\nCancel keeps DenyOut running."
+		primary = "Quit and turn off"
+	}
+	if !nativeConfirm("Quit DenyOut?", body, primary, "Cancel") {
 		return ""
-	}
-	choice, ok := nativeListPick(
-		"Quit DenyOut?",
-		"Protection is on. What should happen?",
-		[]string{
-			"Turn off protection and quit",
-			"Keep protection on and quit",
-			"Cancel",
-		},
-	)
-	if !ok || choice == "Cancel" || choice == "" {
-		return ""
-	}
-	if strings.HasPrefix(choice, "Keep") {
-		return "keep"
 	}
 	return "off"
 }

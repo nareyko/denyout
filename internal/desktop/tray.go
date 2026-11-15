@@ -93,15 +93,7 @@ func (a *App) runTray(ctx context.Context) error {
 		if choice == "" {
 			return // cancel
 		}
-		if choice == "keep" {
-			a.quitLeaveProtectionOn()
-			a.stopAllWrapsOpts("Quit", true)
-			a.stopProtect()
-			tray.Remove()
-			os.Exit(0)
-			return
-		}
-		// Turn off protection and quit (password OK if needed).
+		// Quit always fully unloads (password OK if needed).
 		if err := a.quitUnload(); err != nil {
 			fmt.Fprintf(os.Stderr, "denyout desktop: quit cancelled or failed: %v\n", err)
 			return

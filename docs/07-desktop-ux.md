@@ -99,7 +99,7 @@ Quit DenyOut
 | **My agents...** | With Wails: open window on **My agents** screen. Fallback shell: native agent list / New / Start / Stop |
 | Off | Turn Protect off |
 | Open DenyOut... | Same as left-click -> Home |
-| Quit DenyOut | Asks: **Turn off protection and quit** / **Keep protection on and quit** / Cancel. Turn off = full unload (admin if needed). Keep = proxyd+rules stay; tray exits. Does not delete binaries/config (`denyout uninstall`). |
+| Quit DenyOut | Confirms: **Turn off protection and quit** / Cancel. Quit always fully unloads (admin if needed). Cancel keeps DenyOut running. Does not delete binaries/config (`denyout uninstall`). |
 
 **Not in tray:** What was blocked, Always-allow, Help, Notifications, Test, Agents only, Switch Safe, Resume asks, Learning primary, Last block, version footer.
 
@@ -282,7 +282,7 @@ Threat-list hits use reason `threat_list`. User **Allow this site** / timed allo
 **OS toasts (whitelist only):** `protect_failed` · `allow_undo` · `protect_resumed` · soft `open_app`.  
 `keep_repeat` never reaches the OS (History + tray count).  
 **Levels:** Quiet (default for new installs) / Normal / Detailed (Advanced). Dialogs always when Present.  
-**Presence:** Away (lock or idle ≥5m) → no Ask/Decision; tray `N waiting`; return → one in-app **While you were away**.  
+**Presence:** Away (lock or idle ≥5m) or respected fullscreen → no Ask/Decision; tray quiet count; return → one in-app **Quiet items waiting**.  
 **Snooze:** tray / Settings mute non-critical OS for 1h or until tomorrow (Protect stays on).  
 `protect_failed` may still show when banners master is off.  
 **Fullscreen / night / sound:** Respect fullscreen (default on) suppresses steal-focus + non-critical OS; Quiet overnight mutes sound 22:00–08:00; sound only when you must answer (default on).  

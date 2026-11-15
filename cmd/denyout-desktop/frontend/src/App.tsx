@@ -1193,7 +1193,7 @@ export default function App() {
          ? "Session protection stayed on."
          : (snap?.agents_running || 0) > 0
            ? "My agents kept running."
-           : "Away did not turn protection off by itself."
+           : "Quiet time did not turn protection off by itself."
    }
    onReview={() => {
     void dismissAwayDigest().then(() => {
@@ -1258,15 +1258,15 @@ export default function App() {
  <div className="modal" onClick={(e) => e.stopPropagation()}>
       <h2>Quit DenyOut?</h2>
       <p className="muted">
-        {snap?.mode === "session"
-          ? "Session protection runs inside DenyOut and always stops when you quit. My agents wraps stop too."
-          : snap?.mode === "agents"
-            ? "Agents only can stay on after Quit (everyday browsing stays unprotected), or turn off first. My agents wraps always stop when you quit."
-            : snap?.problems_alert && (snap?.mode === "off" || !snap?.mode)
-              ? (snap?.policy_profile || "").toLowerCase() === "agent"
-                ? "Agents only is not running. Clear restore intent and quit, quit but keep intent for next launch, or Cancel."
-                : "Protect is not running. Clear restore intent and quit, quit but keep intent for next launch, or Cancel."
-              : "Whole-PC Protect (computer proxy) can stay on after Quit, or turn off first. Session and My agents wraps always stop when you quit."}
+        {snap?.problems_alert && (snap?.mode === "off" || !snap?.mode)
+          ? (snap?.policy_profile || "").toLowerCase() === "agent"
+            ? "Agents only is not running. Quit clears restore intent so the next launch does not try to bring it back. Cancel keeps DenyOut open."
+            : "Protect is not running. Quit clears restore intent so the next launch does not try to bring it back. Cancel keeps DenyOut open."
+          : snap?.mode === "session"
+            ? "Quit turns off Session protection and stops My agents wraps. Cancel keeps DenyOut running."
+            : snap?.mode === "agents"
+              ? "Quit turns off Agents only and stops My agents wraps. Everyday browsing was already unprotected. Cancel keeps DenyOut running."
+              : "Quit turns off protection and stops My agents wraps. Cancel keeps DenyOut running."}
       </p>
  {quitMsg ? <p className="warn-box">{quitMsg}</p> : null}
  <div className="stack" style={{ gap: "0.5rem", marginTop: "0.85rem" }}>
@@ -1303,32 +1303,6 @@ export default function App() {
      : "Turn off protection and quit"}
  </strong>
  </button>
- {snap?.mode !== "session" ? (
- <button
- type="button"
- className="btn"
- disabled={quitBusy}
- style={{ width: "100%", textAlign: "left" }}
- onClick={() => {
- setQuitBusy(true);
- setQuitMsg("");
- void api
- .quit("keep")
- .catch((e) => {
- setQuitMsg(String(e) || "Could not quit.");
- setQuitBusy(false);
- });
- }}
- >
- <strong>
- {snap?.problems_alert && (snap?.mode === "off" || !snap?.mode)
- ? "Quit and keep restore intent"
- : snap?.mode === "agents"
-   ? "Keep Agents only on and quit"
-   : "Keep protection on and quit"}
- </strong>
- </button>
- ) : null}
  <button
  type="button"
  className="btn"
@@ -1656,8 +1630,9 @@ export default function App() {
  DenyOut.
  <br />
  {snap.quiet_while_away === false
-  ? "- Stay quiet while away is off — Ask and block dialogs can still appear while locked or idle. Everything is in History."
-  : "- While you are away, DenyOut stays quiet and shows one summary when you return. Everything is in History."}
+  ? "- Stay quiet while away is off — Ask and block dialogs can still appear while locked or idle (about 5 minutes). Everything is in History."
+  : "- Stay quiet while away is on: Ask and block dialogs stay off while locked or idle (about 5 minutes). One summary when you return. Everything is in History."}
+ <br />- Respect fullscreen (Settings → Advanced) separately avoids dialogs while a fullscreen app is in front.
  <br />- Open Home to see if you are protected. If Protect failed, open Problems.
  </p>
  </>
