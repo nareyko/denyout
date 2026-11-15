@@ -396,7 +396,7 @@ func liveToYourSetupMode(liveMode string) string {
 	case "agents":
 		return "agents_only"
 	case "session":
-		return "agents"
+		return "session"
 	default:
 		return "off"
 	}

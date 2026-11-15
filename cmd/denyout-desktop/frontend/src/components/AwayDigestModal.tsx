@@ -2,6 +2,8 @@ type Props = {
   blocks: number;
   waiting: number;
   hosts: string[];
+  /** Mode-honest line: Protect computer / Agents only / My agents / generic. */
+  keptRunningLine?: string;
   onReview: () => void;
   onDismiss: () => void;
 };
@@ -11,12 +13,16 @@ export function AwayDigestModal({
   blocks,
   waiting,
   hosts,
+  keptRunningLine,
   onReview,
   onDismiss,
 }: Props) {
   const top = (hosts || []).filter(Boolean).slice(0, 5);
   const hasWaiting = waiting > 0;
   const hasBlocks = blocks > 0;
+  const kept =
+    (keptRunningLine || "").trim() ||
+    "Away did not turn protection off by itself.";
 
   return (
     <div className="modal-backdrop" style={{ zIndex: 50 }} role="presentation">
@@ -40,8 +46,7 @@ export function AwayDigestModal({
                 </span>
               </>
             ) : null}
-            . DenyOut kept protecting (Protect computer and/or My agents) — Away did not
-            turn protection off.
+            . {kept}
           </p>
         ) : null}
         {hasWaiting ? (

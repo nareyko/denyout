@@ -1152,6 +1152,17 @@ export default function App() {
    blocks={awayDigest.blocks ?? 0}
    waiting={awayDigest.waiting ?? 0}
    hosts={awayDigest.hosts ?? []}
+   keptRunningLine={
+    snap?.mode === "safe" && snap.protection_on
+     ? "Protect computer stayed on."
+     : snap?.mode === "agents"
+       ? "Agents only stayed on — everyday browsing was still not like Protect computer."
+       : snap?.mode === "session"
+         ? "Session protection stayed on."
+         : (snap?.agents_running || 0) > 0
+           ? "My agents kept running."
+           : "Away did not turn protection off by itself."
+   }
    onReview={() => {
     void dismissAwayDigest().then(() => {
      setDeferOnboarding(true);

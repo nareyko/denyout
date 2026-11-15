@@ -169,6 +169,8 @@ func YourSetupText(mode string, autostart bool, unhealthy bool) string {
 			status = "You are protected.\nBrowse as usual - we'll only interrupt for clear risks."
 		case "agents_only":
 			status = "Agents only is on for the whole computer.\nEveryday browsing is not protected like Protect computer — switch from Home or Settings when you want that."
+		case "session":
+			status = "Session protection is on.\nThis is a limited session proxy — switch to Protect computer from Home for everyday browsing."
 		case "agents":
 			status = "Protect computer is off for now.\nUse My agents for AI tools, or turn on Protect computer from Home or the tray."
 		default:

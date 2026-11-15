@@ -26,6 +26,19 @@ func TestEnsureSetupDoneAfterProtect(t *testing.T) {
 	}
 }
 
+func TestYourSetupTextSession(t *testing.T) {
+	text := YourSetupText("session", false, false)
+	if !strings.Contains(text, "Session protection") {
+		t.Fatalf("%q", text)
+	}
+	if strings.Contains(text, "Protect computer is off for now") {
+		t.Fatalf("session must not use agents-off tip: %q", text)
+	}
+	if got := liveToYourSetupMode("session"); got != "session" {
+		t.Fatalf("live map=%q", got)
+	}
+}
+
 func TestYourSetupTextAgentsOnly(t *testing.T) {
 	text := YourSetupText("agents_only", false, false)
 	if !strings.Contains(text, "Agents only") || !strings.Contains(text, "Everyday browsing") {
