@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.5 - Upgrade install + obsolete last-error (2026-11-15)
 
 ### Fixed
 
