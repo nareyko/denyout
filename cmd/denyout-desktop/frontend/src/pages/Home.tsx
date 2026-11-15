@@ -82,9 +82,9 @@ export function Home({
  headline = "You are protected";
  support = "Browse as usual. We'll only interrupt for clear risks.";
  } else if (agentsOnly) {
- headline = "Protection isn't set for everyday browsing";
+ headline = "Agents only is on";
  support =
- "Turn on Protect computer for normal web use. AI tools belong under My agents.";
+ "Everyday browsing is not protected like Protect computer. Switch to Protect computer for normal web use, or pause Agents only from here. AI tools also belong under My agents.";
  } else if (sessionOn) {
  headline = "Session protection is on";
  support =

@@ -71,12 +71,12 @@ const ADVANCED_FIND_KEYS = [
   "resume",
   "diagn",
   "log",
+  "logs",
   "audit",
   "test",
   "version",
   "update",
   "reset",
-  "clipboard",
   "privacy",
   "helper",
   "password",
@@ -96,8 +96,6 @@ const ADVANCED_FIND_KEYS = [
   "advanced list",
   "advanced lists",
   "undo",
-  "ca",
-  "certificate",
   "detailed",
   "banner",
   "banners",
@@ -113,10 +111,16 @@ function findKeysMatch(keys: string[], findQ: string): boolean {
   if (!findQ) return true;
   return keys.some((k) => {
     const kk = k.toLowerCase();
-    // Require length ≥ 3 so short queries like "ca" / "log" do not false-hit
-    // "notification" / "at login".
-    if (findQ.length >= 3 && kk.includes(findQ)) return true;
-    return findQ.length >= 3 && findQ.includes(kk);
+    // Exact key always matches (short keys like "log").
+    if (kk === findQ) return true;
+    // Substring into multi-word keys only for queries length ≥ 3, and only as
+    // whole-token / prefix so "log" does not hit "at login".
+    if (findQ.length < 3) return false;
+    if (kk.includes(" ")) {
+      return kk.split(/\s+/).some((tok) => tok === findQ || tok.startsWith(findQ));
+    }
+    if (kk.includes(findQ)) return true;
+    return findQ.includes(kk);
   });
 }
 
@@ -399,8 +403,6 @@ export function Settings({
           q.includes("system banner") ||
           q.includes("system banners") ||
           (q.includes("banner") && !q.includes("notification")) ||
-          q === "ca" ||
-          q.includes("certificate") ||
           q === "log" ||
           q.includes("logs") ||
           q.includes("allowlist") ||
@@ -428,8 +430,6 @@ export function Settings({
             q.includes("advanced") ||
             q.includes("password") ||
             q.includes("allowlist") ||
-            q.includes("certificate") ||
-            q === "ca" ||
             q === "log" ||
             q.includes("logs")
           ) {
@@ -587,14 +587,33 @@ export function Settings({
  <button
  className="btn danger"
  disabled={pauseBlocked}
+ title={
+  pauseBlocked
+   ? "Finish the open Ask/block or tray pause first."
+   : undefined
+ }
  onClick={() => setPauseOpen(true)}
  >
  {brokenIntent ? "Clear intent / turn off…" : "Pause / turn off…"}
  </button>
  ) : canChangePause ? (
- <button className="btn" disabled={pauseBlocked} onClick={() => setPauseOpen(true)}>
+ <button
+  className="btn"
+  disabled={pauseBlocked}
+  title={
+   pauseBlocked
+    ? "Finish the open Ask/block or tray pause first."
+    : undefined
+  }
+  onClick={() => setPauseOpen(true)}
+ >
  Change pause…
  </button>
+ ) : null}
+ {pauseBlocked ? (
+  <p className="muted" style={{ marginTop: "0.35rem" }}>
+   Pause is busy — finish the open Ask/block or tray pause first.
+  </p>
  ) : null}
  </div>
  </section>
@@ -967,6 +986,8 @@ export function Settings({
               <> Lists update in place for Session — no system restart.</>
             ) : (snap?.agents_running || 0) > 0 ? (
               <> Updates also apply to running My agents wraps without turning on Protect computer.</>
+            ) : intentAgents ? (
+              <> Changes apply the next time Agents only or Protect turns on.</>
             ) : (
               <> Changes apply the next time Protect turns on.</>
             )}
@@ -1202,8 +1223,8 @@ export function Settings({
  onDismiss={onChanged}
  >
  Advanced: system banners (including Detailed), allowed/silenced sites, optional lists,
- diagnostics, and whole-PC Agents only. Changes here affect what DenyOut allows
- permanently.
+ Asks, diagnostics, account, and whole-PC Agents only. Allowed/silenced hosts are the
+ permanent allow controls — other cards here are prefs and tools.
  </Tip>
  )}
 
@@ -1881,10 +1902,20 @@ export function Settings({
  <button
  className="btn danger"
  disabled={pauseBlocked}
+ title={
+  pauseBlocked
+   ? "Finish the open Ask/block or tray pause first."
+   : undefined
+ }
  onClick={() => setPauseOpen(true)}
  >
  Pause / turn off…
  </button>
+ {pauseBlocked ? (
+  <p className="muted" style={{ marginTop: "0.35rem", width: "100%" }}>
+   Pause is busy — finish the open Ask/block or tray pause first.
+  </p>
+ ) : null}
  </div>
  </>
  ) : (
@@ -1968,17 +1999,15 @@ export function Settings({
  [
  "diagn",
  "log",
+ "logs",
  "audit",
  "test",
  "version",
  "update",
  "reset",
- "clipboard",
  "privacy",
  "helper",
  "password",
- "ca",
- "certificate",
  ],
  "diagnostics",
  ) && (
@@ -1993,6 +2022,9 @@ export function Settings({
  {snap.helper_ok
  ? " — Protect usually skips the password prompt."
  : " — Protect may ask for your password on turn-on."}
+ </p>
+ <p className="muted" style={{ marginTop: "0.35rem" }}>
+ Certificate and clipboard status live on Problems, not here.
  </p>
  <div className="row-actions">
  <button
@@ -2050,7 +2082,8 @@ export function Settings({
  </button>
  </div>
  <p className="muted" style={{ marginTop: "0.75rem" }}>
- Privacy: decisions stay on this computer.
+ Privacy: block History stays on this computer. If you sign in, sync can copy
+ allowed/silenced sites and preferences — not your full block History.
  </p>
  </section>
  )}

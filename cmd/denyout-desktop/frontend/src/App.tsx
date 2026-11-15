@@ -783,7 +783,12 @@ export default function App() {
  try {
  await api.stopProtectionWithChoice("forever");
  await refreshSnap();
- setOnboardToast("Cleared stuck Protect intent. Choose a mode below.", false);
+ setOnboardToast(
+  (snap?.policy_profile || "").toLowerCase() === "agent"
+   ? "Cleared stuck Agents only intent. Choose a mode below."
+   : "Cleared stuck Protect intent. Choose a mode below.",
+  false,
+ );
  } catch (e) {
  setOnboardToast(String(e), true);
  } finally {
