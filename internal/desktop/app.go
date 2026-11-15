@@ -222,8 +222,11 @@ func (a *App) UIReadyRestore() {
 }
 
 // UIQuitNeedsChoice reports whether Quit should confirm unload (Cancel keeps DenyOut running).
-// True for live proxyd/session, or broken leave-on (Clear intent vs Cancel).
+// True for live proxyd/session, running My agents wraps, or broken leave-on.
 func (a *App) UIQuitNeedsChoice() bool {
+	if a.runningWrapCount() > 0 {
+		return true
+	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if a.proxyd != nil || a.session != nil {

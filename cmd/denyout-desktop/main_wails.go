@@ -346,6 +346,15 @@ func main() {
 		BackgroundColour: &options.RGBA{R: 246, G: 247, B: 249, A: 255},
 		OnStartup:        bridge.startup,
 		OnBeforeClose: func(ctx context.Context) (prevent bool) {
+			if *noTray {
+				// No tray: hiding would strand the only UI. Unload and allow the window to close.
+				if err := bridge.app.UIQuit("off"); err != nil {
+					notify.Emit(notify.KindTrayHidden, "DenyOut",
+						"Could not exit yet — finish the password prompt or fix Problems, then close again. (No tray in this mode.)")
+					return true
+				}
+				return false
+			}
 			runtime.WindowHide(ctx)
 			bridge.mu.Lock()
 			shown := bridge.hideToast
@@ -353,9 +362,8 @@ func main() {
 			bridge.mu.Unlock()
 			if !shown {
 				// Info is a no-op; tray-hidden must reach the OS even on Quiet.
-				// Mode-neutral: do not claim protection stays on when already Off.
 				notify.Emit(notify.KindTrayHidden, "DenyOut",
-					"Still running in the tray — closing the window is not Quit. Use Quit in the tray menu to exit (that turns protection off).")
+					"Still running in the tray — closing the window is not Quit. Use Quit in the tray menu to exit.")
 			}
 			return true
 		},

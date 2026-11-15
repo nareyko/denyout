@@ -725,7 +725,9 @@ export function Settings({
                   : ""}
                 {snap.away ? "Away right now. " : ""}
                 {typeof snap.away_unread === "number" && snap.away_unread > 0
-                  ? `${snap.away_unread} quiet (locked, idle, or fullscreen). `
+                  ? snap.quiet_while_away === false
+                    ? `${snap.away_unread} quiet (fullscreen). `
+                    : `${snap.away_unread} quiet (locked, idle, or fullscreen). `
                   : ""}
                 {snap.away_digest?.pending ? "Return summary is ready. " : ""}
                 {protectionContinuityNow(snap)}
@@ -2301,13 +2303,18 @@ function formatExpiry(iso: string): string {
   const now = new Date();
   // Match chrome/tray/Home: time-only today; include day across midnight.
   if (d.toDateString() === now.toDateString()) {
-    return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleTimeString(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
   }
   return d.toLocaleString(undefined, {
     month: "short",
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
   });
 }
 

@@ -485,7 +485,7 @@ func (a *App) chooseProtectPause() (choice string, ok bool) {
 				"--height=300",
 				"15 minutes",
 				"1 hour",
-				"Until tomorrow",
+				"About 24 hours",
 				"Until I turn it on",
 			)
 			out, err := cmd.Output()
@@ -508,7 +508,7 @@ func mapPauseLabel(s, def string) string {
 		return "15m"
 	case "1 hour":
 		return "1h"
-	case "Until tomorrow":
+	case "About 24 hours", "Until tomorrow": // legacy zenity label
 		return "tomorrow"
 	case "Until I turn it on":
 		return "forever"

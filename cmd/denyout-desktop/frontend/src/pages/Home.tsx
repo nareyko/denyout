@@ -213,7 +213,9 @@ export function Home({
  {snap?.notify_snooze_active ? "Notifications snoozed. " : ""}
  {snap?.away ? "Away — quiet for now. " : ""}
  {typeof snap?.away_unread === "number" && snap.away_unread > 0
- ? `${snap.away_unread} quiet (locked, idle, or fullscreen). `
+ ? snap.quiet_while_away === false
+   ? `${snap.away_unread} quiet (fullscreen). `
+   : `${snap.away_unread} quiet (locked, idle, or fullscreen). `
  : ""}
  {snap?.system_banners === false
  ? "System banners off (Protect failed can still show). "
@@ -516,12 +518,17 @@ function formatPauseUntil(iso: string): string {
  const now = new Date();
  // Match chrome/tray: time-only today; include day when pause crosses midnight.
  if (d.toDateString() === now.toDateString()) {
- return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+ return d.toLocaleTimeString(undefined, {
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+ });
  }
  return d.toLocaleString(undefined, {
  month: "short",
  day: "numeric",
  hour: "2-digit",
  minute: "2-digit",
+ hour12: false,
  });
 }

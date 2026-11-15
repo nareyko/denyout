@@ -151,11 +151,11 @@ func (a *App) runTray(ctx context.Context) error {
 					label = pausePrefix + "Paused"
 					if t, err := time.Parse(time.RFC3339, pauseUntil); err == nil {
 						local := t.Local()
-						// Prefer 12h clock to match typical chrome toLocaleTimeString.
+						// 24h local clock — matches chrome formatPauseUntil (hour12: false).
 						if local.Format("2006-01-02") == time.Now().Local().Format("2006-01-02") {
-							label = pausePrefix + "paused until " + local.Format("3:04 PM")
+							label = pausePrefix + "paused until " + local.Format("15:04")
 						} else {
-							label = pausePrefix + "paused until " + local.Format("Jan 2, 3:04 PM")
+							label = pausePrefix + "paused until " + local.Format("Jan 2, 15:04")
 						}
 					}
 				} else if mode == ModeOff && pauseLast == "forever" {

@@ -70,7 +70,7 @@ export function AwayDigestModal({
         ) : null}
         {!hasBlocks && !hasWaiting ? (
           <p className="muted">
-            Something waited while DenyOut stayed quiet (locked, idle, or fullscreen).
+            Something waited while DenyOut stayed quiet.
           </p>
         ) : null}
         <p className="muted">{kept}</p>

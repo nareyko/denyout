@@ -26,14 +26,18 @@ export default function App() {
  const [onboardMsgWarn, setOnboardMsgWarn] = useState(false);
  /** First-run chatty choice. "keep" = Detailed already on, no Quiet/A bit more pick yet. */
  const [onboardChatty, setOnboardChatty] = useState<"quiet" | "normal" | "keep">("quiet");
+ /** True after user clicks Quiet / A bit more (avoids Quiet flash while Detailed is active). */
+ const [chattyTouched, setChattyTouched] = useState(false);
  function setOnboardToast(msg: string, warn = true) {
  setOnboardMsg(msg);
  setOnboardMsgWarn(!!msg && warn);
  }
+ const shownOnboardChatty: "quiet" | "normal" | "keep" =
+  !chattyTouched && snap?.notify_level === "detailed" ? "keep" : onboardChatty;
  async function applyOnboardChatty() {
  // Preserve Detailed only until the user explicitly picks Quiet or A bit more.
- if (onboardChatty === "keep") return;
- await api.setNotifyLevel(onboardChatty);
+ if (shownOnboardChatty === "keep") return;
+ await api.setNotifyLevel(shownOnboardChatty);
  }
  const [openNewProfile, setOpenNewProfile] = useState(false);
  /** Keep Profiles mounted after first visit so New/Edit drafts survive nav. */
@@ -451,15 +455,20 @@ export default function App() {
  const d = new Date(t);
  const now = new Date();
  const sameDay = d.toDateString() === now.toDateString();
- // Match Home: include day when pause crosses midnight ("Until tomorrow").
+ // Match tray 15:04 / Home: include day when pause crosses midnight.
  if (sameDay) {
- return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+ return d.toLocaleTimeString(undefined, {
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+ });
  }
  return d.toLocaleString(undefined, {
  month: "short",
  day: "numeric",
  hour: "2-digit",
  minute: "2-digit",
+ hour12: false,
  });
  })();
  const foreverOff =
@@ -1275,11 +1284,13 @@ export default function App() {
           ? (snap?.policy_profile || "").toLowerCase() === "agent"
             ? "Agents only is not running. Quit clears restore intent so the next launch does not try to bring it back. Cancel keeps DenyOut open."
             : "Protect is not running. Quit clears restore intent so the next launch does not try to bring it back. Cancel keeps DenyOut open."
-          : snap?.mode === "session"
-            ? "Quit turns off Session protection and stops My agents wraps. Cancel keeps DenyOut running."
-            : snap?.mode === "agents"
-              ? "Quit turns off Agents only and stops My agents wraps. Everyday browsing was already unprotected. Cancel keeps DenyOut running."
-              : "Quit turns off protection and stops My agents wraps. Cancel keeps DenyOut running."}
+          : (snap?.mode === "off" || !snap?.mode) && (snap?.agents_running || 0) > 0
+            ? "Quit stops My agents wraps. Cancel keeps DenyOut running."
+            : snap?.mode === "session"
+              ? "Quit turns off Session protection and stops My agents wraps. Cancel keeps DenyOut running."
+              : snap?.mode === "agents"
+                ? "Quit turns off Agents only and stops My agents wraps. Everyday browsing was already unprotected. Cancel keeps DenyOut running."
+                : "Quit turns off protection and stops My agents wraps. Cancel keeps DenyOut running."}
       </p>
  {quitMsg ? <p className="warn-box">{quitMsg}</p> : null}
  <div className="stack" style={{ gap: "0.5rem", marginTop: "0.85rem" }}>
@@ -1309,11 +1320,13 @@ export default function App() {
  <strong>
  {snap?.problems_alert && (snap?.mode === "off" || !snap?.mode)
  ? "Clear intent and quit"
- : snap?.mode === "agents"
-   ? "Turn off Agents only and quit"
-   : snap?.mode === "session"
-     ? "Turn off Session protection and quit"
-     : "Turn off protection and quit"}
+ : (snap?.mode === "off" || !snap?.mode) && (snap?.agents_running || 0) > 0
+   ? "Stop agents and quit"
+   : snap?.mode === "agents"
+     ? "Turn off Agents only and quit"
+     : snap?.mode === "session"
+       ? "Turn off Session protection and quit"
+       : "Turn off protection and quit"}
  </strong>
  </button>
  <button
@@ -1440,17 +1453,23 @@ export default function App() {
               <div className="row-actions" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
                 <button
                   type="button"
-                  className={onboardChatty === "quiet" ? "btn primary" : "btn"}
+                  className={shownOnboardChatty === "quiet" ? "btn primary" : "btn"}
                   disabled={onboardBusy}
-                  onClick={() => setOnboardChatty("quiet")}
+                  onClick={() => {
+                    setChattyTouched(true);
+                    setOnboardChatty("quiet");
+                  }}
                 >
                   Quiet (recommended)
                 </button>
                 <button
                   type="button"
-                  className={onboardChatty === "normal" ? "btn primary" : "btn"}
+                  className={shownOnboardChatty === "normal" ? "btn primary" : "btn"}
                   disabled={onboardBusy}
-                  onClick={() => setOnboardChatty("normal")}
+                  onClick={() => {
+                    setChattyTouched(true);
+                    setOnboardChatty("normal");
+                  }}
                 >
                   A bit more
                 </button>

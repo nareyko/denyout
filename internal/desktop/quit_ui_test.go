@@ -35,6 +35,13 @@ func TestUIQuitNeedsChoiceOffHealthy(t *testing.T) {
 	}
 }
 
+func TestUIQuitNeedsChoiceWrapsRunning(t *testing.T) {
+	a := &App{state: DefaultState(), wraps: map[string]*wrapProc{"p1": {}}}
+	if !a.UIQuitNeedsChoice() {
+		t.Fatal("running My agents wraps should confirm before Quit")
+	}
+}
+
 func TestTestProtectionMessageUnhealthy(t *testing.T) {
 	a := &App{state: DefaultState(), status: "Needs attention", wraps: map[string]*wrapProc{}}
 	a.state.ProtectionOn = true
