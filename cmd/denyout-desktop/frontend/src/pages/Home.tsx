@@ -90,12 +90,15 @@ export function Home({
  support =
  "This is a limited session proxy — switch to Protect computer for everyday browsing.";
  } else if (pausedLabel) {
- headline = "Protection is paused";
- support = `Protect stays off until ${pausedLabel}. Turn on anytime to resume, or change how long.`;
+ const pauseNoun = intentAgents ? "Agents only" : "Protect";
+ headline = intentAgents ? "Agents only is paused" : "Protection is paused";
+ support = `${pauseNoun} stays off until ${pausedLabel}. Turn on anytime to resume, or change how long.`;
  } else if (foreverOff) {
- headline = "Protection is off until you turn it on";
- support =
- "You chose to leave Protect off. Turn on anytime from here, or change to a timed pause.";
+ const pauseNoun = intentAgents ? "Agents only" : "Protect";
+ headline = intentAgents
+ ? "Agents only is off until you turn it on"
+ : "Protection is off until you turn it on";
+ support = `You chose to leave ${pauseNoun} off. Turn on anytime from here, or change to a timed pause.`;
  } else if (snap?.computer_available === false) {
  headline = "Protection is off";
  support =

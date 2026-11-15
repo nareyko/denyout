@@ -330,6 +330,7 @@ export function Settings({
  !pausedUntilLabel &&
  !foreverOffLabel &&
  snap.computer_available === false;
+ const pauseNoun = intentAgents ? "Agents only" : "Protect";
  const protectionNow = snap.problems_alert
  ? "Needs attention"
  : snap.mode === "safe"
@@ -339,9 +340,11 @@ export function Settings({
      : snap.mode === "session"
        ? "Session"
        : pausedUntilLabel
-         ? `Paused until ${formatExpiry(pausedUntilLabel)}`
+         ? `${pauseNoun} paused until ${formatExpiry(pausedUntilLabel)}`
          : foreverOffLabel
-           ? "Off until you turn it on"
+           ? intentAgents
+             ? "Agents only off until you turn it on"
+             : "Off until you turn it on"
            : unavailableOff
              ? (snap.agents_running || 0) > 0
                ? "Off (unavailable) · agents running"
