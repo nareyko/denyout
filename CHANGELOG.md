@@ -1,11 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.4.3 - Elevate-skip honesty + URLhaus mirror (2026-11-15)
 
 ### Fixed
 
 - **Test/CI elevate skip** (`DENYOUT_TEST_NO_ELEVATE` / `GITHUB_ACTIONS`) no longer sticky **Off (unavailable)** or claim a password window appeared — that path never shows pkexec.
-- **Block known malware** feed: abuse.ch keyless URLhaus hostfile returns HTTP 410; switched to the maintained `urlhaus-filter` hosts mirror (no Auth-Key).
+- **Block known malware** feed: abuse.ch keyless URLhaus hostfile returns HTTP 410; switched to the maintained `urlhaus-filter` hosts mirror (no Auth-Key). Settings label: **URLhaus filter (malware)**.
 
 ## 0.4.2 - Quit unload, in-app Undo, quiet phrase (2026-11-15)
 
