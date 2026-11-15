@@ -302,6 +302,8 @@ export function Settings({
  // Proxyd restart (password possible) only for whole-PC computer mode — not session.
  // Live computer proxy (safe / agents). Session is separate below.
  const computerLive = snap.mode === "safe" || snap.mode === "agents";
+ const computerLiveNoun =
+  snap.mode === "agents" || intentAgents ? "Agents only" : "Protect";
  // available === false means store failed; omit field (older bridge) still counts as ready.
  const threatsReady = !!threats && threats.available !== false;
  const showTurnOnProtect =
@@ -958,7 +960,7 @@ export function Settings({
           </p>
  {!threatsReady && (
  <p className="warn-box" style={{ marginTop: "0.5rem" }}>
- Couldn’t load threat lists yet. Use Refresh now below — list choices stay hidden until that
+ Couldn’t load threat lists yet. Use Retry load below — list choices stay hidden until that
  works (not shown as all off).
  {snap?.threat_lists_warn
  ? " The top bar still shows they need attention."
@@ -1105,12 +1107,13 @@ export function Settings({
  disabled={threatBusy}
  onClick={() => {
  setThreatBusy(true);
- void api
-  .refreshThreatLists()
-  .then(async (t) => {
-   setThreats(t);
-   await reload();
-  })
+ const run = !threatsReady
+  ? reloadThreats()
+  : api.refreshThreatLists().then(async (t) => {
+     setThreats(t);
+     await reload();
+    });
+ void run
   .catch(async (err) => {
    fail(err);
    try {
@@ -1122,16 +1125,16 @@ export function Settings({
   .finally(() => setThreatBusy(false));
  }}
  >
- {threatBusy ? "Working..." : "Refresh now"}
+ {threatBusy ? "Working..." : !threatsReady ? "Retry load" : "Refresh now"}
  </button>
  </div>
  {!threatsReady ? (
  <p className="muted" style={{ marginTop: "0.5rem" }}>
  Couldn’t load threat lists. Protect still works for secrets.
  </p>
- ) : (threats!.feeds || []).length > 0 ? (
+ ) : ((threats && threats.feeds) || []).length > 0 ? (
  <ul style={{ marginTop: "0.75rem" }}>
- {threats.feeds.map((f) => (
+ {threats!.feeds.map((f) => (
  <li key={f.id} className="muted" style={{ marginBottom: "0.35rem" }}>
  <span className="mono">{f.label}</span>
  {": "}
@@ -1586,9 +1589,7 @@ export function Settings({
                         if (computerLive) {
                           setExtraConfirm({
                             title: `Undo timed allow for ${host}?`,
-                            body: `Removing this timed allow while ${
-                              snap.mode === "agents" ? "Agents only" : "Protect"
-                            } is on restarts protection (may ask for a password).`,
+                            body: `Removing this timed allow while ${computerLiveNoun} is on restarts protection (may ask for a password).`,
                             confirmLabel: "Undo and restart",
                             run: () => api.removeTimedAllow(host).then(() => reload()),
                           });
@@ -1699,8 +1700,13 @@ export function Settings({
  <p className="muted">
  {threats?.advanced_warning ||
  "Broader ad/tracker lists - not DenyOut's main job. Default off."}
+ {computerLive
+  ? ` Changing these while ${computerLiveNoun} is on restarts protection (may ask for a password).`
+  : ""}
  </p>
- {(threats?.advanced_feeds || []).length === 0 ? (
+ {!threatsReady ? (
+ <p className="muted">Unavailable until threat lists load.</p>
+ ) : (threats?.advanced_feeds || []).length === 0 ? (
  <p className="muted">Unavailable.</p>
  ) : (
  <ul style={{ listStyle: "none", padding: 0 }}>
@@ -1710,7 +1716,7 @@ export function Settings({
  <input
  type="checkbox"
  checked={!!f.enabled}
- disabled={threatBusy || !threats}
+ disabled={threatBusy || !threatsReady}
  onChange={(e) => {
  const on = e.target.checked;
  const feedID = f.id;
@@ -1730,10 +1736,22 @@ export function Settings({
  setExtraConfirm({
  title: `Enable ${f.label}?`,
  body:
- threats?.advanced_warning ||
- "Broader list may break sites. Continue?",
+ (threats?.advanced_warning ||
+ "Broader list may break sites. Continue?") +
+ (computerLive
+  ? ` While ${computerLiveNoun} is on this restarts protection (may ask for a password).`
+  : ""),
  danger: true,
  confirmLabel: "Enable",
+ run: apply,
+ });
+ return;
+ }
+ if (computerLive) {
+ setExtraConfirm({
+ title: `Disable ${f.label}?`,
+ body: `Turning this off while ${computerLiveNoun} is on restarts protection (may ask for a password).`,
+ confirmLabel: "Disable and restart",
  run: apply,
  });
  return;
