@@ -606,6 +606,10 @@ export function Settings({
  </p>
           {(snap.notify_snooze_active ||
             snap.system_banners === false ||
+            snap.silent_when_open === false ||
+            snap.respect_fullscreen === false ||
+            snap.quiet_overnight === false ||
+            snap.sound_only_answer === false ||
             snap.away ||
             (typeof snap.away_unread === "number" && snap.away_unread > 0) ||
             snap.away_digest?.pending) && (
@@ -626,6 +630,10 @@ export function Settings({
                   : ""}
                 {snap.respect_fullscreen === false
                   ? "Fullscreen respect off. "
+                  : ""}
+                {snap.quiet_overnight === false ? "Night quiet sound off. " : ""}
+                {snap.sound_only_answer === false
+                  ? "Sound may play for passive blocks. "
                   : ""}
                 {snap.away ? "Away right now. " : ""}
                 {typeof snap.away_unread === "number" && snap.away_unread > 0
