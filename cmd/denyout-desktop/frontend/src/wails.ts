@@ -123,6 +123,7 @@ export type ThreatFeedView = {
 };
 
 export type ThreatListsView = {
+ available?: boolean;
  poll_hours: number;
  block_phishing: boolean;
  block_malware: boolean;
