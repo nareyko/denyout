@@ -130,6 +130,7 @@ export function Settings({
  pauseCloseReq = 0,
  onClearFocus,
  onPauseOpenChange,
+ onOpenActivity,
 }: {
  snap?: UISnapshot | null;
  onChanged?: () => void;
@@ -141,6 +142,7 @@ export function Settings({
  pauseCloseReq?: number;
  onClearFocus?: () => void;
  onPauseOpenChange?: (open: boolean) => void;
+ onOpenActivity?: () => void;
 }) {
  const [snap, setSnap] = useState<UISnapshot | null>(snapProp ?? null);
  const [threats, setThreats] = useState<ThreatListsView | null>(null);
@@ -607,24 +609,57 @@ export function Settings({
             snap.away ||
             (typeof snap.away_unread === "number" && snap.away_unread > 0) ||
             snap.away_digest?.pending) && (
-            <p className="notice-box" style={{ marginBottom: "0.65rem" }}>
-              {snap.notify_snooze_active
-                ? `Snoozed${
-                    snap.notify_snooze_until
-                      ? ` until ${new Date(snap.notify_snooze_until).toLocaleString()}`
-                      : ""
-                  }. `
-                : ""}
-              {snap.system_banners === false
-                ? "System banners off (Protect failed can still show). "
-                : ""}
-              {snap.away ? "Away right now. " : ""}
-              {typeof snap.away_unread === "number" && snap.away_unread > 0
-                ? `${snap.away_unread} quiet while away (summary when you return). `
-                : ""}
-              {snap.away_digest?.pending ? "Return summary is ready. " : ""}
-              Protection stays on.
-            </p>
+            <div className="notice-box" style={{ marginBottom: "0.65rem" }}>
+              <p style={{ margin: 0 }}>
+                {snap.notify_snooze_active
+                  ? `Snoozed${
+                      snap.notify_snooze_until
+                        ? ` until ${new Date(snap.notify_snooze_until).toLocaleString()}`
+                        : ""
+                    }. `
+                  : ""}
+                {snap.system_banners === false
+                  ? "System banners off (Protect failed can still show). "
+                  : ""}
+                {snap.away ? "Away right now. " : ""}
+                {typeof snap.away_unread === "number" && snap.away_unread > 0
+                  ? `${snap.away_unread} quiet while away (summary when you return). `
+                  : ""}
+                {snap.away_digest?.pending ? "Return summary is ready. " : ""}
+                Protection stays on.
+              </p>
+              {snap.away_digest?.pending ? (
+                <div className="row-actions" style={{ marginTop: "0.5rem", gap: "0.4rem" }}>
+                  <button
+                    type="button"
+                    className="btn primary"
+                    onClick={() =>
+                      void api
+                        .dismissAwayDigest()
+                        .then(() => {
+                          onOpenActivity?.();
+                          return reload();
+                        })
+                        .catch((err) => fail(err))
+                    }
+                  >
+                    Review history
+                  </button>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() =>
+                      void api
+                        .dismissAwayDigest()
+                        .then(reload)
+                        .catch((err) => fail(err))
+                    }
+                  >
+                    Dismiss summary
+                  </button>
+                </div>
+              ) : null}
+            </div>
           )}
           <label>
             How chatty{" "}

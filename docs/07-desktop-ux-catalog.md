@@ -58,7 +58,7 @@ App name: **DenyOut**.
 
 | Label |
 | --- |
-| `Off` / `Protected` / `Agents only` / ... (disabled status line; may append `· N waiting` or `· snoozed`) |
+| `Off` / `Protected` / `Agents only` / ... (disabled status line; may append `· N quiet` or `· snoozed`) |
 | `Protect computer` or `Protect computer ✓` |
 | `My agents...` |
 | `Off` or `Off ✓` |

@@ -82,6 +82,16 @@ export default function App() {
  const deferYourSetupRef = useRef(false);
  deferYourSetupRef.current = deferYourSetup;
 
+ // Keep first-run Quiet / A bit more aligned with saved level when snapshot arrives.
+ useEffect(() => {
+ if (!snap || snap.setup_done) return;
+ if (snap.notify_level === "normal" || snap.notify_level === "detailed") {
+ setOnboardChatty("normal");
+ } else if (snap.notify_level === "quiet") {
+ setOnboardChatty("quiet");
+ }
+ }, [snap?.setup_done, snap?.notify_level]);
+
  async function refreshSnap() {
  try {
  const s = await api.snapshot();
@@ -1091,6 +1101,10 @@ export default function App() {
  }}
  onClearFocus={() => setSettingsFocus(undefined)}
  onChanged={() => void refreshSnap()}
+ onOpenActivity={() => {
+ setDeferOnboarding(true);
+ setRoute("activity");
+ }}
  />
  )}
  {route === "problems" && (

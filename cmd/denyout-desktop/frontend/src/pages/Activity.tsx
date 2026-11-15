@@ -240,8 +240,9 @@ export function Activity({
  <strong>Nothing blocked yet - that is OK.</strong>
  </p>
  <p>
- When DenyOut blocks something, you get an in-app Keep blocked / Allow this site prompt,
- and it shows up here.
+ Every block is recorded here. When you are at the computer, DenyOut asks Keep blocked /
+ Allow this site in the app. While you are away, it stays quiet and shows one summary when
+ you return.
  </p>
  <div className="row-actions">
  <button
