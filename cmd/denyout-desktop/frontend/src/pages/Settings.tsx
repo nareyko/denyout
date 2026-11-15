@@ -291,9 +291,17 @@ export function Settings({
  const dismissed = snap.dismissed_tips;
 
  function enableAgentsOnly() {
+ const running = snap?.agents_running || 0;
+ const wraps =
+  running > 0
+   ? `\n\nRunning My agents wraps will stop (${running}).`
+   : "\n\nAny running My agents wraps will stop.";
  setProtectConfirm({
  title: "Turn on Agents only for the whole computer?",
- body: "Messengers and many sites may stop working. Prefer My agents for AI tools.\n\nOnly continue if you understand the risk.",
+ body:
+  "Messengers and many sites may stop working. Prefer My agents for AI tools." +
+  wraps +
+  "\n\nOnly continue if you understand the risk.",
  action: "agents",
  });
  }
@@ -1918,11 +1926,48 @@ export function Settings({
  ) : null}
  </div>
  </>
+ ) : intentAgents ? (
+ <>
+ <p>
+ Last mode was Agents only (whole PC). Everyday browsing stays unprotected.
+ Turn it on again here — same as Home / Basic — without redoing the first-enable
+ warning. Running My agents wraps keep running on retry.
+ </p>
+ <div className="row-actions">
+ <button
+  className="btn primary"
+  onClick={() =>
+   setProtectConfirm({
+    title: "Turn on Agents only?",
+    body: agentsConfirmBody,
+    action: "retry",
+   })
+  }
+ >
+  Turn on Agents only
+ </button>
+ {canChangePause ? (
+  <button
+   className="btn"
+   disabled={pauseBlocked}
+   title={
+    pauseBlocked
+     ? "Finish the open Ask/block or tray pause first."
+     : undefined
+   }
+   onClick={() => setPauseOpen(true)}
+  >
+   Change pause…
+  </button>
+ ) : null}
+ </div>
+ </>
  ) : (
  <>
  <p>
  Almost nobody needs this. It puts the entire computer on an allowlist - messengers
- and many sites may stop working. Prefer My agents for AI tools.
+ and many sites may stop working. Prefer My agents for AI tools. Enabling stops
+ any running My agents wraps.
  </p>
  <button className="btn danger" onClick={enableAgentsOnly}>
  Enable Agents only (whole PC)...

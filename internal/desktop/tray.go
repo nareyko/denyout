@@ -75,7 +75,7 @@ func (a *App) runTray(ctx context.Context) error {
 	snooze1h := menu.Add("Snooze notifications 1 hour", func() {
 		go func() { _ = a.UISetNotifySnooze("1h") }()
 	})
-	snoozeTomorrow := menu.Add("Snooze until tomorrow", func() {
+	snoozeTomorrow := menu.Add("Snooze until tomorrow morning (8am)", func() {
 		go func() { _ = a.UISetNotifySnooze("tomorrow") }()
 	})
 	clearSnooze := menu.Add("Clear notification snooze", func() {
