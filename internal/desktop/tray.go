@@ -183,19 +183,32 @@ func (a *App) runTray(ctx context.Context) error {
 				computerItem.SetDisabled(mode == ModeComputer && profile == PolicyProfileBrowse)
 				// Needs attention is ModeOff with leave-on intent — Off must stay
 				// clickable so PauseModal can clear broken Protect (same as Home).
+				offNoun := "Protect"
+				switch {
+				case mode == ModeComputer && profile == PolicyProfileAgent:
+					offNoun = "Agents only"
+				case mode == ModeSession:
+					offNoun = "Session protection"
+				case agentsIntent && (paused || mode == ModeOff):
+					offNoun = "Agents only"
+				}
 				if paused {
-					offItem.SetLabel("Change pause…")
+					offItem.SetLabel("Change " + offNoun + " pause…")
 					offItem.SetDisabled(false)
 				} else if needsAttention && mode == ModeOff {
 					// Match Home/Jump: Clear intent only when Protect is not live.
-					offItem.SetLabel("Clear intent / turn off…")
+					if agentsIntent {
+						offItem.SetLabel("Clear Agents only intent…")
+					} else {
+						offItem.SetLabel("Clear Protect intent…")
+					}
 					offItem.SetDisabled(false)
 				} else if needsAttention || (mode == ModeOff && leaveOn) {
-					offItem.SetLabel("Pause / turn off…")
+					offItem.SetLabel("Pause / turn off " + offNoun + "…")
 					offItem.SetDisabled(false)
 				} else if mode != ModeOff {
-					// Match Home / Settings / Jump: live Protect → pause wording, not bare "Off".
-					offItem.SetLabel("Pause / turn off…")
+					// Match Home / Settings / Jump: live protector → pause wording, not bare "Off".
+					offItem.SetLabel("Pause / turn off " + offNoun + "…")
 					offItem.SetDisabled(false)
 				} else {
 					offItem.SetLabel(checkedLabel("Off", true))

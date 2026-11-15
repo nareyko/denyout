@@ -113,7 +113,9 @@ function findKeysMatch(keys: string[], findQ: string): boolean {
   if (!findQ) return true;
   return keys.some((k) => {
     const kk = k.toLowerCase();
-    if (kk.includes(findQ)) return true;
+    // Require length ≥ 3 so short queries like "ca" / "log" do not false-hit
+    // "notification" / "at login".
+    if (findQ.length >= 3 && kk.includes(findQ)) return true;
     return findQ.length >= 3 && findQ.includes(kk);
   });
 }
@@ -396,7 +398,13 @@ export function Settings({
           q.includes("resume") ||
           q.includes("system banner") ||
           q.includes("system banners") ||
-          (q.includes("banner") && !q.includes("notification"))
+          (q.includes("banner") && !q.includes("notification")) ||
+          q === "ca" ||
+          q.includes("certificate") ||
+          q === "log" ||
+          q.includes("logs") ||
+          q.includes("allowlist") ||
+          q.includes("diagn")
         ) {
           setTab("advanced");
         } else if (advHit && !basicHit) {
@@ -418,7 +426,12 @@ export function Settings({
             q.includes("account") ||
             q.includes("sign") ||
             q.includes("advanced") ||
-            q.includes("password")
+            q.includes("password") ||
+            q.includes("allowlist") ||
+            q.includes("certificate") ||
+            q === "ca" ||
+            q === "log" ||
+            q.includes("logs")
           ) {
             setTab("advanced");
           } else {
@@ -639,7 +652,7 @@ export function Settings({
                   ? "System banners off (Protect failed can still show). "
                   : ""}
                 {snap.silent_when_open === false
-                  ? "OS can speak while DenyOut is open. "
+                  ? "OS can speak while DenyOut is focused. "
                   : ""}
                 {snap.respect_fullscreen === false
                   ? "Fullscreen respect off. "
@@ -744,7 +757,7 @@ export function Settings({
           <p className="muted" style={{ marginTop: "0.25rem" }}>
             {snap.quiet_while_away === false
               ? "Off: Ask and block dialogs can appear while the screen is locked or idle."
-              : `When on: no Ask or block dialogs while locked or idle; soft OS banners stay off. Tray count grows. One summary when you return. ${protectionContinuityNow(snap)} Live Away / quiet count stay in the notice above when active.`}
+              : "When on: no Ask or block dialogs while locked or idle; soft OS banners stay off. Tray count grows. One summary when you return. Live Away / quiet count stay in the notice above when active."}
           </p>
           <div style={{ marginTop: "0.65rem" }}>
             <div style={{ fontWeight: 500, marginBottom: "0.35rem" }}>Snooze</div>
@@ -754,8 +767,8 @@ export function Settings({
                     snap.notify_snooze_until
                       ? ` until ${new Date(snap.notify_snooze_until).toLocaleString()}`
                       : ""
-                  }. Soft OS banners stay off until then. Clear below or see the notice at the top. ${protectionContinuityNow(snap)}`
-                : `Temporarily quiet OS banners without changing How chatty. ${protectionContinuityNow(snap)}`}
+                  }. Soft OS banners stay off until then. Clear below or see the notice at the top.`
+                : "Temporarily quiet OS banners without changing How chatty. Continuity (what stays on) is in the notice above when snooze or Away is active."}
             </p>
             <div className="row-actions" style={{ gap: "0.4rem", flexWrap: "wrap" }}>
               <button
@@ -1212,8 +1225,8 @@ export function Settings({
  <section className="card" id="settings-system-banners">
  <h2>System banners</h2>
  <p className="muted">
- How DenyOut may talk through the operating system. Decisions stay inside DenyOut;
- the system may only say Open DenyOut.
+ How DenyOut may talk through the operating system. Decisions stay inside DenyOut.
+ The OS may show Open DenyOut, Undo, status, or Protect failed.
  </p>
  <label style={{ display: "block" }}>
  <input
@@ -1284,14 +1297,18 @@ export function Settings({
  .catch((err) => fail(err))
  }
  />{" "}
- If DenyOut is open, stay silent in the system
+ If DenyOut is focused, stay silent in the system
  </label>
+ <p className="muted" style={{ marginTop: "0.25rem" }}>
+ Soft OS banners stay off while DenyOut is in front (focused and visible). An open
+ but background window does not count as focused.
+ </p>
  <p className="muted" style={{ marginTop: "0.65rem" }}>
  <strong style={{ fontWeight: 500, color: "inherit" }}>
  Decisions only inside DenyOut
  </strong>{" "}
- — always on. Allow / Keep / timed choices are in-app. The system may say Open
- DenyOut.
+ — always on. Allow / Keep / timed choices are in-app. The OS may still show Open /
+ Undo / status / Protect failed.
  </p>
  <p className="muted" style={{ marginTop: "0.35rem" }}>
  How long banners live: Protect failed stays · soft Open short (~12s) · status
@@ -1485,6 +1502,9 @@ export function Settings({
  <h2 id="settings-keeps">Sites I've allowed or silenced</h2>
  <p className="muted">
  Allowed sites skip blocks. Silenced entries stay quiet after you chose Keep blocked.
+ {computerLive
+  ? ` Adding or removing while ${computerLiveNoun} is on restarts protection (may ask for a password).`
+  : ""}
  </p>
  <div className="toolbar">
  <input
@@ -1494,15 +1514,25 @@ export function Settings({
  />
  <button
  className="btn"
-                  onClick={() =>
-                    void api
-                      .undoLastAlways()
-                      .then((m) => {
-                        note(m || "Undid last allow.");
-                        return reload();
-                      })
-                      .catch((e) => fail(e))
-                  }
+                  onClick={() => {
+                    const run = () =>
+                      api
+                        .undoLastAlways()
+                        .then((m) => {
+                          note(m || "Undid last allow.");
+                          return reload();
+                        });
+                    if (computerLive) {
+                      setExtraConfirm({
+                        title: "Undo last allow?",
+                        body: `Removing the last allow while ${computerLiveNoun} is on restarts protection (may ask for a password).`,
+                        confirmLabel: "Undo and restart",
+                        run,
+                      });
+                      return;
+                    }
+                    void run().catch((e) => fail(e));
+                  }}
                 >
                   Undo last allow
                 </button>
@@ -1518,9 +1548,19 @@ export function Settings({
  <span className="mono">{h}</span>
  <button
  className="btn danger"
- onClick={() =>
- void api.removeAlways(h).then(reload).catch((e) => fail(e))
- }
+ onClick={() => {
+  const run = () => api.removeAlways(h).then(reload);
+  if (computerLive) {
+   setExtraConfirm({
+    title: `Remove allow for ${h}?`,
+    body: `Removing this allow while ${computerLiveNoun} is on restarts protection (may ask for a password).`,
+    confirmLabel: "Remove and restart",
+    run,
+   });
+   return;
+  }
+  void run().catch((e) => fail(e));
+ }}
  >
  Remove
  </button>
@@ -1539,14 +1579,22 @@ export function Settings({
  e.preventDefault();
  const h = addAllowHost.trim().toLowerCase();
  if (!h) return;
- void api
- .alwaysAllow(h, "")
- .then(() => {
- setAddAllowHost("");
- note("Allowed " + h);
- return reload();
- })
- .catch((err) => fail(err));
+ const run = () =>
+  api.alwaysAllow(h, "").then(() => {
+   setAddAllowHost("");
+   note("Allowed " + h);
+   return reload();
+  });
+ if (computerLive) {
+  setExtraConfirm({
+   title: `Allow ${h}?`,
+   body: `Adding this allow while ${computerLiveNoun} is on restarts protection (may ask for a password).`,
+   confirmLabel: "Add and restart",
+   run,
+  });
+  return;
+ }
+ void run().catch((err) => fail(err));
  }}
  />
  <button
@@ -1555,14 +1603,22 @@ export function Settings({
  onClick={() => {
  const h = addAllowHost.trim().toLowerCase();
  if (!h) return;
- void api
- .alwaysAllow(h, "")
- .then(() => {
- setAddAllowHost("");
- note("Allowed " + h);
- return reload();
- })
- .catch((e) => fail(e));
+ const run = () =>
+  api.alwaysAllow(h, "").then(() => {
+   setAddAllowHost("");
+   note("Allowed " + h);
+   return reload();
+  });
+ if (computerLive) {
+  setExtraConfirm({
+   title: `Allow ${h}?`,
+   body: `Adding this allow while ${computerLiveNoun} is on restarts protection (may ask for a password).`,
+   confirmLabel: "Add and restart",
+   run,
+  });
+  return;
+ }
+ void run().catch((e) => fail(e));
  }}
  >
  Add
