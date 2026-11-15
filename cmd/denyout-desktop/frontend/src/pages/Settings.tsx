@@ -1497,7 +1497,18 @@ export function Settings({
  onChange={(e) => setAddAllowHost(e.target.value)}
  style={{ flex: 1 }}
  onKeyDown={(e) => {
- if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+ if (e.key !== "Enter") return;
+ e.preventDefault();
+ const h = addAllowHost.trim().toLowerCase();
+ if (!h) return;
+ void api
+ .alwaysAllow(h, "")
+ .then(() => {
+ setAddAllowHost("");
+ note("Allowed " + h);
+ return reload();
+ })
+ .catch((err) => fail(err));
  }}
  />
  <button
@@ -1811,7 +1822,12 @@ export function Settings({
             <div className="row-actions">
               <button
                 className="btn"
-                disabled={!!snap.ask_paused}
+                disabled={
+                  !!snap.ask_paused ||
+                  (snap.mode !== "agents" &&
+                    !intentAgents &&
+                    (snap.agents_running || 0) === 0)
+                }
                 onClick={() =>
                   void api
                     .pauseAsks()
