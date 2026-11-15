@@ -113,12 +113,12 @@ function findKeysMatch(keys: string[], findQ: string): boolean {
     const kk = k.toLowerCase();
     // Exact key always matches (short keys like "log").
     if (kk === findQ) return true;
-    // Substring into multi-word keys only for queries length ≥ 3, and only as
-    // whole-token / prefix so "log" does not hit "at login".
-    if (findQ.length < 3) return false;
+    // Multi-word keys: whole-token equality only ("log" must not hit "at login").
     if (kk.includes(" ")) {
-      return kk.split(/\s+/).some((tok) => tok === findQ || tok.startsWith(findQ));
+      return kk.split(/\s+/).some((tok) => tok === findQ);
     }
+    // Single-word keys: substring only for queries length ≥ 3.
+    if (findQ.length < 3) return false;
     if (kk.includes(findQ)) return true;
     return findQ.includes(kk);
   });

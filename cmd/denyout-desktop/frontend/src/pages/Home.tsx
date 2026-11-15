@@ -230,6 +230,11 @@ export function Home({
           <button
             className="btn danger"
             disabled={busy || pauseBlocked}
+            title={
+              pauseBlocked
+                ? "Finish the open Ask/block or tray pause first."
+                : undefined
+            }
             onClick={() => setPauseOpen(true)}
           >
             {brokenIntent ? "Clear intent / turn off…" : "Pause / turn off…"}
@@ -248,6 +253,11 @@ export function Home({
             <button
               className="btn danger"
               disabled={busy || pauseBlocked}
+              title={
+                pauseBlocked
+                  ? "Finish the open Ask/block or tray pause first."
+                  : undefined
+              }
               onClick={() => setPauseOpen(true)}
             >
               Pause / turn off…
@@ -256,6 +266,11 @@ export function Home({
             <button
               className="btn"
               disabled={busy || pauseBlocked}
+              title={
+                pauseBlocked
+                  ? "Finish the open Ask/block or tray pause first."
+                  : undefined
+              }
               onClick={() => setPauseOpen(true)}
             >
               Change pause…
@@ -266,12 +281,22 @@ export function Home({
         <button
           className="btn danger"
           disabled={busy || pauseBlocked}
+          title={
+            pauseBlocked
+              ? "Finish the open Ask/block or tray pause first."
+              : undefined
+          }
           onClick={() => setPauseOpen(true)}
         >
           Pause / turn off…
         </button>
       )}
  </div>
+ {pauseBlocked ? (
+  <p className="muted" style={{ marginTop: "0.35rem" }}>
+   Pause is busy — finish the open Ask/block or tray pause first.
+  </p>
+ ) : null}
  {err ? (
  <p className="warn-box" style={{ marginTop: "0.65rem" }}>
  {err}
