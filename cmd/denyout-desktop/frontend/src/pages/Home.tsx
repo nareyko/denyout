@@ -336,7 +336,7 @@ export function Home({
  </button>
  )}
  <button className="btn" onClick={() => onSeeHistory?.()}>
- See history
+ See History
  </button>
  </div>
  </section>
@@ -345,7 +345,7 @@ export function Home({
  <h2>Blocked today: {blockedToday}</h2>
  <p className="muted">Open History to review what was blocked.</p>
  <button className="btn" onClick={() => onSeeHistory?.()}>
- See history
+ See History
  </button>
  </section>
  ) : (
@@ -357,7 +357,7 @@ export function Home({
  : "Turn on Protect computer (or run My agents) to start recording blocks here. Everyday browsing stays unprotected until then."}
  </p>
  <button className="btn" onClick={() => onSeeHistory?.()}>
- See history
+ See History
  </button>
  </section>
  )}

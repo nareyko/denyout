@@ -288,7 +288,7 @@ export function Profiles({
  <th>Name</th>
  <th>Command</th>
  <th>Ask</th>
- <th>Dialogs</th>
+ <th>Ask / block</th>
  <th>Learning</th>
  <th>Status</th>
  <th />
