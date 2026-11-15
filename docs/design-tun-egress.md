@@ -88,6 +88,8 @@ Opening a real TUN requires an explicit `DENYOUT_TUN_E2E=1` test tag and root â€
 
 Release verify without dogfood: `scripts/closed-loop-release-smoke.sh /path/to/extracted/release` (or no arg to build local CLI).
 
+VM gate (still no device on CI/laptop): `scripts/closed-loop-tun-preflight.sh` + [tun-vm-dogfood.md](tun-vm-dogfood.md).
+
 ## 8. Decision lock (pending owner)
 
 - Default Protect stays **nft redirect + QUIC drop** until T1 VM dogfood passes.

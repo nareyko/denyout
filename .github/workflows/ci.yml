@@ -42,6 +42,11 @@ jobs:
           set -euo pipefail
           chmod +x scripts/closed-loop-release-smoke.sh
           DENYOUT_BIN=./bin/denyout-cli ./scripts/closed-loop-release-smoke.sh
+      - name: Closed-loop TUN VM preflight (no device)
+        run: |
+          set -euo pipefail
+          chmod +x scripts/closed-loop-tun-preflight.sh
+          DENYOUT_BIN=./bin/denyout-cli ./scripts/closed-loop-tun-preflight.sh
       - name: govulncheck
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
