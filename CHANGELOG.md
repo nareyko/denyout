@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## 0.4.0 - Quiet while away + honest desktop (2026-11-15)
+
+### Added
+
+- **Stay quiet while away** (default on): while the screen is locked or idle, DenyOut keeps protecting but does not spam OS notifications; the tray shows a quiet count.
+- **While you were away** return summary in DenyOut (one in-app card, not a lock-screen wall). Soft “Open DenyOut” nudge only when Quiet/Normal allows and the app is closed.
+- Settings knobs for quiet-while-away, return digest, snooze, night quiet, sound-only-when-answer, silent-when-focused, respect fullscreen.
+
+### Changed
+
+- Screens and tray name **Protect / Agents only / Session** consistently (pause, quit, Jump, Off copy, History empty states).
+- History and Settings honesty: Needs attention, filter empty vs truly empty, threat lists hidden until loaded (Retry load), Allowed-site changes confirm restart when proxy is live.
+- Pause-blocked buttons explain why (Ask/block or tray pause open). Find no longer confuses `log` with Autostart.
+
 ## 0.3.0 - Uninstall + install/quit hygiene (2026-11-14)
 
 ### Added
