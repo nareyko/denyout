@@ -35,6 +35,9 @@ var iconIdlePNG []byte
 //go:embed icon-alert.png
 var iconAlertPNG []byte
 
+//go:embed icon-quiet.png
+var iconQuietPNG []byte
+
 // Keep default icon referenced for older tray paths / tests.
 var _ = iconPNG
 
@@ -77,6 +80,7 @@ type App struct {
 	lastAutostartCheck time.Time          // throttle login-entry repair while UI polls
 	legacySessionNote  string             // one-shot Home notice after clearing ScopeSession on restore
 	presence           presence           // Away / idle / lock (notify-presence wave)
+	undoOffer          *undoOffer         // in-app Undo (Pass 29; no OS Undo button)
 }
 
 func applyNotifyPrefs(st State) {
@@ -221,9 +225,12 @@ func (a *App) UIReadyRestore() {
 	})
 }
 
-// UIQuitNeedsChoice reports whether Quit should ask keep-vs-off.
-// True for live proxyd/session, or broken leave-on (explicit Off vs Cancel).
+// UIQuitNeedsChoice reports whether Quit should confirm unload (Cancel keeps DenyOut running).
+// True for live proxyd/session, running My agents wraps, or broken leave-on.
 func (a *App) UIQuitNeedsChoice() bool {
+	if a.runningWrapCount() > 0 {
+		return true
+	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if a.proxyd != nil || a.session != nil {
@@ -232,28 +239,15 @@ func (a *App) UIQuitNeedsChoice() bool {
 	return problemsUnhealthyLocked(a)
 }
 
-// UIQuit finishes the tray Quit flow. choice: "off" | "keep".
+// UIQuit finishes the tray Quit flow. choice is ignored except for logging;
+// Quit always fully unloads (no leave-on / keep protection).
 func (a *App) UIQuit(choice string) error {
-	choice = strings.TrimSpace(strings.ToLower(choice))
+	_ = strings.TrimSpace(strings.ToLower(choice))
+	notify.CloseAll()
 	a.mu.Lock()
-	hasProxyd := a.proxyd != nil
-	hasSession := a.session != nil
-	live := hasProxyd || hasSession
+	live := a.proxyd != nil || a.session != nil
 	a.mu.Unlock()
-	if choice == "keep" {
-		// Session lives in-process — Exit always tears it down. Refuse a false promise.
-		if hasSession && !hasProxyd {
-			return fmt.Errorf("Session protection cannot stay on after Quit. Choose Turn off and quit, or Cancel.")
-		}
-		if hasProxyd {
-			a.quitLeaveProtectionOn()
-		}
-		// Unhealthy leave-on with no live proxyd: Keep leaves intent for next restore.
-		a.stopAllWrapsOpts("Quit", true)
-		a.stopProtect()
-		return nil
-	}
-	// Default / "off": unload protection then quit.
+	// Always unload: never leave proxyd/intent running after Quit.
 	if live {
 		if err := a.quitUnload(); err != nil {
 			return err

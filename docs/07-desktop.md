@@ -74,7 +74,7 @@ denyout uninstall --keep-config   # leave ~/.config/denyout and related state
 | Leaves CA + nft/pf for one Apply | Removes system CA + NSS + dangling `/etc/ssl/certs/denyout-desktop.pem` |
 | Warns about other PATH copies | Deletes only `DENYOUT_INSTALL_DIR` bins; warns on other PATH hits |
 
-Tray **Quit** unloads protection for this session. It does **not** delete binaries or config - use `uninstall` for that.
+Tray **Quit** unloads protection for this session and dismisses DenyOut OS banners. It does **not** delete binaries or config - use `uninstall` for that. Cancelled admin password keeps the tray running.
 
 macOS/Windows CA untrust follows the reverse of install (Keychain / certutil) and is best-effort until field-verified.
 

@@ -24,21 +24,20 @@ export default function App() {
  const [onboardMsg, setOnboardMsg] = useState("");
  /** false = success/notice (notice-box); true = failure (warn-box). */
  const [onboardMsgWarn, setOnboardMsgWarn] = useState(false);
- /** First-run chatty choice on the same mode screen (Quiet recommended). */
- const [onboardChatty, setOnboardChatty] = useState<"quiet" | "normal">("quiet");
+ /** First-run chatty choice. "keep" = Detailed already on, no Quiet/A bit more pick yet. */
+ const [onboardChatty, setOnboardChatty] = useState<"quiet" | "normal" | "keep">("quiet");
+ /** True after user clicks Quiet / A bit more (avoids Quiet flash while Detailed is active). */
+ const [chattyTouched, setChattyTouched] = useState(false);
  function setOnboardToast(msg: string, warn = true) {
  setOnboardMsg(msg);
  setOnboardMsgWarn(!!msg && warn);
  }
+ const shownOnboardChatty: "quiet" | "normal" | "keep" =
+  !chattyTouched && snap?.notify_level === "detailed" ? "keep" : onboardChatty;
  async function applyOnboardChatty() {
- // Do not silently downgrade an existing Detailed preference.
- try {
-  const s = snap ?? (await api.snapshot());
-  if ((s?.notify_level || "") === "detailed") return;
- } catch {
-  /* preview / first paint */
- }
- await api.setNotifyLevel(onboardChatty);
+ // Preserve Detailed only until the user explicitly picks Quiet or A bit more.
+ if (shownOnboardChatty === "keep") return;
+ await api.setNotifyLevel(shownOnboardChatty);
  }
  const [openNewProfile, setOpenNewProfile] = useState(false);
  /** Keep Profiles mounted after first visit so New/Edit drafts survive nav. */
@@ -90,11 +89,13 @@ export default function App() {
  deferYourSetupRef.current = deferYourSetup;
 
  // Keep first-run Quiet / A bit more aligned with saved level when snapshot arrives.
- // Detailed is Advanced-only — do not map it to "A bit more" in the chooser.
+ // Detailed is Advanced-only — neither button selected until user picks Quiet / A bit more.
  useEffect(() => {
  if (!snap || snap.setup_done) return;
  if (snap.notify_level === "normal") {
  setOnboardChatty("normal");
+ } else if (snap.notify_level === "detailed") {
+ setOnboardChatty("keep");
  } else if (snap.notify_level === "quiet") {
  setOnboardChatty("quiet");
  }
@@ -454,15 +455,20 @@ export default function App() {
  const d = new Date(t);
  const now = new Date();
  const sameDay = d.toDateString() === now.toDateString();
- // Match Home: include day when pause crosses midnight ("Until tomorrow").
+ // Match tray 15:04 / Home: include day when pause crosses midnight.
  if (sameDay) {
- return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+ return d.toLocaleTimeString(undefined, {
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+ });
  }
  return d.toLocaleString(undefined, {
  month: "short",
  day: "numeric",
  hour: "2-digit",
  minute: "2-digit",
+ hour12: false,
  });
  })();
  const foreverOff =
@@ -512,22 +518,34 @@ export default function App() {
  const unreadAway = snap?.away_unread && snap.away_unread > 0 ? snap.away_unread : 0;
  const unreadSuffix =
  unreadAway === 1 ? " · 1 quiet" : unreadAway > 1 ? ` · ${unreadAway} quiet` : "";
- const snoozeSuffix = snap?.notify_snooze_active ? " · snoozed" : "";
+ // Pass 30: shared phrase with tray (Quiet · away · fullscreen · snoozed until …).
+ const quietReason = (snap?.quiet_reason || "").trim();
+ const quietReasonSuffix = quietReason ? ` · ${quietReason}` : "";
+ const snoozeSuffix =
+  !quietReason && snap?.notify_snooze_active ? " · snoozed" : "";
  const statusTextBase =
  snap?.threat_lists_warn && !snap?.problems_alert
  ? modeStatusText
  ? `${modeStatusText} · Threat lists need a refresh`
  : "Threat lists need a refresh"
  : modeStatusText;
+ // Match pill + tray: Needs attention drops quiet extras.
+ const statusExtras = snap?.problems_alert
+  ? ""
+  : `${quietReasonSuffix || snoozeSuffix}${unreadSuffix}`;
  const statusText = statusTextBase
- ? `${statusTextBase}${snoozeSuffix}${unreadSuffix}`
- : unreadAway
-   ? unreadAway === 1
-     ? `1 quiet${snoozeSuffix}`
-     : `${unreadAway} quiet${snoozeSuffix}`
-   : snoozeSuffix
-     ? "Snoozed"
-     : "";
+ ? `${statusTextBase}${statusExtras}`
+ : snap?.problems_alert
+   ? ""
+   : quietReason
+     ? `${quietReason}${unreadSuffix}`
+     : unreadAway
+       ? unreadAway === 1
+         ? `1 quiet${snoozeSuffix}`
+         : `${unreadAway} quiet${snoozeSuffix}`
+       : snoozeSuffix
+         ? "Snoozed"
+         : "";
  const pillLabelBase = !snap
  ? "Setup pending"
  : snap.problems_alert
@@ -555,7 +573,7 @@ export default function App() {
                : agentsOnlyOff
                  ? "Off · agents running"
                  : snap.mode_label || "Off";
- const pillLabel = `${pillLabelBase}${snap?.problems_alert ? "" : `${snoozeSuffix}${unreadSuffix}`}`;
+ const pillLabel = `${pillLabelBase}${snap?.problems_alert ? "" : `${quietReasonSuffix || snoozeSuffix}${unreadSuffix}`}`;
 
  type JumpItem = {
  label: string;
@@ -605,16 +623,30 @@ export default function App() {
  {
  label: "Notifications",
  route: "settings",
- hint: "Quiet, snooze, timeouts",
+ hint: "Quiet, Stay quiet, snooze, sound, overnight, timeouts",
  settingsTab: "basic",
  focus: "notifications",
  },
  {
  label: "System banners",
  route: "settings",
- hint: "Advanced OS banners & Detailed",
+ hint: "OS banners, Detailed, fullscreen",
  settingsTab: "advanced",
  focus: "system-banners",
+ },
+ {
+ label: "Respect fullscreen",
+ route: "settings",
+ hint: "Fullscreen / games quiet",
+ settingsTab: "advanced",
+ focus: "system-banners",
+ },
+ {
+ label: "Stay quiet while away",
+ route: "settings",
+ hint: "Locked or idle quiet",
+ settingsTab: "basic",
+ focus: "notifications",
  },
  {
  label: "Autostart",
@@ -1080,6 +1112,13 @@ export default function App() {
  setSettingsFocusNonce((n) => n + 1);
  setRoute("settings");
  }}
+ onOpenSystemBanners={() => {
+ setDeferOnboarding(true);
+ setSettingsTab("advanced");
+ setSettingsFocus("system-banners");
+ setSettingsFocusNonce((n) => n + 1);
+ setRoute("settings");
+ }}
  onOpenAgents={() => {
  setDeferOnboarding(true);
  setRoute("profiles");
@@ -1186,7 +1225,9 @@ export default function App() {
          ? "Session protection stayed on."
          : (snap?.agents_running || 0) > 0
            ? "My agents kept running."
-           : "Away did not turn protection off by itself."
+           : snap?.mode === "off" || !snap?.protection_on
+             ? "Protection was already off."
+             : "Quiet time did not turn protection off by itself."
    }
    onReview={() => {
     void dismissAwayDigest().then(() => {
@@ -1251,15 +1292,17 @@ export default function App() {
  <div className="modal" onClick={(e) => e.stopPropagation()}>
       <h2>Quit DenyOut?</h2>
       <p className="muted">
-        {snap?.mode === "session"
-          ? "Session protection runs inside DenyOut and always stops when you quit. My agents wraps stop too."
-          : snap?.mode === "agents"
-            ? "Agents only can stay on after Quit (everyday browsing stays unprotected), or turn off first. My agents wraps always stop when you quit."
-            : snap?.problems_alert && (snap?.mode === "off" || !snap?.mode)
-              ? (snap?.policy_profile || "").toLowerCase() === "agent"
-                ? "Agents only is not running. Clear restore intent and quit, quit but keep intent for next launch, or Cancel."
-                : "Protect is not running. Clear restore intent and quit, quit but keep intent for next launch, or Cancel."
-              : "Whole-PC Protect (computer proxy) can stay on after Quit, or turn off first. Session and My agents wraps always stop when you quit."}
+        {snap?.problems_alert && (snap?.mode === "off" || !snap?.mode)
+          ? (snap?.policy_profile || "").toLowerCase() === "agent"
+            ? "Agents only is not running. Quit clears restore intent so the next launch does not try to bring it back. Cancel keeps DenyOut open."
+            : "Protect is not running. Quit clears restore intent so the next launch does not try to bring it back. Cancel keeps DenyOut open."
+          : (snap?.mode === "off" || !snap?.mode) && (snap?.agents_running || 0) > 0
+            ? "Quit stops My agents wraps. Cancel keeps DenyOut running."
+            : snap?.mode === "session"
+              ? "Quit turns off Session protection and stops My agents wraps. Cancel keeps DenyOut running."
+              : snap?.mode === "agents"
+                ? "Quit turns off Agents only and stops My agents wraps. Everyday browsing was already unprotected. Cancel keeps DenyOut running."
+                : "Quit turns off protection and stops My agents wraps. Cancel keeps DenyOut running."}
       </p>
  {quitMsg ? <p className="warn-box">{quitMsg}</p> : null}
  <div className="stack" style={{ gap: "0.5rem", marginTop: "0.85rem" }}>
@@ -1289,39 +1332,15 @@ export default function App() {
  <strong>
  {snap?.problems_alert && (snap?.mode === "off" || !snap?.mode)
  ? "Clear intent and quit"
- : snap?.mode === "agents"
-   ? "Turn off Agents only and quit"
-   : snap?.mode === "session"
-     ? "Turn off Session protection and quit"
-     : "Turn off protection and quit"}
+ : (snap?.mode === "off" || !snap?.mode) && (snap?.agents_running || 0) > 0
+   ? "Stop agents and quit"
+   : snap?.mode === "agents"
+     ? "Turn off Agents only and quit"
+     : snap?.mode === "session"
+       ? "Turn off Session protection and quit"
+       : "Turn off protection and quit"}
  </strong>
  </button>
- {snap?.mode !== "session" ? (
- <button
- type="button"
- className="btn"
- disabled={quitBusy}
- style={{ width: "100%", textAlign: "left" }}
- onClick={() => {
- setQuitBusy(true);
- setQuitMsg("");
- void api
- .quit("keep")
- .catch((e) => {
- setQuitMsg(String(e) || "Could not quit.");
- setQuitBusy(false);
- });
- }}
- >
- <strong>
- {snap?.problems_alert && (snap?.mode === "off" || !snap?.mode)
- ? "Quit and keep restore intent"
- : snap?.mode === "agents"
-   ? "Keep Agents only on and quit"
-   : "Keep protection on and quit"}
- </strong>
- </button>
- ) : null}
  <button
  type="button"
  className="btn"
@@ -1339,8 +1358,57 @@ export default function App() {
  </div>
  ) : null}
 
+ {/* Pass 29: in-app Undo only (no OS Undo button). Below Decision (z=60). */}
+ {!decision && snap?.undo_offer?.body ? (
+ <div
+ className="notice-box"
+ style={{
+ position: "fixed",
+ bottom: "1rem",
+ left: "1rem",
+ right: "1rem",
+ zIndex: 52,
+ display: "flex",
+ flexWrap: "wrap",
+ gap: "0.5rem",
+ alignItems: "center",
+ }}
+ role="status"
+ >
+ <span style={{ flex: "1 1 12rem", whiteSpace: "pre-line" }}>
+ {snap.undo_offer.body}
+ </span>
+ <button
+ type="button"
+ className="btn primary"
+ disabled={quitBusy}
+ onClick={() => {
+ void api
+ .takeUndoOffer()
+ .then(() => refreshSnap())
+ .catch((e) => setOnboardToast(String(e) || "Could not undo."));
+ }}
+ >
+ Undo
+ </button>
+ <button
+ type="button"
+ className="btn subtle"
+ onClick={() => {
+ void api
+ .dismissUndoOffer()
+ .then(() => refreshSnap())
+ .catch(() => undefined);
+ }}
+ >
+ Dismiss
+ </button>
+ </div>
+ ) : null}
+
  {/* Never cover Ask/block (Decision z=60) — toast only when Decision is closed. */}
  {(!decision &&
+ !snap?.undo_offer?.body &&
  (trayPauseMsg ||
  (onboardMsg &&
  !showOnboarding &&
@@ -1446,26 +1514,32 @@ export default function App() {
               <div className="row-actions" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
                 <button
                   type="button"
-                  className={onboardChatty === "quiet" ? "btn primary" : "btn"}
+                  className={shownOnboardChatty === "quiet" ? "btn primary" : "btn"}
                   disabled={onboardBusy}
-                  onClick={() => setOnboardChatty("quiet")}
+                  onClick={() => {
+                    setChattyTouched(true);
+                    setOnboardChatty("quiet");
+                  }}
                 >
                   Quiet (recommended)
                 </button>
                 <button
                   type="button"
-                  className={onboardChatty === "normal" ? "btn primary" : "btn"}
+                  className={shownOnboardChatty === "normal" ? "btn primary" : "btn"}
                   disabled={onboardBusy}
-                  onClick={() => setOnboardChatty("normal")}
+                  onClick={() => {
+                    setChattyTouched(true);
+                    setOnboardChatty("normal");
+                  }}
                 >
                   A bit more
                 </button>
               </div>
               {snap?.notify_level === "detailed" ? (
                 <p className="muted" style={{ marginTop: "0.45rem", fontSize: "0.9em" }}>
-                  Detailed is already on (more status banners). Quiet / A bit more apply only if
-                  you pick one above; otherwise Detailed stays. Change Detailed later under
-                  Settings → Advanced → System banners.
+                  Detailed is already on (adds the auto-resume OS banner for Protect or Agents
+                  only vs A bit more). Quiet / A bit more apply only if you pick one above;
+                  otherwise Detailed stays. Change under Settings → Advanced → System banners.
                 </p>
               ) : null}
             </div>
@@ -1647,8 +1721,12 @@ export default function App() {
  <p>
  - When something is blocked while you are here: Keep blocked or Allow this site in
  DenyOut.
- <br />- While you are away, DenyOut stays quiet and shows one summary when you
- return. Everything is in History.
+ <br />
+ {snap.quiet_while_away === false
+  ? "- Stay quiet while away is off — Ask/block dialogs can still appear while locked or idle (about 5 minutes). Soft OS banners still follow How chatty / System banners (Quiet keeps them off except Protect failed and the tray-hidden hint). Everything is in History."
+  : "- Stay quiet while away is on: Ask and block dialogs stay off while locked or idle (about 5 minutes); soft OS banners stay off while away (Protect failed and tray-hidden on window close can still show). One summary when you return. Everything is in History."}
+
+ <br />- Respect fullscreen (Settings → Advanced) separately avoids Ask/block dialogs and soft OS banners while a fullscreen app is in front (Protect failed and tray-hidden on window close can still show).
  <br />- Open Home to see if you are protected. If Protect failed, open Problems.
  </p>
  </>

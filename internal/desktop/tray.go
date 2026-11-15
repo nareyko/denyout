@@ -10,6 +10,7 @@ import (
 	"github.com/gogpu/systray"
 
 	"github.com/nareyko/denyout/internal/hostguard"
+	"github.com/nareyko/denyout/internal/notify"
 )
 
 func (a *App) trayEnableProtectComputer() {
@@ -75,7 +76,7 @@ func (a *App) runTray(ctx context.Context) error {
 	snooze1h := menu.Add("Snooze notifications 1 hour", func() {
 		go func() { _ = a.UISetNotifySnooze("1h") }()
 	})
-	snoozeTomorrow := menu.Add("Snooze until tomorrow morning (8am)", func() {
+	snoozeTomorrow := menu.Add("Snooze until 8:00 tomorrow", func() {
 		go func() { _ = a.UISetNotifySnooze("tomorrow") }()
 	})
 	clearSnooze := menu.Add("Clear notification snooze", func() {
@@ -93,15 +94,8 @@ func (a *App) runTray(ctx context.Context) error {
 		if choice == "" {
 			return // cancel
 		}
-		if choice == "keep" {
-			a.quitLeaveProtectionOn()
-			a.stopAllWrapsOpts("Quit", true)
-			a.stopProtect()
-			tray.Remove()
-			os.Exit(0)
-			return
-		}
-		// Turn off protection and quit (password OK if needed).
+		notify.CloseAll()
+		// Quit always fully unloads (password OK if needed).
 		if err := a.quitUnload(); err != nil {
 			fmt.Fprintf(os.Stderr, "denyout desktop: quit cancelled or failed: %v\n", err)
 			return
@@ -157,11 +151,11 @@ func (a *App) runTray(ctx context.Context) error {
 					label = pausePrefix + "Paused"
 					if t, err := time.Parse(time.RFC3339, pauseUntil); err == nil {
 						local := t.Local()
-						// Prefer 12h clock to match typical chrome toLocaleTimeString.
+						// 24h local clock — matches chrome formatPauseUntil (hour12: false).
 						if local.Format("2006-01-02") == time.Now().Local().Format("2006-01-02") {
-							label = pausePrefix + "paused until " + local.Format("3:04 PM")
+							label = pausePrefix + "paused until " + local.Format("15:04")
 						} else {
-							label = pausePrefix + "paused until " + local.Format("Jan 2, 3:04 PM")
+							label = pausePrefix + "paused until " + local.Format("Jan 2, 15:04")
 						}
 					}
 				} else if mode == ModeOff && pauseLast == "forever" {
@@ -216,31 +210,48 @@ func (a *App) runTray(ctx context.Context) error {
 				}
 
 				tooltip := "DenyOut - " + label
-				if snoozeUntil != "" {
-					tooltip += " · snoozed"
-					if !needsAttention && unread == 0 {
-						statusItem.SetLabel(label + " · snoozed")
+				statusExtra := ""
+				quietPhrase := a.quietReason()
+				// Mirror chrome: Needs attention pill drops snooze/quiet extras.
+				if !needsAttention {
+					if quietPhrase != "" {
+						tooltip += " · " + quietPhrase
+						statusExtra += " · " + quietPhrase
+					} else if snoozeUntil != "" {
+						// Fallback if phrase empty but snooze set (should not happen).
+						tooltip += " · snoozed"
+						statusExtra += " · snoozed"
 					}
-				}
-				if unread > 0 {
-					if unread == 1 {
-						tooltip += " · 1 quiet"
-						if !needsAttention {
-							statusItem.SetLabel(label + " · 1 quiet")
+					if unread > 0 {
+						if unread == 1 {
+							tooltip += " · 1 quiet"
+							statusExtra += " · 1 quiet"
+						} else {
+							tooltip += fmt.Sprintf(" · %d quiet", unread)
+							statusExtra += fmt.Sprintf(" · %d quiet", unread)
 						}
-					} else {
-						tooltip += fmt.Sprintf(" · %d quiet", unread)
-						if !needsAttention {
-							statusItem.SetLabel(fmt.Sprintf("%s · %d quiet", label, unread))
-						}
+					}
+					if a.undoOfferActive() {
+						tooltip += " · Undo available — open DenyOut"
+						statusExtra += " · Undo"
+					}
+					if statusExtra != "" {
+						statusItem.SetLabel(label + statusExtra)
 					}
 				}
 				tray.SetTooltip(tooltip)
 
 				wrapsRunning := a.runningWrapCount() > 0
+				quieting := quietPhrase != ""
 				switch {
 				case needsAttention, strings.Contains(strings.ToLower(st), "error"), strings.Contains(st, "Needs"):
 					tray.SetIcon(iconAlertPNG)
+				case quieting:
+					// Slate-blue quiet icon — distinct from On (cream), Idle (white), Alert (brown).
+					tray.SetIcon(iconQuietPNG)
+					if threatWarn {
+						tray.SetTooltip(tooltip + " · Threat lists need a refresh")
+					}
 				case mode != ModeOff:
 					// Threat-list warn keeps the on icon (chrome: mode pill + warn chip).
 					tray.SetIcon(iconOnPNG)
@@ -254,21 +265,25 @@ func (a *App) runTray(ctx context.Context) error {
 					// Protect computer is Off — don't imply whole-PC Protect with the on icon.
 					tray.SetIcon(iconIdlePNG)
 					if !paused && !needsAttention && !threatWarn {
+						snoozeBit := ""
+						if snoozeUntil != "" {
+							snoozeBit = " · snoozed"
+						}
+						quietBit := ""
+						if unread == 1 {
+							quietBit = " · 1 quiet"
+						} else if unread > 1 {
+							quietBit = fmt.Sprintf(" · %d quiet", unread)
+						}
 						if mode == ModeOff && !avail {
-							// Match chrome: unavailable wins, agents still visible.
-							statusItem.SetLabel("Off (unavailable) · agents running")
-							tip := "DenyOut - Off (unavailable) · agents running"
-							if unread > 0 {
-								tip += fmt.Sprintf(" · %d quiet", unread)
-							}
-							tray.SetTooltip(tip)
+							// Match chrome: unavailable wins, agents still visible; keep snooze+quiet.
+							base := "Off (unavailable) · agents running"
+							statusItem.SetLabel(base + snoozeBit + quietBit)
+							tray.SetTooltip("DenyOut - " + base + snoozeBit + quietBit)
 						} else if mode == ModeOff && pauseUntil == "" && pauseLast != "forever" {
-							tip := "DenyOut - Off · agents running"
-							if unread > 0 {
-								tip += fmt.Sprintf(" · %d quiet", unread)
-							}
-							tray.SetTooltip(tip)
-							statusItem.SetLabel("Off · agents running")
+							base := "Off · agents running"
+							statusItem.SetLabel(base + snoozeBit + quietBit)
+							tray.SetTooltip("DenyOut - " + base + snoozeBit + quietBit)
 						}
 					}
 				default:

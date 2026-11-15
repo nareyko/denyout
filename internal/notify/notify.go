@@ -1,6 +1,7 @@
 package notify
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -13,19 +14,19 @@ import (
 )
 
 var (
-	mu               sync.Mutex
-	enabled          = true
-	level            = "quiet" // quiet | normal | detailed — new installs default Quiet
-	uiFocused        bool      // main window focused/visible
-	away             bool      // screen locked / idle
-	snoozeUntil      time.Time // zero = not snoozed
-	bannersAllowed   = true    // master: Allow system banners (protect_failed still passes when off)
-	silentWhenOpen   = true    // If DenyOut is open, stay silent in the system
-	respectFullscreen = true   // Respect fullscreen / games
-	fullscreen       bool      // runtime: currently fullscreen (Phase E detector wires this)
-	quietOvernight   = true    // No sound at night (sound gate; Emit banners unchanged)
-	soundOnlyAnswer  = true    // Sound only when you must answer
-	nowFunc          = time.Now // overridable in tests (night window)
+	mu                sync.Mutex
+	enabled           = true
+	level             = "quiet"  // quiet | normal | detailed — new installs default Quiet
+	uiFocused         bool       // main window focused/visible
+	away              bool       // screen locked / idle
+	snoozeUntil       time.Time  // zero = not snoozed
+	bannersAllowed    = true     // master: Allow system banners (protect_failed still passes when off)
+	silentWhenOpen    = true     // If DenyOut is open, stay silent in the system
+	respectFullscreen = true     // Respect fullscreen / games
+	fullscreen        bool       // runtime: currently fullscreen (Phase E detector wires this)
+	quietOvernight    = true     // No sound at night (sound gate; Emit banners unchanged)
+	soundOnlyAnswer   = true     // Sound only when you must answer
+	nowFunc           = time.Now // overridable in tests (night window)
 )
 
 // Kind is an OS-toast category. Only whitelisted kinds may reach the desktop.
@@ -41,12 +42,15 @@ const (
 	// KindOpenApp is a soft "Open DenyOut" nudge (return digest / missed waiting).
 	// Quiet suppresses it; never while Away or while the UI is focused.
 	KindOpenApp Kind = "open_app"
+	// KindTrayHidden is the one-shot "window closed → still in tray" hint.
+	// Allowed even on Quiet / banners-off / focused so close≠Quit is never silent.
+	KindTrayHidden Kind = "tray_hidden"
 )
 
 // AllowedKind reports whether kind may emit an OS notification.
 func AllowedKind(kind Kind) bool {
 	switch kind {
-	case KindAllowUndo, KindProtectResumed, KindProtectFailed, KindOpenApp:
+	case KindAllowUndo, KindProtectResumed, KindProtectFailed, KindOpenApp, KindTrayHidden:
 		return true
 	default:
 		// keep_repeat and unknowns stay off the OS whitelist
@@ -105,7 +109,7 @@ func SnoozeUntil() time.Time {
 }
 
 // SetBannersAllowed is the Advanced "Allow system banners" master.
-// When off, only protect_failed may still reach the OS (L7).
+// When off, only protect_failed and tray_hidden may still reach the OS.
 func SetBannersAllowed(on bool) {
 	mu.Lock()
 	bannersAllowed = on
@@ -232,6 +236,8 @@ func ExpireFor(kind Kind) time.Duration {
 		return 10 * time.Second
 	case KindOpenApp:
 		return 12 * time.Second
+	case KindTrayHidden:
+		return 8 * time.Second
 	case KindProtectResumed:
 		return 5 * time.Second
 	default:
@@ -304,8 +310,11 @@ func levelAllows(kind Kind) bool {
 	}
 	switch level {
 	case "quiet":
-		return kind == KindProtectFailed
-	default: // normal, detailed
+		return kind == KindProtectFailed || kind == KindTrayHidden
+	case "normal":
+		// Protect-resumed OS banner is Detailed-only so the level is not a no-op vs Normal.
+		return kind != KindProtectResumed
+	default: // detailed
 		return true
 	}
 }
@@ -315,15 +324,16 @@ func emitAllowed(kind Kind) bool {
 		return false
 	}
 	critical := kind == KindProtectFailed
-	if !bannersAllowed && !critical {
+	trayHint := kind == KindTrayHidden
+	if !bannersAllowed && !critical && !trayHint {
 		return false
 	}
-	if !snoozeUntil.IsZero() && time.Now().Before(snoozeUntil) && !critical {
+	if !snoozeUntil.IsZero() && time.Now().Before(snoozeUntil) && !critical && !trayHint {
 		return false
 	}
 	focusSuppress := uiFocused && silentWhenOpen
 	fsSuppress := fullscreen && respectFullscreen
-	if (focusSuppress || away || fsSuppress) && !critical {
+	if (focusSuppress || away || fsSuppress) && !critical && !trayHint {
 		return false
 	}
 	return true
@@ -418,6 +428,65 @@ func runNotifySendPlain(kind Kind, title, body string) {
 	}
 }
 
+var (
+	waitProcsMu sync.Mutex
+	waitProcs   []*os.Process
+)
+
+func trackWaitProc(p *os.Process) {
+	if p == nil {
+		return
+	}
+	waitProcsMu.Lock()
+	waitProcs = append(waitProcs, p)
+	waitProcsMu.Unlock()
+}
+
+func untrackWaitProc(p *os.Process) {
+	if p == nil {
+		return
+	}
+	waitProcsMu.Lock()
+	out := waitProcs[:0]
+	for _, x := range waitProcs {
+		if x != p {
+			out = append(out, x)
+		}
+	}
+	waitProcs = out
+	waitProcsMu.Unlock()
+}
+
+// CloseAll dismisses lingering DenyOut OS banners (tracked --wait children + Linux pkill fallback).
+// Call on Quit unload and Uninstall so sticky Protect-failed / Undo toasts do not outlive the app.
+// Killing --wait notify-send processes removes the matching GNOME shade entries; orphaned
+// children reparented to systemd are caught by the pkill fallback.
+func CloseAll() {
+	waitProcsMu.Lock()
+	procs := waitProcs
+	waitProcs = nil
+	waitProcsMu.Unlock()
+	for _, p := range procs {
+		if p != nil {
+			_ = p.Kill()
+		}
+	}
+	if runtime.GOOS == "linux" {
+		killDenyOutNotifySend()
+	}
+}
+
+// killDenyOutNotifySend best-effort clears Linux notify-send processes that used --app-name=DenyOut
+// (including orphans whose parent already exited without CloseAll).
+func killDenyOutNotifySend() {
+	if _, err := exec.LookPath("pkill"); err != nil {
+		return
+	}
+	// Prefer the literal argv form Emit/EmitAction/Ask use; keep a looser pattern as backup.
+	_ = exec.Command("pkill", "-f", "notify-send --app-name=DenyOut").Run()
+	_ = exec.Command("pkill", "-f", "notify-send.*--app-name=DenyOut").Run()
+}
+
 func runNotifySendActions(kind Kind, title, body string, wait time.Duration, actions []Action) string {
 	args := []string{"--app-name=DenyOut"}
 	if kind == KindProtectFailed {
@@ -439,18 +508,22 @@ func runNotifySendActions(kind Kind, title, body string, wait time.Duration, act
 	}
 	args = append(args, title, body)
 	cmd := exec.Command("notify-send", args...)
-	done := make(chan string, 1)
-	go func() {
-		out, err := cmd.Output()
-		if err != nil {
-			done <- ""
-			return
-		}
-		done <- strings.TrimSpace(string(out))
-	}()
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	if err := cmd.Start(); err != nil {
+		fmt.Fprintf(os.Stderr, "denyout: notification: %v\n", err)
+		return ""
+	}
+	trackWaitProc(cmd.Process)
+	defer untrackWaitProc(cmd.Process)
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
 	select {
-	case id := <-done:
-		return id
+	case err := <-done:
+		if err != nil {
+			return ""
+		}
+		return strings.TrimSpace(stdout.String())
 	case <-time.After(wait + 2*time.Second):
 		if cmd.Process != nil {
 			_ = cmd.Process.Kill()

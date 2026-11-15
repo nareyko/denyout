@@ -2,6 +2,7 @@ package desktop
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -29,6 +30,8 @@ type presence struct {
 	away          bool // last computed, for notify.SetAway edge updates
 	digestPending bool // Armed on Away→Present when unread > 0
 	softOpenSent  bool // Soft OS Open once per return cycle
+	fsDetectOK    bool // last probeFullscreen ok (honest Settings)
+	fsActive      bool // last known fullscreen when fsDetectOK
 }
 
 func (a *App) initPresence() {
@@ -113,12 +116,18 @@ func (a *App) syncAwayNotify() {
 		return
 	}
 	// Away → Present: arm return digest if something waited.
-	if a.awayUnreadCount() > 0 {
-		a.presence.mu.Lock()
-		a.presence.digestPending = true
-		a.presence.mu.Unlock()
-		a.maybeSoftOpenReturn()
+	a.armQuietReturnDigest()
+}
+
+// armQuietReturnDigest marks a return summary when quiet items waited (Away or fullscreen).
+func (a *App) armQuietReturnDigest() {
+	if a.awayUnreadCount() <= 0 {
+		return
 	}
+	a.presence.mu.Lock()
+	a.presence.digestPending = true
+	a.presence.mu.Unlock()
+	a.maybeSoftOpenReturn()
 }
 
 func (a *App) maybeSoftOpenReturn() {
@@ -138,11 +147,11 @@ func (a *App) maybeSoftOpenReturn() {
 	if n <= 0 {
 		return
 	}
-	body := "While you were away — open DenyOut to see quiet items."
+	body := "Quiet items waiting — switch to DenyOut to review."
 	if n == 1 {
-		body = "While you were away — 1 quiet item. Open DenyOut."
+		body = "1 quiet item waiting. Switch to DenyOut."
 	} else if n > 1 {
-		body = fmt.Sprintf("While you were away — %d quiet items. Open DenyOut.", n)
+		body = fmt.Sprintf("%d quiet items waiting. Switch to DenyOut.", n)
 	}
 	notify.EmitAction(notify.KindOpenApp, "DenyOut", body, 12*time.Second,
 		[]notify.Action{{ID: "open", Label: "Open"}},
@@ -228,10 +237,40 @@ func (a *App) pollPresenceOnce() {
 }
 
 // pollFullscreenOnce updates notify.Fullscreen when a detector is available.
+// Leaving fullscreen with quiet unread arms the same return digest as Away→Present.
+// When detection is unavailable, clear fullscreen so we do not fake quiet.
 func (a *App) pollFullscreenOnce() {
-	if fs, ok := probeFullscreen(); ok {
-		notify.SetFullscreen(fs)
+	fs, ok := probeFullscreen()
+	a.presence.mu.Lock()
+	a.presence.fsDetectOK = ok
+	a.presence.fsActive = ok && fs
+	a.presence.mu.Unlock()
+	if !ok {
+		if notify.Fullscreen() {
+			notify.SetFullscreen(false)
+		}
+		return
 	}
+	was := notify.Fullscreen()
+	notify.SetFullscreen(fs)
+	if was && !fs {
+		a.armQuietReturnDigest()
+	}
+}
+
+// fullscreenDetectOK reports whether the last poll could see fullscreen state.
+func (a *App) fullscreenDetectOK() bool {
+	a.presence.mu.Lock()
+	defer a.presence.mu.Unlock()
+	return a.presence.fsDetectOK
+}
+
+// sessionLooksWayland is used for honest Settings copy (not probe order).
+func sessionLooksWayland() bool {
+	if strings.EqualFold(os.Getenv("XDG_SESSION_TYPE"), "wayland") {
+		return true
+	}
+	return strings.TrimSpace(os.Getenv("WAYLAND_DISPLAY")) != ""
 }
 
 // isFullscreenQuiet: Respect fullscreen is on and a fullscreen app is in front.

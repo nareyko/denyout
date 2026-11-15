@@ -219,7 +219,8 @@ export function Profiles({
  <h2>Learning</h2>
  <p className="muted">
  {pendingTotal} pending Allow once host{pendingTotal === 1 ? "" : "s"}. Pin adds them to
- the agent allowlist; Discard clears them.
+ the agent allowlist; Discard clears them and keeps them blocked for this agent —
+ including this run if the agent is running.
  </p>
  <div className="row-actions" style={{ marginTop: "0.55rem" }}>
  {list
@@ -249,7 +250,7 @@ export function Profiles({
  const n = p.pending_once?.length || 0;
  setConfirm({
  title: `Discard pending for ${p.name}?`,
- body: `Discard ${n} pending site${n === 1 ? "" : "s"}?\n\nThey stay blocked for this agent.`,
+ body: `Discard ${n} pending site${n === 1 ? "" : "s"}?\n\nThey stay blocked for this agent — including this run if the agent is running.`,
  danger: true,
  confirmLabel: "Discard",
  run: async () => {
@@ -360,7 +361,7 @@ export function Profiles({
  const n = p.pending_once?.length || 0;
  setConfirm({
  title: `Discard pending for ${p.name}?`,
- body: `Discard ${n} pending site${n === 1 ? "" : "s"}?\n\nThey stay blocked for this agent.`,
+ body: `Discard ${n} pending site${n === 1 ? "" : "s"}?\n\nThey stay blocked for this agent — including this run if the agent is running.`,
  danger: true,
  confirmLabel: "Discard",
  run: async () => {
@@ -458,8 +459,14 @@ export function Profiles({
  Show Ask and block dialogs for this agent
  </label>
  <p className="muted" style={{ marginTop: 4 }}>
- When on, prompts appear while you are at the computer. With Stay quiet while away
- (Settings), they stay quiet while you are away and show in the return summary.
+ When on, in-app Ask and block dialogs appear for this agent while you are at the
+ computer (and this agent is running).
+ </p>
+ <p className="muted" style={{ marginTop: 4 }}>
+ Also:{" "}
+ {snap?.quiet_while_away === false
+  ? "Stay quiet while away is off (Settings) — Ask/block dialogs can still appear while locked or idle (~5 min). Soft OS banners still follow How chatty / System banners (Quiet keeps them off except Protect failed and the tray-hidden hint). Fullscreen quiet is separate (Advanced → Respect fullscreen)."
+  : "With Stay quiet while away on (Settings), locked or idle (~5 min) stays quiet and shows in the return summary. Soft OS banners stay off while away too (Protect failed and tray-hidden on window close can still show). Fullscreen quiet is separate (Advanced → Respect fullscreen)."}
  </p>
  <label style={{ display: "block", marginTop: 8 }}>
  <input

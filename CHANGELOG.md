@@ -1,6 +1,20 @@
 # Changelog
 
-## Unreleased
+## 0.4.2 - Quit unload, in-app Undo, quiet phrase (2026-11-15)
+
+### Added
+
+- **In-app Undo** after Allow (~10s) and after auto-resume from pause (~5s). No OS Undo button; tray shows `Undo available — open DenyOut`.
+- **Quieting phrase** shared on Home, chrome, and tray: `Quiet · away` / `fullscreen` / `snoozed until …`, plus a slate-blue tray icon while quieting.
+- **Fullscreen detect** chain: X11 → GNOME Eval/Introspect → Hyprland → Sway; Settings warns when detection is unavailable (common on locked-down GNOME Wayland).
+
+### Changed
+
+- **Quit** always fully unloads (no “keep protection on”); cancelled admin password keeps the tray running. OS DenyOut banners dismissed on Quit/uninstall (`CloseAll`).
+- Desktop/notify tests stub `notify-send` so suites do not litter the notification shade.
+- Docs: D19 / desktop UX match unload-only Quit; OS toast whitelist no longer promises Undo.
+
+### Fixed
 
 - **Uninstall:** always stop/remove Linux `denyout-hostguard.service` (helper-serve). Previously, if the helper was up, teardown could leave the unit running after binaries were deleted.
 

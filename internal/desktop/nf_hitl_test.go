@@ -64,6 +64,12 @@ func TestNF_PauseChoiceMapping(t *testing.T) {
 	if mapPauseLabel("1 hour", "15m") != "1h" {
 		t.Fatal("1h")
 	}
+	if mapPauseLabel("About 24 hours", "1h") != "tomorrow" {
+		t.Fatal("about 24h")
+	}
+	if mapPauseLabel("Until tomorrow", "1h") != "tomorrow" {
+		t.Fatal("legacy tomorrow label")
+	}
 	if mapPauseLabel("Until I turn it on", "1h") != "forever" {
 		t.Fatal("forever")
 	}

@@ -67,7 +67,7 @@ Claim carefully: **install never asks**; **first Protect** (and Off→On when he
 - G4. **After the first successful Protect computer, reboot/login restore must not ask for a password again.** Achieved by installing a privileged helper during that first approved Protect.  
 - G4b. **Quit always fully unloads** (D19): no leftover redirects, proxyd, or mediation. Prefer helper; **if a password is required to finish unload, ask for it.** Never exit “protected but tray gone.”
 - G5. Autostart is turned **on automatically** when setup finishes; mentioned in Your setup; user can disable in Settings (D9=C).
-- G6. Works for both shells: `denyout-desktop` (primary) and `denyout desktop` (native fallback, same three choices).
+- G6. Works for both shells: `denyout-desktop` (primary) and `denyout desktop` (native fallback, same mode choices + Quit unload confirm).
 - G7. Cancelled/failed password returns the user to **mode choice** (not a dead Off with SetupDone) on first-run (D6=B).
 
 ### Non-goals
@@ -155,15 +155,14 @@ Then:
 
 ### 3.5 Quit DenyOut (D19)
 
-Tray **Quit DenyOut** asks first (when protection is on):
+Tray **Quit DenyOut** = program unloaded (desktop canon). Confirm when protection / agents / leave-on intent is live:
 
 | Choice | Behavior |
 | --- | --- |
-| **Turn off protection and quit** | Full unload: stop proxyd/wraps, hostguard Remove (helper first; OS password if needed), clear leave-on, exit |
-| **Keep protection on and quit** | Leave proxyd + rules running; persist leave-on; exit tray/UI only |
+| **Turn off protection and quit** (wording varies: Agents only / Session / Clear intent / Stop agents) | Full unload: stop proxyd/wraps, hostguard Remove (helper first; OS password if needed), clear leave-on, dismiss DenyOut OS banners, exit |
 | **Cancel** | Stay running |
 
-If unload needs a password and the user cancels: stay running and protected (do not pretend to have quit).
+There is **no** “Keep protection on and quit.” If unload needs a password and the user cancels: stay running and protected (do not pretend to have quit; do not leave tray).
 
 ### 3.6 Terminal install copy
 
@@ -422,7 +421,7 @@ Unit: `Install()` state assertions; Bootstrap does not call `restoreProtection` 
 | D16 | Close window before choosing | **Resume modal** | Incomplete setup must not silently become Not now; no autostart until a real choice |
 | D17 | Helper mechanism | **System helper service** (not passwordless polkit as primary) | Same UX on all OSes; narrower privilege; Quit/Off/restore consistent |
 | D18 | Ship order | **Same release** as onboarding for promised OS; gate copy per OS | Never promise password-free restore before it works |
-| D19 | Quit while protected | **Ask:** turn off + quit (full unload, password OK if needed) **or** keep protection on + quit (proxyd/rules stay) **or** Cancel | Never silent leave-on without asking; never pretend to quit if unload password was cancelled |
+| D19 | Quit while protected | **Confirm unload:** turn off + quit (full unload, password OK if needed) **or** Cancel | Never leave protection on without the tray; never pretend to quit if unload password was cancelled |
 | D20 | Reset setup | **Yes, Settings → Advanced**, with confirm | Support/testing escape hatch without cluttering main UI |
 
 ### Locked answers (verbatim)
@@ -446,7 +445,7 @@ D15: A (+ D20 Reset setup in Advanced)
 D16: resume mode modal (do not treat close as Not now)
 D17: system helper service (primary); not passwordless polkit
 D18: same release as onboarding for any OS that promises no reboot password
-D19: Quit asks turn-off vs keep-on vs cancel; turn-off = full unload (password OK); keep-on = proxyd stays
+D19: Quit confirms unload vs cancel; unload = full tear-down (password OK if needed); cancel / failed password = stay in tray
 D20: Settings → Advanced → Reset setup (confirm)
 ```
 

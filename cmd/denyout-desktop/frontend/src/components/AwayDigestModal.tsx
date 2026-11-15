@@ -43,7 +43,7 @@ export function AwayDigestModal({
   const hasBlocks = blocks > 0;
   const kept =
     (keptRunningLine || "").trim() ||
-    "Away did not turn protection off by itself.";
+    "Protection was already off.";
 
   return (
     <div className="modal-backdrop" style={{ zIndex: 50 }} role="presentation">
@@ -53,7 +53,7 @@ export function AwayDigestModal({
         aria-labelledby="away-digest-title"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 id="away-digest-title">While you were away</h2>
+        <h2 id="away-digest-title">Quiet items waiting</h2>
         {hasBlocks ? (
           <p>
             {blocks === 1 ? "1 site blocked" : `${blocks} sites blocked`}
@@ -65,11 +65,13 @@ export function AwayDigestModal({
             {waiting === 1
               ? "1 decision was waiting"
               : `${waiting} decisions were waiting`}
-            {hostSpan(waitHosts)}. Review History to Allow or Keep blocked.
+            {hostSpan(waitHosts)}. Review History to Allow this site, or leave it blocked.
           </p>
         ) : null}
         {!hasBlocks && !hasWaiting ? (
-          <p className="muted">Something waited while you were away.</p>
+          <p className="muted">
+            Something waited while DenyOut stayed quiet.
+          </p>
         ) : null}
         <p className="muted">{kept}</p>
         <div className="decision-actions" style={{ marginTop: "0.85rem" }}>

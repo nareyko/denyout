@@ -27,7 +27,7 @@ func TestEnsureSetupDoneAfterProtect(t *testing.T) {
 }
 
 func TestYourSetupTextSession(t *testing.T) {
-	text := YourSetupText("session", false, false)
+	text := YourSetupText("session", false, false, true)
 	if !strings.Contains(text, "Session protection") {
 		t.Fatalf("%q", text)
 	}
@@ -40,9 +40,35 @@ func TestYourSetupTextSession(t *testing.T) {
 }
 
 func TestYourSetupTextAgentsOnly(t *testing.T) {
-	text := YourSetupText("agents_only", false, false)
+	text := YourSetupText("agents_only", false, false, true)
 	if !strings.Contains(text, "Agents only") || !strings.Contains(text, "Everyday browsing") {
 		t.Fatalf("unexpected agents_only copy: %q", text)
+	}
+}
+
+func TestYourSetupTextQuietWhileAway(t *testing.T) {
+	on := YourSetupText("safe", false, false, true)
+	if !strings.Contains(on, "Stay quiet while away is on") {
+		t.Fatalf("quiet on: %q", on)
+	}
+	if !strings.Contains(on, "Respect fullscreen") {
+		t.Fatalf("want separate fullscreen line: %q", on)
+	}
+	if !strings.Contains(on, "soft OS banners") {
+		t.Fatalf("fullscreen line should name soft banners: %q", on)
+	}
+	if !strings.Contains(on, "tray-hidden") {
+		t.Fatalf("quiet on should name tray-hidden: %q", on)
+	}
+	off := YourSetupText("safe", false, false, false)
+	if !strings.Contains(off, "Stay quiet while away is off") {
+		t.Fatalf("quiet off: %q", off)
+	}
+	if !strings.Contains(off, "tray-hidden") {
+		t.Fatalf("quiet off should name tray-hidden: %q", off)
+	}
+	if !strings.Contains(off, "System banners") {
+		t.Fatalf("quiet off should name System banners: %q", off)
 	}
 }
 
@@ -83,14 +109,14 @@ func TestPendingYourSetupModeAgentsTipWhileOff(t *testing.T) {
 }
 
 func TestYourSetupTextUnhealthy(t *testing.T) {
-	text := YourSetupText("safe", false, true)
+	text := YourSetupText("safe", false, true, true)
 	if strings.Contains(text, "You are protected") {
 		t.Fatalf("unhealthy setup must not claim protected: %q", text)
 	}
 	if !strings.Contains(text, "needs your attention") || !strings.Contains(text, "Problems") {
 		t.Fatalf("unexpected unhealthy copy: %q", text)
 	}
-	agents := YourSetupText("agents_only", false, true)
+	agents := YourSetupText("agents_only", false, true, true)
 	if !strings.Contains(agents, "Agents only needs your attention") {
 		t.Fatalf("agents unhealthy: %q", agents)
 	}

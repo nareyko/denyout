@@ -15,6 +15,7 @@ export function Home({
  onOpenThreatSettings,
  onOpenAgents,
  onOpenSettingsDiagnostics,
+ onOpenSystemBanners,
  onBeforeProtect,
 }: {
  snap: UISnapshot | null;
@@ -30,6 +31,8 @@ export function Home({
  onOpenThreatSettings?: () => void;
  onOpenAgents?: () => void;
  onOpenSettingsDiagnostics?: () => void;
+ /** Advanced → System banners (master + fullscreen / silent). */
+ onOpenSystemBanners?: () => void;
 }) {
  const [msg, setMsg] = useState("");
  const [err, setErr] = useState("");
@@ -202,20 +205,58 @@ export function Home({
  <section className={`home-hero card ${needsHelp ? "home-hero-alert" : ""}`}>
  <h1 className="home-headline">{headline}</h1>
  <p className="muted">{support}</p>
- {(snap?.notify_snooze_active ||
+ {(snap?.quiet_reason ||
+ snap?.notify_snooze_active ||
  snap?.away ||
  (typeof snap?.away_unread === "number" && snap.away_unread > 0) ||
  snap?.system_banners === false) && (
  <p className="notice-box" style={{ marginTop: "0.35rem" }}>
- {snap?.notify_snooze_active ? "Notifications snoozed. " : ""}
- {snap?.away ? "Away — quiet for now. " : ""}
+ {snap?.quiet_reason ? (
+ <>
+ <strong style={{ fontWeight: 600 }}>{snap.quiet_reason}</strong>
+ {" — same words as the tray. "}
+ {snap.away || snap.fullscreen_now
+ ? "Ask/block dialogs and soft OS banners stay quiet (Protect failed and tray-hidden on window close can still show). "
+ : snap.notify_snooze_active
+   ? "Soft OS banners stay quiet (Protect failed and tray-hidden on window close can still show). "
+   : ""}
+ </>
+ ) : (
+ <>
+ {snap?.notify_snooze_active
+ ? "Notifications snoozed (Protect failed and tray-hidden on window close can still show). "
+ : ""}
+ {snap?.away
+ ? "Away — soft banners and Ask/block dialogs quiet for now (Protect failed and tray-hidden on window close can still show). "
+ : ""}
+ </>
+ )}
  {typeof snap?.away_unread === "number" && snap.away_unread > 0
- ? `${snap.away_unread} quiet while away. `
+ ? `${snap.away_unread} quiet. `
  : ""}
  {snap?.system_banners === false
- ? "System banners off (Protect failed can still show). "
+ ? "System banners off (Protect failed and tray-hidden on window close can still show). "
  : ""}
- Open Settings → Notifications to change.
+ {(snap?.quiet_reason ||
+ snap?.notify_snooze_active ||
+ snap?.away ||
+ (typeof snap?.away_unread === "number" && snap.away_unread > 0)) && (
+ <>
+ <button type="button" className="linkish" onClick={() => onOpenSettings?.()}>
+ Open Settings → Notifications
+ </button>
+ {snap?.system_banners === false ? " · " : ""}
+ </>
+ )}
+ {snap?.system_banners === false ? (
+ <button
+ type="button"
+ className="linkish"
+ onClick={() => (onOpenSystemBanners || onOpenSettings)?.()}
+ >
+ Open Settings → Advanced → System banners
+ </button>
+ ) : null}
  </p>
  )}
  <div className="row-actions">
@@ -389,7 +430,9 @@ export function Home({
  <h2>Nothing blocked yet - that is OK.</h2>
  <p className="muted">
  {protectedOn || agentsOnly || sessionOn
- ? "When DenyOut blocks something while you are here, you get an in-app Keep blocked / Allow this site prompt — and it shows up in History. While you are away (if Stay quiet while away is on), it stays quiet and shows one summary when you return."
+ ? snap?.quiet_while_away === false
+   ? "When DenyOut blocks something while you are here, you get an in-app Keep blocked / Allow this site prompt — and it shows up in History. Stay quiet while away is off — Ask/block dialogs can still appear while locked or idle (~5 min). Soft OS banners still follow How chatty / System banners (Quiet keeps them off except Protect failed and the tray-hidden hint). Fullscreen quiet is a separate Advanced setting (Respect fullscreen)."
+   : "When DenyOut blocks something while you are here, you get an in-app Keep blocked / Allow this site prompt — and it shows up in History. With Stay quiet while away on, locked or idle (~5 min) stays quiet and shows one summary when you return. Soft OS banners stay off while away too (Protect failed and tray-hidden on window close can still show). Fullscreen quiet is separate (Advanced → Respect fullscreen)."
  : intentAgents
    ? "Last mode was Agents only. Turn it on again from here (or run My agents) to start recording blocks. Everyday browsing stays unprotected until you switch to Protect computer."
    : "Turn on Protect computer (or run My agents) to start recording blocks here. Everyday browsing stays unprotected until then."}
@@ -493,12 +536,17 @@ function formatPauseUntil(iso: string): string {
  const now = new Date();
  // Match chrome/tray: time-only today; include day when pause crosses midnight.
  if (d.toDateString() === now.toDateString()) {
- return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+ return d.toLocaleTimeString(undefined, {
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+ });
  }
  return d.toLocaleString(undefined, {
  month: "short",
  day: "numeric",
  hour: "2-digit",
  minute: "2-digit",
+ hour12: false,
  });
 }

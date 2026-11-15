@@ -465,8 +465,8 @@ var (
 
 const undoBannerCooldown = 2 * time.Minute
 
-// emitAllowUndoBanner shows ~10s OS toast with Undo (whitelist allow_undo).
-// Same host within undoBannerCooldown does not get a second banner (U6).
+// emitAllowUndoBanner arms ~10s in-app Undo (Pass 29 — no OS Undo button / shade action).
+// Same host within undoBannerCooldown does not get a second offer (U6).
 func (a *App) emitAllowUndoBanner(host, body string, onUndo func()) {
 	host = strings.TrimSpace(strings.ToLower(host))
 	undoBannerMu.Lock()
@@ -478,16 +478,18 @@ func (a *App) emitAllowUndoBanner(host, body string, onUndo func()) {
 	undoBannerAt = time.Now()
 	undoBannerMu.Unlock()
 
-	wait := notify.ExpireFor(notify.KindAllowUndo)
-	notify.EmitAction(notify.KindAllowUndo, "DenyOut", body+"\nUndo within 10 seconds.", wait,
-		[]notify.Action{{ID: "undo", Label: "Undo"}},
-		func(id string) {
-			if id != "undo" || onUndo == nil {
-				return
-			}
-			onUndo()
-		},
-	)
+	ttl := notify.ExpireFor(notify.KindAllowUndo)
+	if ttl <= 0 {
+		ttl = undoOfferDefaultAllow
+	}
+	msg := strings.TrimSpace(body)
+	if msg == "" {
+		msg = "Allowed."
+	}
+	if !strings.Contains(strings.ToLower(msg), "undo") {
+		msg = msg + "\nUndo within 10 seconds."
+	}
+	a.armUndoOffer(undoOfferAllow, host, msg, ttl, onUndo)
 }
 
 // revokeHostEverywhere drops a live allow from Protect session and running wraps.

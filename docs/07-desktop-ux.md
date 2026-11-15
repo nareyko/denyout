@@ -99,7 +99,7 @@ Quit DenyOut
 | **My agents...** | With Wails: open window on **My agents** screen. Fallback shell: native agent list / New / Start / Stop |
 | Off | Turn Protect off |
 | Open DenyOut... | Same as left-click -> Home |
-| Quit DenyOut | Asks: **Turn off protection and quit** / **Keep protection on and quit** / Cancel. Turn off = full unload (admin if needed). Keep = proxyd+rules stay; tray exits. Does not delete binaries/config (`denyout uninstall`). |
+| Quit DenyOut | Confirms: **Turn off protection and quit** / Cancel (wording varies by mode). Quit always fully unloads (admin if needed) and dismisses DenyOut OS banners. Cancel or cancelled password keeps DenyOut running in the tray. Does not delete binaries/config (`denyout uninstall`). |
 
 **Not in tray:** What was blocked, Always-allow, Help, Notifications, Test, Agents only, Switch Safe, Resume asks, Learning primary, Last block, version footer.
 
@@ -279,14 +279,16 @@ Normative detail: [`ux-iters/notifications-rework-plan.md`](ux-iters/notificatio
 
 Threat-list hits use reason `threat_list`. User **Allow this site** / timed allow beats threat lists. Starter **packs** do not. Product unbreak (Book D) skips threat lists only - scanners still apply. Detail: [`ux-iters/threat-lists-plan.md`](ux-iters/threat-lists-plan.md).
 
-**OS toasts (whitelist only):** `protect_failed` · `allow_undo` · `protect_resumed` · soft `open_app`.  
+**OS toasts (whitelist only):** `protect_failed` · soft `open_app` · `tray_hidden`.  
+**Undo is in-app only** (strip after Allow / auto-resume; tray tooltip “Undo available”) — no OS Undo button.  
 `keep_repeat` never reaches the OS (History + tray count).  
 **Levels:** Quiet (default for new installs) / Normal / Detailed (Advanced). Dialogs always when Present.  
-**Presence:** Away (lock or idle ≥5m) → no Ask/Decision; tray `N waiting`; return → one in-app **While you were away**.  
+**Presence:** Away (lock or idle ≥5m) or respected fullscreen → no Ask/Decision; tray quiet count; return → one in-app **Quiet items waiting**.  
+**Quieting phrase (Home + tray tooltip + slate-blue tray icon):** `Quiet · away` / `fullscreen` / `snoozed until …` (same words everywhere). Needs attention still uses alert icon.  
 **Snooze:** tray / Settings mute non-critical OS for 1h or until tomorrow (Protect stays on).  
 `protect_failed` may still show when banners master is off.  
-**Fullscreen / night / sound:** Respect fullscreen (default on) suppresses steal-focus + non-critical OS; Quiet overnight mutes sound 22:00–08:00; sound only when you must answer (default on).  
-**Banner lifetimes:** failed stays · soft Open ~12s · status ~5s · Undo ~10s once per host (throttle).  
+**Fullscreen / night / sound:** Respect fullscreen (default on) suppresses steal-focus + non-critical OS when DenyOut can detect fullscreen (X11, Hyprland, Sway, or GNOME Eval/Introspect when allowed). Locked-down GNOME Wayland often cannot detect — Settings says so; Stay quiet while away still covers lock/idle. Quiet overnight mutes sound 22:00–08:00; sound only when you must answer (default on).  
+**Lifetimes:** failed stays · soft Open ~12s · in-app Undo ~10s after Allow (~5s after auto-resume) · tray-hidden ~8s.  
 **Protect Off:** pause presets (15m / 1h / tomorrow / forever). Home/tray truthful. No Off nags.
 
 No false-deny of normal API auth on Safe (0.2.1).

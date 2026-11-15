@@ -204,6 +204,14 @@ func TestFullscreenQuietSuppressesDecision(t *testing.T) {
 	if a.awayUnreadCount() < 1 {
 		t.Fatal("expected unread while fullscreen quiet")
 	}
+	if a.awayDigestPending() {
+		t.Fatal("digest should wait until leaving fullscreen")
+	}
+	notify.SetFullscreen(false)
+	a.armQuietReturnDigest()
+	if !a.awayDigestPending() {
+		t.Fatal("leaving fullscreen with unread should arm return digest")
+	}
 }
 
 func TestUndoBannerThrottleSameHost(t *testing.T) {
@@ -227,7 +235,7 @@ func TestUndoBannerThrottleSameHost(t *testing.T) {
 	if host != "same.example" {
 		t.Fatalf("host=%q", host)
 	}
-	// Second call must be throttled (no second EmitAction wait). calls stay 0 until Undo clicked.
+	// Second call must be throttled (no second in-app offer). calls stay 0 until Undo taken.
 	_ = calls
 	a.emitAllowUndoBanner("other.example", "other", nil)
 	undoBannerMu.Lock()

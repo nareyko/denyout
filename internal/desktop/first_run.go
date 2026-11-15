@@ -72,9 +72,11 @@ func (a *App) runFirstRunWizard() {
 }
 
 func (a *App) finishSetupNotNow(extra string) error {
-	// Peek-mode Protect may already be live — unload before claiming Off.
+	// Peek-mode Protect may already be live — best-effort unload before claiming Off.
+	// If admin Remove fails (cancelled pkexec / no helper), still clear leave-on so
+	// Not now cannot trap the user in Needs attention.
 	if err := a.stopProtectionErr(); err != nil {
-		return err
+		AppendDesktopLog("WARN setup Not now unload: %v (clearing Off intent anyway)", err)
 	}
 	a.mu.Lock()
 	a.state.SetupDone = true
@@ -126,7 +128,8 @@ func (a *App) showYourSetup(mode string) {
 		return
 	}
 	autostartOn := a.state.Autostart
-	text := YourSetupText(mode, autostartOn, false)
+	quietAway := !a.state.QuietWhileAwayOff
+	text := YourSetupText(mode, autostartOn, false, quietAway)
 	if a.opts.SkipNativeYourSetup {
 		// Wails shows Your setup when setup_done && !your_setup_shown.
 		// Do not mark shown here — MarkYourSetupShown runs on dismiss.
@@ -159,7 +162,8 @@ func (a *App) showYourSetup(mode string) {
 // YourSetupText is shared EN copy for native + Wails Your setup (Q6).
 // autostart must reflect the real login-launch preference after RegisterAutostart.
 // unhealthy: Protect intent is broken — never claim "You are protected."
-func YourSetupText(mode string, autostart bool, unhealthy bool) string {
+// quietWhileAway: Stay quiet while away preference (default on).
+func YourSetupText(mode string, autostart bool, unhealthy bool, quietWhileAway bool) string {
 	var status string
 	if unhealthy {
 		switch mode {
@@ -193,8 +197,15 @@ func YourSetupText(mode string, autostart bool, unhealthy bool) string {
 	case "agents", "off":
 		homeBullet = "- Open DenyOut (Home) for mode status and what was blocked.\n"
 	}
+	blockBullet := "- When something is blocked while you are here: Keep blocked or Allow this site.\n"
+	if quietWhileAway {
+		blockBullet += "- Stay quiet while away is on: Ask and block dialogs stay off while locked or idle (about 5 minutes); soft OS banners stay off while away (Protect failed and tray-hidden on window close can still show). One summary when you return. Everything is in History.\n"
+	} else {
+		blockBullet += "- Stay quiet while away is off — Ask/block dialogs can still appear while locked or idle (about 5 minutes). Soft OS banners still follow How chatty / System banners (Quiet keeps them off except Protect failed and the tray-hidden hint). Everything is in History.\n"
+	}
+	blockBullet += "- Respect fullscreen (Settings → Advanced) separately avoids Ask/block dialogs and soft OS banners while a fullscreen app is in front (Protect failed and tray-hidden on window close can still show).\n"
 	body := status + "\n\n" +
-		"- When something is blocked: Keep blocked or Allow this site.\n" +
+		blockBullet +
 		homeBullet +
 		"- If Protect or Agents only failed, open Problems.\n\n"
 	if autostart {
@@ -494,7 +505,7 @@ func (a *App) maybeAskAutostart(kind string) {
 		body := "Start DenyOut automatically when you log in?\n\nRecommended so DenyOut is ready after reboot."
 		switch strings.ToLower(strings.TrimSpace(kind)) {
 		case "protect", "safe", "computer":
-			body = "Start DenyOut automatically when you log in?\n\nRecommended so Protect computer stays on after reboot."
+			body = "Start DenyOut automatically when you log in?\n\nRecommended so DenyOut can restore Protect after reboot when it was left on (Quit turns Protect off)."
 		case "agents":
 			body = "Start DenyOut automatically when you log in?\n\nRecommended so DenyOut is ready for My agents after reboot. Everyday browsing stays unprotected until you turn on Protect computer."
 		}

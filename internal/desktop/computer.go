@@ -83,7 +83,7 @@ func (a *App) startComputer() error {
 		args = append(args, "--allow-base", strings.TrimRight(wizard, "/"))
 	}
 	cmd := exec.Command(self, args...)
-	// Detached so "Quit but keep protection" can leave proxyd running after tray exits.
+	// Detached process group: hostguard/proxyd lifecycle is owned by ElevateRemove on Quit unload.
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	detachCmd(cmd)
@@ -259,65 +259,57 @@ func (a *App) stopProtectionErr() error {
 }
 
 // quitUnload fully tears down protection and clears leave-on state so the next
-// login does not auto-restore. Used by tray Quit when user chooses turn off.
+// login does not auto-restore. Used by every Quit path (no leave-on).
 // Prefer helper; if password is required and the user cancels, return error and
 // do not exit — never leave half-running protection with tray gone.
 func (a *App) quitUnload() error {
 	return a.stopProtectionErr()
 }
 
-// quitLeaveProtectionOn keeps hostguard + proxyd running and persists leave-on
-// so protection continues after the tray process exits.
-func (a *App) quitLeaveProtectionOn() {
-	a.mu.Lock()
-	cmd := a.proxyd
-	a.proxyd = nil // do not Signal/Wait — process stays up (started with Setsid)
-	if cmd != nil {
-		a.state.ProtectionOn = true
-		a.state.ComputerEnabled = true
-		a.state.Scope = ScopeComputer
-	}
-	st := a.state
-	a.mu.Unlock()
-	_ = SaveState(st)
-	AppendDesktopLog("INFO quit: leaving protection on (proxyd kept)")
-}
-
-// trayQuitChoice asks whether to unload protection when quitting the tray.
-// Returns "off", "keep", or "" (cancel).
+// trayQuitChoice confirms full unload when quitting the tray.
+// Returns "off" or "" (cancel). Keep-protection-on was removed (Quit always unloads).
 func (a *App) trayQuitChoice() string {
+	wrapsRunning := a.runningWrapCount() > 0
 	a.mu.Lock()
-	on := a.proxyd != nil || a.state.ProtectionOn || a.state.ComputerEnabled
+	hasProxyd := a.proxyd != nil
+	hasSession := a.session != nil
+	unhealthy := problemsUnhealthyLocked(a)
+	// Inline currentMode (already hold a.mu — do not call currentMode()).
+	mode := ModeOff
+	if hasProxyd {
+		mode = ModeComputer
+	} else if hasSession {
+		mode = ModeSession
+	}
+	agentsIntent := normalizePolicyProfile(a.state.PolicyProfile) == PolicyProfileAgent
+	on := hasProxyd || hasSession || a.state.ProtectionOn || a.state.ComputerEnabled || unhealthy
 	a.mu.Unlock()
-	if !on {
-		return "off" // nothing to leave on
+	if !on && !wrapsRunning {
+		return "off" // nothing live — exit
 	}
-	if !dialogToolkitAvailable() {
-		// No dialog toolkit: safest default is full unload (ask via notify is weak).
-		if nativeConfirm(
-			"Quit DenyOut?",
-			"Turn off protection and quit?\n\nCancel keeps DenyOut running.",
-			"Turn off and quit",
-			"Cancel",
-		) {
-			return "off"
+	body := "Quit turns off protection and stops My agents wraps.\n\nCancel keeps DenyOut running."
+	primary := "Turn off protection and quit"
+	switch {
+	case unhealthy && mode == ModeOff:
+		if agentsIntent {
+			body = "Agents only is not running. Quit clears restore intent.\n\nCancel keeps DenyOut open."
+			primary = "Clear intent and quit"
+		} else {
+			body = "Protect is not running. Quit clears restore intent.\n\nCancel keeps DenyOut open."
+			primary = "Clear intent and quit"
 		}
-		return ""
+	case !on && wrapsRunning:
+		body = "Quit stops My agents wraps.\n\nCancel keeps DenyOut running."
+		primary = "Stop agents and quit"
+	case mode == ModeComputer && agentsIntent:
+		body = "Quit turns off Agents only and stops My agents wraps. Everyday browsing was already unprotected.\n\nCancel keeps DenyOut running."
+		primary = "Turn off Agents only and quit"
+	case hasSession && !hasProxyd:
+		body = "Quit turns off Session protection and stops My agents wraps.\n\nCancel keeps DenyOut running."
+		primary = "Turn off Session protection and quit"
 	}
-	choice, ok := nativeListPick(
-		"Quit DenyOut?",
-		"Protection is on. What should happen?",
-		[]string{
-			"Turn off protection and quit",
-			"Keep protection on and quit",
-			"Cancel",
-		},
-	)
-	if !ok || choice == "Cancel" || choice == "" {
+	if !nativeConfirm("Quit DenyOut?", body, primary, "Cancel") {
 		return ""
-	}
-	if strings.HasPrefix(choice, "Keep") {
-		return "keep"
 	}
 	return "off"
 }
@@ -497,7 +489,7 @@ func (a *App) chooseProtectPause() (choice string, ok bool) {
 				"--height=300",
 				"15 minutes",
 				"1 hour",
-				"Until tomorrow",
+				"About 24 hours",
 				"Until I turn it on",
 			)
 			out, err := cmd.Output()
@@ -520,7 +512,7 @@ func mapPauseLabel(s, def string) string {
 		return "15m"
 	case "1 hour":
 		return "1h"
-	case "Until tomorrow":
+	case "About 24 hours", "Until tomorrow": // legacy zenity label
 		return "tomorrow"
 	case "Until I turn it on":
 		return "forever"

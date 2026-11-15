@@ -184,7 +184,7 @@ func (b *Bridge) UISetNotifyUIFocused(on bool)          { b.app.UISetNotifyUIFoc
 func (b *Bridge) UISetQuietWhileAway(on bool) error     { return b.app.UISetQuietWhileAway(on) }
 func (b *Bridge) UIClearAwayUnread() error              { return b.app.UIClearAwayUnread() }
 func (b *Bridge) UIDismissAwayDigest() error            { return b.app.UIDismissAwayDigest() }
-func (b *Bridge) UISetNotifySnooze(choice string) error  { return b.app.UISetNotifySnooze(choice) }
+func (b *Bridge) UISetNotifySnooze(choice string) error { return b.app.UISetNotifySnooze(choice) }
 func (b *Bridge) UISetQuietOvernight(on bool) error     { return b.app.UISetQuietOvernight(on) }
 func (b *Bridge) UISetSoundOnlyAnswer(on bool) error    { return b.app.UISetSoundOnlyAnswer(on) }
 func (b *Bridge) UISetSystemBanners(on bool) error      { return b.app.UISetSystemBanners(on) }
@@ -243,7 +243,9 @@ func (b *Bridge) UIResumeAsks() string              { return b.app.UIResumeAsks(
 func (b *Bridge) UIUndoLastAlwaysAllow() (string, error) {
 	return b.app.UIUndoLastAlwaysAllow()
 }
-func (b *Bridge) UITestProtection() string { return b.app.UITestProtection() }
+func (b *Bridge) UITakeUndoOffer() error    { return b.app.UITakeUndoOffer() }
+func (b *Bridge) UIDismissUndoOffer() error { return b.app.UIDismissUndoOffer() }
+func (b *Bridge) UITestProtection() string  { return b.app.UITestProtection() }
 func (b *Bridge) UIBulkAlwaysAllow(hosts []string) (string, error) {
 	return b.app.UIBulkAlwaysAllow(hosts)
 }
@@ -346,13 +348,24 @@ func main() {
 		BackgroundColour: &options.RGBA{R: 246, G: 247, B: 249, A: 255},
 		OnStartup:        bridge.startup,
 		OnBeforeClose: func(ctx context.Context) (prevent bool) {
+			if *noTray {
+				// No tray: hiding would strand the only UI. Unload and allow the window to close.
+				if err := bridge.app.UIQuit("off"); err != nil {
+					notify.Emit(notify.KindTrayHidden, "DenyOut",
+						"Could not exit yet — finish the password prompt or fix Problems, then close again. (No tray in this mode.)")
+					return true
+				}
+				return false
+			}
 			runtime.WindowHide(ctx)
 			bridge.mu.Lock()
 			shown := bridge.hideToast
 			bridge.hideToast = true
 			bridge.mu.Unlock()
 			if !shown {
-				notify.Info("DenyOut", "Still running in the tray. Quit from the tray menu when you are done.")
+				// Info is a no-op; tray-hidden must reach the OS even on Quiet.
+				notify.Emit(notify.KindTrayHidden, "DenyOut",
+					"Still running in the tray — closing the window is not Quit. Use Quit in the tray menu to exit.")
 			}
 			return true
 		},

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/nareyko/denyout/internal/hostguard"
+	"github.com/nareyko/denyout/internal/notify"
 )
 
 // UninstallOptions controls product uninstall.
@@ -24,6 +25,8 @@ func Uninstall(opts UninstallOptions) error {
 	_ = opts.Yes
 	fmt.Fprintln(os.Stderr, "denyout uninstall: stopping tray/proxyd...")
 	StopPreviousInstances()
+	// Dismiss OS banners before teardown (and again at end — orphans can appear mid-run).
+	notify.CloseAll()
 
 	uid, _ := hostguard.CurrentUID()
 	fmt.Fprintln(os.Stderr, "denyout uninstall: removing hostguard + system CA (admin once if prompted)...")
@@ -86,6 +89,7 @@ func Uninstall(opts UninstallOptions) error {
 		WarnStaleBinariesOnPATH(dir)
 	}
 
+	notify.CloseAll()
 	printUninstallVerification(opts.KeepConfig)
 	fmt.Fprintln(os.Stderr, "denyout uninstall: done")
 	return nil
