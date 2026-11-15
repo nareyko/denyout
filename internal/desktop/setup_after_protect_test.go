@@ -90,4 +90,8 @@ func TestYourSetupTextUnhealthy(t *testing.T) {
 	if !strings.Contains(text, "needs your attention") || !strings.Contains(text, "Problems") {
 		t.Fatalf("unexpected unhealthy copy: %q", text)
 	}
+	agents := YourSetupText("agents_only", false, true)
+	if !strings.Contains(agents, "Agents only needs your attention") {
+		t.Fatalf("agents unhealthy: %q", agents)
+	}
 }
