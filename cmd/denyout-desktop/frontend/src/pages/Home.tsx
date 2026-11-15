@@ -101,16 +101,22 @@ export function Home({
  support = `You chose to leave ${pauseNoun} off. Turn on anytime from here, or change to a timed pause.`;
  } else if (snap?.computer_available === false) {
  headline = "Protection is off";
- support =
- (snap?.agents_running || 0) > 0
- ? "Protect computer was unavailable last time (password cancelled or setup failed). My agents are still running — try Protect again when ready."
- : "Protect computer was unavailable last time (password cancelled or setup failed). Try again when ready.";
+ support = intentAgents
+  ? (snap?.agents_running || 0) > 0
+    ? "Agents only was unavailable last time (password cancelled or setup failed). My agents are still running — try Agents only again when ready, or switch to Protect computer from Settings."
+    : "Agents only was unavailable last time (password cancelled or setup failed). Try Agents only again when ready, or switch to Protect computer from Settings."
+  : (snap?.agents_running || 0) > 0
+    ? "Protect computer was unavailable last time (password cancelled or setup failed). My agents are still running — try Protect again when ready."
+    : "Protect computer was unavailable last time (password cancelled or setup failed). Try again when ready.";
  } else if ((snap?.agents_running || 0) > 0) {
  headline = "Protection is off";
- support =
- snap!.agents_running === 1
- ? "My agent is running, but everyday browsing is not protected. Turn on Protect computer when you want that."
- : "My agents are running, but everyday browsing is not protected. Turn on Protect computer when you want that.";
+ support = intentAgents
+  ? snap!.agents_running === 1
+    ? "My agent is running. Last mode was Agents only — turn it on again from here, or switch to Protect computer from Settings."
+    : "My agents are running. Last mode was Agents only — turn it on again from here, or switch to Protect computer from Settings."
+  : snap!.agents_running === 1
+    ? "My agent is running, but everyday browsing is not protected. Turn on Protect computer when you want that."
+    : "My agents are running, but everyday browsing is not protected. Turn on Protect computer when you want that.";
  } else if (intentAgents && isOff) {
  headline = "Protection is off";
  support =
@@ -359,7 +365,9 @@ export function Home({
  <p className="muted">
  {protectedOn || agentsOnly || sessionOn
  ? "When DenyOut blocks something while you are here, you get an in-app Keep blocked / Allow this site prompt — and it shows up in History. While you are away (if Stay quiet while away is on), it stays quiet and shows one summary when you return."
- : "Turn on Protect computer (or run My agents) to start recording blocks here. Everyday browsing stays unprotected until then."}
+ : intentAgents
+   ? "Last mode was Agents only. Turn it on again from here (or run My agents) to start recording blocks. Everyday browsing stays unprotected until you switch to Protect computer."
+   : "Turn on Protect computer (or run My agents) to start recording blocks here. Everyday browsing stays unprotected until then."}
  </p>
  <button className="btn" onClick={() => onSeeHistory?.()}>
  See History

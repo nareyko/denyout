@@ -1270,7 +1270,8 @@ export default function App() {
  .quit("off")
  .catch((e) => {
  const offNoun =
-  snap?.mode === "agents"
+  snap?.mode === "agents" ||
+  (snap?.policy_profile || "").toLowerCase() === "agent"
    ? "Agents only"
    : snap?.mode === "session"
      ? "Session protection"
@@ -1285,7 +1286,9 @@ export default function App() {
  ? "Clear intent and quit"
  : snap?.mode === "agents"
    ? "Turn off Agents only and quit"
-   : "Turn off protection and quit"}
+   : snap?.mode === "session"
+     ? "Turn off Session protection and quit"
+     : "Turn off protection and quit"}
  </strong>
  </button>
  {snap?.mode !== "session" ? (
@@ -1463,8 +1466,9 @@ export default function App() {
             </div>
             {snap?.problems_alert ? (
               <p className="warn-box" style={{ marginTop: "0.75rem" }}>
-                Protect intent looks stuck from a previous try. Clear it below, or open Problems in
-                peek mode — use Continue setup on the banner to return here.
+                {(snap?.policy_profile || "").toLowerCase() === "agent"
+                  ? "Agents only intent looks stuck from a previous try. Clear it below, or open Problems in peek mode — use Continue setup on the banner to return here."
+                  : "Protect intent looks stuck from a previous try. Clear it below, or open Problems in peek mode — use Continue setup on the banner to return here."}
               </p>
             ) : null}
             {snap?.threat_lists_warn && !snap?.problems_alert ? (
@@ -1481,9 +1485,15 @@ export default function App() {
                 onClick={() => void clearBrokenSetupIntent()}
                 style={{ width: "100%", textAlign: "left" }}
               >
-                <strong>Clear broken Protect intent</strong>
+                <strong>
+                  {(snap?.policy_profile || "").toLowerCase() === "agent"
+                    ? "Clear broken Agents only intent"
+                    : "Clear broken Protect intent"}
+                </strong>
                 <div className="muted" style={{ fontWeight: 400, marginTop: "0.25rem" }}>
-                  Stops DenyOut from trying to restore Protect before you choose a mode.
+                  {(snap?.policy_profile || "").toLowerCase() === "agent"
+                    ? "Stops DenyOut from trying to restore Agents only before you choose a mode."
+                    : "Stops DenyOut from trying to restore Protect before you choose a mode."}
                 </div>
               </button>
             ) : null}

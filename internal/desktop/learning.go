@@ -114,8 +114,14 @@ func (a *App) testProtectionMessage() string {
 	case mode == ModeSession:
 		return "Session protection is on (limited proxy). Prefer Protect computer from Home for everyday browsing."
 	case a.runningWrapCount() > 0:
+		if profile == PolicyProfileAgent {
+			return "Agents only is off, but a wrapped agent is running. Turn Agents only on from Home, or switch to Protect computer for everyday browsing."
+		}
 		return "Protect computer is off, but a wrapped agent is running. Start Protect computer from Home for everyday browsing."
 	default:
+		if profile == PolicyProfileAgent {
+			return "Protection is off. Last mode was Agents only — turn it on from Home, or switch to Protect computer."
+		}
 		return "Protection is off. Turn on Protect computer from Home, then browse as usual."
 	}
 }

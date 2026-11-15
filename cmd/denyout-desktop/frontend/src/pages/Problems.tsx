@@ -130,14 +130,22 @@ export function Problems({
       : foreverOff
         ? `You chose to leave ${pauseNoun} off. Turn on anytime from here or Home.`
         : p.computer_available === false
-          ? agentsRunning > 0
-            ? "Protect computer was unavailable last time (password cancelled or setup failed). My agents are still running — try Protect again when ready."
-            : "Protect computer was unavailable last time (password cancelled or setup failed). Try again when ready."
+          ? intentAgents
+            ? agentsRunning > 0
+              ? "Agents only was unavailable last time (password cancelled or setup failed). My agents are still running — try Agents only again when ready, or switch to Protect computer from Settings."
+              : "Agents only was unavailable last time (password cancelled or setup failed). Try Agents only again when ready, or switch to Protect computer from Settings."
+            : agentsRunning > 0
+              ? "Protect computer was unavailable last time (password cancelled or setup failed). My agents are still running — try Protect again when ready."
+              : "Protect computer was unavailable last time (password cancelled or setup failed). Try again when ready."
           : agentsRunning > 0
-            ? "Wrapped agents are running, but everyday browsing is not protected. Turn on Protect computer when you want that."
-            : p.threat_lists_warn
-              ? "Protect is off; phishing/malware lists still need a refresh (below)."
-              : "Turn on Protect computer from Home when you want browsing protection.";
+            ? intentAgents
+              ? "Wrapped agents are running. Last mode was Agents only — turn it on again from here, or switch to Protect computer from Settings."
+              : "Wrapped agents are running, but everyday browsing is not protected. Turn on Protect computer when you want that."
+            : intentAgents
+              ? "Last mode was Agents only. Turn it on again from here, or switch to Protect computer from Settings."
+              : p.threat_lists_warn
+                ? "Protect is off; phishing/malware lists still need a refresh (below)."
+                : "Turn on Protect computer from Home when you want browsing protection.";
   if (unhealthy) {
     if (hasError) {
       summary = "Something went wrong turning protection on.";
