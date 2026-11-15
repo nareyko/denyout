@@ -80,9 +80,14 @@ Landed (string/unit only): `ClassifyIPPacket`, `Engine.Handle`, `RenderT1SteerTa
 
 Landed (helper protocol, still no device): helper verbs `tun-start` / `tun-stop` / `tun-stats` reply `OK tun1 enabled=false` (or `present=false source=tun`); `hostctl` exposes the same; `quic-stats` lines include `source=nft`.
 
+Landed (Protect Off lifecycle): `logQuicDropStats` emits `source=nft`, `tun_drop_stats`, then best-effort `tun_stop` (stub). `hostctl render --tun` prints T1 steer preview after T0 rules (never applied by `apply`).
+
+**Netstack choice (spike):** keep pure-Go classify/`Engine` until VM dogfood; do **not** vendor gVisor in CI for T1 stubs. Revisit when a real `denyout0` reader is required.
+
 Opening a real TUN requires an explicit `DENYOUT_TUN_E2E=1` test tag and root — not CI default.
 
 ## 8. Decision lock (pending owner)
 
 - Default Protect stays **nft redirect + QUIC drop** until T1 VM dogfood passes.
 - Cursor remains **TCP passthrough + QUIC drop** (no browser-only QUIC exception).
+- Protect On must **not** call `tun-start` until an explicit feature flag + VM green.

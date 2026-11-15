@@ -549,6 +549,7 @@ Flags:
   --ca-dir D   persistent CA directory (proxyd)
   --uid N      desktop user uid (Unix)
   --allow-quic allow UDP/443 (HTTP/3); default is drop QUIC so browsers use TCP MITM
+  --tun        with render: append T1 steer table preview (not applied)
   --ask        Ask mode policy (proxyd)
   --allow-base URL  wizard base for Ask allow page (proxyd)
   --no-elevate already running elevated (internal)`)
@@ -630,6 +631,7 @@ Flags:
 	uid := 0
 	noElevate := false
 	allowQUIC := false
+	tunPreview := false
 	for i := 1; i < len(args); i++ {
 		a := args[i]
 		switch {
@@ -637,6 +639,8 @@ Flags:
 			noElevate = true
 		case a == "--allow-quic":
 			allowQUIC = true
+		case a == "--tun":
+			tunPreview = true
 		case strings.HasPrefix(a, "--port="):
 			fmt.Sscanf(strings.TrimPrefix(a, "--port="), "%d", &port)
 		case a == "--port":
@@ -666,7 +670,13 @@ Flags:
 	spec := hostguard.Spec{ProxyPort: port, UID: uid, CACert: ca, AllowQUIC: allowQUIC}
 	switch action {
 	case "render":
-		out, err := hostguard.Render(spec)
+		var out string
+		var err error
+		if tunPreview {
+			out, err = hostguard.RenderWithTUNPreview(spec)
+		} else {
+			out, err = hostguard.Render(spec)
+		}
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "denyout-cli hostctl: %v\n", err)
 			return 2

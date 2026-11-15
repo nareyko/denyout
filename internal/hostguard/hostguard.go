@@ -122,6 +122,17 @@ func Render(spec Spec) (string, error) {
 	return renderRules(spec)
 }
 
+// RenderWithTUNPreview appends the T1 steer table as a comment/preview block.
+// Closed-loop only: never applied by Apply(); see docs/design-tun-egress.md.
+func RenderWithTUNPreview(spec Spec) (string, error) {
+	base, err := renderRules(spec)
+	if err != nil {
+		return "", err
+	}
+	return base + "\n# --- T1 TUN preview (not applied; Protect stays on T0 nft drop) ---\n" +
+		renderTUNPreview(spec.UID), nil
+}
+
 // SelfExe returns the path to the CLI `denyout-cli` binary for pkexec/osascript/proxyd.
 // When the running process is the Wails GUI (`denyout`), elevation must not re-exec
 // the GUI binary (GTK init fails under pkexec) — resolve sibling/PATH `denyout-cli`.
