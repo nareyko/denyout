@@ -40,7 +40,8 @@ export function AwayDigestModal({
                 </span>
               </>
             ) : null}
-            . Protect stayed on.
+            . DenyOut kept protecting (Protect computer and/or My agents) — Away did not
+            turn protection off.
           </p>
         ) : null}
         {hasWaiting ? (
@@ -56,7 +57,7 @@ export function AwayDigestModal({
         ) : null}
         <div className="decision-actions" style={{ marginTop: "0.85rem" }}>
           <button type="button" className="btn primary" onClick={onReview}>
-            Review history
+            Review History
           </button>
           <button type="button" className="btn" onClick={onDismiss}>
             Dismiss

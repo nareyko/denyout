@@ -632,7 +632,7 @@ export function Settings({
                   ? `${snap.away_unread} quiet while away (summary when you return). `
                   : ""}
                 {snap.away_digest?.pending ? "Return summary is ready. " : ""}
-                Protection stays on.
+                {protectionContinuityNow(snap)}
               </p>
               {snap.away_digest?.pending ? (
                 <div className="row-actions" style={{ marginTop: "0.5rem", gap: "0.4rem" }}>
@@ -649,7 +649,7 @@ export function Settings({
                         .catch((err) => fail(err))
                     }
                   >
-                    Review history
+                    Review History
                   </button>
                   <button
                     type="button"
@@ -723,7 +723,7 @@ export function Settings({
           <p className="muted" style={{ marginTop: "0.25rem" }}>
             {snap.quiet_while_away === false
               ? "Off: Ask and block dialogs can appear while the screen is locked or idle."
-              : "When on: no Ask popups while locked or idle. Tray count grows. One summary when you return. Protect stays on."}
+              : `When on: no Ask popups while locked or idle. Tray count grows. One summary when you return. ${protectionContinuityNow(snap)}`}
             {typeof snap.away_unread === "number" && snap.away_unread > 0
               ? ` Quiet so far: ${snap.away_unread}.`
               : ""}
@@ -737,12 +737,12 @@ export function Settings({
                 {snap.notify_snooze_until
                   ? ` until ${new Date(snap.notify_snooze_until).toLocaleString()}`
                   : ""}
-                . Soft OS banners stay off until then. Protection stays on.
+                . Soft OS banners stay off until then. {protectionContinuityNow(snap)}
               </p>
             ) : (
               <p className="muted" style={{ marginBottom: "0.35rem" }}>
-                Temporarily quiet OS banners without changing How chatty. Protection
-                stays on.
+                Temporarily quiet OS banners without changing How chatty.{" "}
+                {protectionContinuityNow(snap)}
               </p>
             )}
             <div className="row-actions" style={{ gap: "0.4rem", flexWrap: "wrap" }}>
@@ -1497,7 +1497,18 @@ export function Settings({
  onChange={(e) => setAddAllowHost(e.target.value)}
  style={{ flex: 1 }}
  onKeyDown={(e) => {
- if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+ if (e.key !== "Enter") return;
+ e.preventDefault();
+ const h = addAllowHost.trim().toLowerCase();
+ if (!h) return;
+ void api
+ .alwaysAllow(h, "")
+ .then(() => {
+ setAddAllowHost("");
+ note("Allowed " + h);
+ return reload();
+ })
+ .catch((err) => fail(err));
  }}
  />
  <button
@@ -1811,7 +1822,12 @@ export function Settings({
             <div className="row-actions">
               <button
                 className="btn"
-                disabled={!!snap.ask_paused}
+                disabled={
+                  !!snap.ask_paused ||
+                  (snap.mode !== "agents" &&
+                    !intentAgents &&
+                    (snap.agents_running || 0) === 0)
+                }
                 onClick={() =>
                   void api
                     .pauseAsks()
@@ -2073,4 +2089,13 @@ function humanKeepReason(code: string): string {
     default:
       return code || "blocked";
   }
+}
+
+/** Honest continuity line for snooze / away copy (not always “Protect computer”). */
+function protectionContinuityNow(snap: UISnapshot): string {
+  if (snap.mode === "safe" && snap.protection_on) return "Protect computer stays on.";
+  if (snap.mode === "agents") return "Agents only stays on.";
+  if (snap.mode === "session") return "Session protection stays on.";
+  if ((snap.agents_running || 0) > 0) return "My agents keep running.";
+  return "Snooze and Away do not turn protection off by themselves.";
 }

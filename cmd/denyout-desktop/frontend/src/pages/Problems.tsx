@@ -244,6 +244,11 @@ export function Problems({
           </div>
         ) : (
           <div className="row-actions">
+            {p.threat_lists_warn && onOpenThreatSettings ? (
+              <button className="btn" onClick={() => onOpenThreatSettings()}>
+                Open Threat lists
+              </button>
+            ) : null}
             <button className="btn danger" disabled={pauseBusy || pauseBlocked} onClick={() => setPauseOpen(true)}>
               Pause / turn off…
             </button>

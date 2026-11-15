@@ -90,9 +90,10 @@ export default function App() {
  deferYourSetupRef.current = deferYourSetup;
 
  // Keep first-run Quiet / A bit more aligned with saved level when snapshot arrives.
+ // Detailed is Advanced-only — do not map it to "A bit more" in the chooser.
  useEffect(() => {
  if (!snap || snap.setup_done) return;
- if (snap.notify_level === "normal" || snap.notify_level === "detailed") {
+ if (snap.notify_level === "normal") {
  setOnboardChatty("normal");
  } else if (snap.notify_level === "quiet") {
  setOnboardChatty("quiet");
@@ -1398,6 +1399,13 @@ export default function App() {
                   A bit more
                 </button>
               </div>
+              {snap?.notify_level === "detailed" ? (
+                <p className="muted" style={{ marginTop: "0.45rem", fontSize: "0.9em" }}>
+                  Detailed is already on (more status banners). Quiet / A bit more apply only if
+                  you pick one above; otherwise Detailed stays. Change Detailed later under
+                  Settings → Advanced → System banners.
+                </p>
+              ) : null}
             </div>
             {snap?.problems_alert ? (
               <p className="warn-box" style={{ marginTop: "0.75rem" }}>

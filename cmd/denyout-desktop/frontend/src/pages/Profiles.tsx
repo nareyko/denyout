@@ -288,7 +288,7 @@ export function Profiles({
  <th>Name</th>
  <th>Command</th>
  <th>Ask</th>
- <th>Dialogs</th>
+ <th>Ask / block</th>
  <th>Learning</th>
  <th>Status</th>
  <th />
@@ -631,6 +631,18 @@ export function Profiles({
  value={addHost}
  onChange={(e) => setAddHost(e.target.value)}
  style={{ flex: 1 }}
+ onKeyDown={(e) => {
+ if (e.key !== "Enter") return;
+ e.preventDefault();
+ const h = addHost.trim().toLowerCase();
+ if (!h) return;
+ if ((edit.extra_allow || []).includes(h)) {
+ setAddHost("");
+ return;
+ }
+ setEdit({ ...edit, extra_allow: [...(edit.extra_allow || []), h] });
+ setAddHost("");
+ }}
  />
  <button
  className="btn"
