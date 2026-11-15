@@ -27,7 +27,7 @@ TUN would pull **L3** traffic into userspace so UDP is observable and policy can
 | Phase | Deliverable | Kernel touch | Exit criteria |
 | --- | --- | --- | --- |
 | **T0** (done) | nft `counter` on QUIC drop; `hostctl quic-stats`; `quic_drop_stats` event | only existing apply/remove | counters readable |
-| **T1** | Optional TUN that receives **only UDP/443** for UID (mirror drop+log in userspace) | create `denyout0`, narrow nft/policy routing | closed-loop unit + VM dogfood; easy rollback to T0 |
+| **T1** (closed-loop code) | Classify IPv4/IPv6 UDP; `DecideT1` + userspace `Counter`; helper line + nft steer **string** render; `source=tun\|nft` stats | **no** device yet | unit tests green; VM dogfood still required before Protect default |
 | **T2** | DNS awareness (fake-ip or resolved-name cache) for UDP policy | + DNS hijack care | host-labeled quic stats |
 | **T3** | Optional full-UID TCP via TUN (replace redirect) | larger routing surface | parity with current MITM; VPN coexistence matrix |
 | **T4** | QUIC MITM (optional) | QUIC+TLS stack | only if threat model demands decrypt |
@@ -72,8 +72,11 @@ Rollback: `tun-stop` + delete device + restore T0 nft-only rules in one elevate.
 Code under `internal/tun` may only:
 
 - classify packets / decide DropLog vs Direct vs (future) MITM;
-- format helper protocol lines;
+- format helper protocol lines + `source=` stats;
+- render intended nft steer tables as strings;
 - unit-test without opening `/dev/net/tun`.
+
+Landed (string/unit only): `ClassifyIPPacket`, `Engine.Handle`, `RenderT1SteerTable`, `FormatDropStatsLine`.
 
 Opening a real TUN requires an explicit `DENYOUT_TUN_E2E=1` test tag and root — not CI default.
 

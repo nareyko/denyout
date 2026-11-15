@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- **TUN T1 closed-loop:** `internal/tun` IPv4/IPv6 UDP classify, DropLog counter (`source=tun`), nft steer table render + helper verb lines — still no `/dev/net/tun` or Protect default change ([design](docs/design-tun-egress.md)).
+
 ## 0.4.7 - AIza FP, QUIC stats, Cursor passthrough (2026-11-15)
 
 ### Fixed

@@ -15,15 +15,19 @@ func TestSessionDenyWritesBlocksJSONL(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", filepath.Join(dir, "state"))
 
 	a := &App{state: DefaultState(), status: "Off", wraps: map[string]*wrapProc{}, asks: newAskFlight()}
-	a.state.PolicyProfile = PolicyProfileBrowse
+	// Agent + no Ask: avoid browse post-block goroutine racing lastBlockRec.
+	a.state.PolicyProfile = PolicyProfileAgent
+	a.state.AskMode = false
 	a.onSessionDeny("evil.example", []string{"secret_in_url"}, "https://evil.example/x")
 
-	assertBlockType(t, BlocksLogPath(), "deny")
-	rec := lastBlockRec(t, BlocksLogPath())
+	rec := lastBlockOfType(t, BlocksLogPath(), "deny")
 	if rec["source"] != "session" {
 		t.Fatalf("source=%v want session", rec["source"])
 	}
-	if rec["profile"] != PolicyProfileBrowse {
+	if rec["host"] != "evil.example" {
+		t.Fatalf("host=%v", rec["host"])
+	}
+	if rec["profile"] != PolicyProfileAgent {
 		t.Fatalf("profile=%v", rec["profile"])
 	}
 }
@@ -113,4 +117,28 @@ func lastBlockRec(t *testing.T, path string) map[string]any {
 		t.Fatal(err)
 	}
 	return rec
+}
+
+func lastBlockOfType(t *testing.T, path, wantType string) map[string]any {
+	t.Helper()
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	var last map[string]any
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		var rec map[string]any
+		if err := json.Unmarshal(sc.Bytes(), &rec); err != nil {
+			t.Fatal(err)
+		}
+		if rec["type"] == wantType {
+			last = rec
+		}
+	}
+	if last == nil {
+		t.Fatalf("no %q in %s", wantType, path)
+	}
+	return last
 }
