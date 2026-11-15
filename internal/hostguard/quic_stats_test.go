@@ -1,6 +1,7 @@
 package hostguard_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/nareyko/denyout/internal/hostguard"
@@ -37,14 +38,17 @@ func TestParseQUICDropStatsLine(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !st.Present || st.Packets != 9 || st.Bytes != 100 {
+	if !st.Present || st.Packets != 9 || st.Bytes != 100 || st.Source != "nft" {
 		t.Fatalf("got %+v", st)
 	}
 }
 
 func TestFormatQUICDropStatsRoundTrip(t *testing.T) {
-	in := hostguard.QUICDropStats{Packets: 3, Bytes: 99, Present: true}
+	in := hostguard.QUICDropStats{Packets: 3, Bytes: 99, Present: true, Source: "nft"}
 	line := "OK quic1 " + hostguard.FormatQUICDropStatsLine(in)
+	if !strings.Contains(line, "source=nft") {
+		t.Fatalf("missing source=nft: %q", line)
+	}
 	out, err := hostguard.ParseQUICDropStatsLine(line)
 	if err != nil {
 		t.Fatal(err)

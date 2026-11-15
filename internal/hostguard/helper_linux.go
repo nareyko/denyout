@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+
+	"github.com/nareyko/denyout/internal/tun"
 )
 
 const (
@@ -88,6 +90,38 @@ func helperQUICStats(uid int) (QUICDropStats, error) {
 		return QUICDropStats{}, fmt.Errorf("helper quic-stats: %s", resp)
 	}
 	return ParseQUICDropStatsLine(resp)
+}
+
+func helperTunCall(verb string, uid int) (string, error) {
+	if !tun.IsHelperVerb(verb) {
+		return "", fmt.Errorf("hostguard: not a tun verb %q", verb)
+	}
+	c, err := net.Dial("unix", helperSockPath)
+	if err != nil {
+		// Closed-loop fallback: local stub reply (no elevate, no device).
+		return tun.HelperReply(verb)
+	}
+	defer c.Close()
+	line, err := tun.HelperLine(verb, uid)
+	if err != nil {
+		return "", err
+	}
+	if _, err := c.Write([]byte(line)); err != nil {
+		return "", err
+	}
+	resp, err := bufio.NewReader(c).ReadString('\n')
+	if err != nil {
+		return "", err
+	}
+	resp = strings.TrimSpace(resp)
+	if !strings.HasPrefix(resp, "OK") {
+		// Pre-tun helpers: fall back to local disabled contract (no device).
+		if strings.Contains(resp, "unknown verb") {
+			return tun.HelperReply(verb)
+		}
+		return "", fmt.Errorf("helper %s: %s", verb, resp)
+	}
+	return resp, nil
 }
 
 // InstallHelper installs and starts the systemd helper (must run as root).
@@ -267,7 +301,18 @@ func handleHelperConn(c net.Conn, ownerUID int) {
 			_, _ = c.Write([]byte("ERR " + rerr.Error() + "\n"))
 			return
 		}
+		st.Source = "nft"
 		_, _ = c.Write([]byte("OK quic1 " + FormatQUICDropStatsLine(st) + "\n"))
+		return
+	case "tun-start", "tun-stop", "tun-stats":
+		// Closed-loop: acknowledge protocol, never open /dev/net/tun here.
+		_ = uid
+		reply, rerr := tun.HelperReply(verb)
+		if rerr != nil {
+			_, _ = c.Write([]byte("ERR " + rerr.Error() + "\n"))
+			return
+		}
+		_, _ = c.Write([]byte(reply + "\n"))
 		return
 	default:
 		_, _ = c.Write([]byte("ERR unknown verb\n"))

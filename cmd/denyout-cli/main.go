@@ -533,12 +533,13 @@ Profiles live in ~/.config/denyout/profiles/`)
 
 func cmdHostctl(args []string) int {
 	if len(args) == 0 || args[0] == "--help" || args[0] == "-h" {
-		fmt.Println(`Usage: denyout-cli hostctl apply|remove|teardown|render|proxyd|quic-stats|helper-serve|helper-uninstall [flags]
+		fmt.Println(`Usage: denyout-cli hostctl apply|remove|teardown|render|proxyd|quic-stats|tun-stats|tun-start|tun-stop|helper-serve|helper-uninstall [flags]
 
   Privileged helper for Protect this computer (transparent redirect + CA trust).
   proxyd runs the transparent proxy (started after setcap so SO_MARK works).
   teardown removes redirect rules and the system CA (used by denyout-cli uninstall).
   quic-stats prints nft UDP/443 drop counters (Linux; helper or root).
+  tun-stats|tun-start|tun-stop  T1 helper protocol (disabled stub until VM dogfood; no /dev/net/tun).
   helper-serve runs the root unix-socket helper (systemd; Linux).
   helper-uninstall stops/removes denyout-hostguard.service (Linux; used by uninstall).
 
@@ -572,7 +573,29 @@ Flags:
 			}
 		}
 		st := hostguard.QUICDropStatsBestEffort(uid)
-		fmt.Printf("packets=%d bytes=%d present=%v\n", st.Packets, st.Bytes, st.Present)
+		fmt.Printf("%s\n", hostguard.FormatQUICDropStatsLine(st))
+		return 0
+	}
+	if action == "tun-stats" || action == "tun-start" || action == "tun-stop" {
+		uid, _ := hostguard.CurrentUID()
+		for i := 1; i < len(args); i++ {
+			a := args[i]
+			switch {
+			case strings.HasPrefix(a, "--uid="):
+				fmt.Sscanf(strings.TrimPrefix(a, "--uid="), "%d", &uid)
+			case a == "--uid":
+				i++
+				if i < len(args) {
+					fmt.Sscanf(args[i], "%d", &uid)
+				}
+			}
+		}
+		line, err := hostguard.HelperTunCall(action, uid)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "denyout-cli hostctl %s: %v\n", action, err)
+			return 2
+		}
+		fmt.Println(line)
 		return 0
 	}
 	if action == "helper-serve" {
