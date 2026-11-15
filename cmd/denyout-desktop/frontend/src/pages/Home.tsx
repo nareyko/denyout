@@ -205,24 +205,40 @@ export function Home({
  <section className={`home-hero card ${needsHelp ? "home-hero-alert" : ""}`}>
  <h1 className="home-headline">{headline}</h1>
  <p className="muted">{support}</p>
- {(snap?.notify_snooze_active ||
+ {(snap?.quiet_reason ||
+ snap?.notify_snooze_active ||
  snap?.away ||
  (typeof snap?.away_unread === "number" && snap.away_unread > 0) ||
  snap?.system_banners === false) && (
  <p className="notice-box" style={{ marginTop: "0.35rem" }}>
+ {snap?.quiet_reason ? (
+ <>
+ <strong style={{ fontWeight: 600 }}>{snap.quiet_reason}</strong>
+ {" — same words as the tray. "}
+ {snap.away || snap.fullscreen_now
+ ? "Ask/block dialogs and soft OS banners stay quiet (Protect failed and tray-hidden on window close can still show). "
+ : snap.notify_snooze_active
+   ? "Soft OS banners stay quiet (Protect failed and tray-hidden on window close can still show). "
+   : ""}
+ </>
+ ) : (
+ <>
  {snap?.notify_snooze_active
  ? "Notifications snoozed (Protect failed and tray-hidden on window close can still show). "
  : ""}
  {snap?.away
  ? "Away — soft banners and Ask/block dialogs quiet for now (Protect failed and tray-hidden on window close can still show). "
  : ""}
+ </>
+ )}
  {typeof snap?.away_unread === "number" && snap.away_unread > 0
  ? `${snap.away_unread} quiet. `
  : ""}
  {snap?.system_banners === false
  ? "System banners off (Protect failed and tray-hidden on window close can still show). "
  : ""}
- {(snap?.notify_snooze_active ||
+ {(snap?.quiet_reason ||
+ snap?.notify_snooze_active ||
  snap?.away ||
  (typeof snap?.away_unread === "number" && snap.away_unread > 0)) && (
  <>

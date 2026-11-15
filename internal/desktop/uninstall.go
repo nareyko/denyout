@@ -25,6 +25,7 @@ func Uninstall(opts UninstallOptions) error {
 	_ = opts.Yes
 	fmt.Fprintln(os.Stderr, "denyout uninstall: stopping tray/proxyd...")
 	StopPreviousInstances()
+	// Dismiss OS banners before teardown (and again at end — orphans can appear mid-run).
 	notify.CloseAll()
 
 	uid, _ := hostguard.CurrentUID()
@@ -88,6 +89,7 @@ func Uninstall(opts UninstallOptions) error {
 		WarnStaleBinariesOnPATH(dir)
 	}
 
+	notify.CloseAll()
 	printUninstallVerification(opts.KeepConfig)
 	fmt.Fprintln(os.Stderr, "denyout uninstall: done")
 	return nil

@@ -53,7 +53,18 @@ export type UISnapshot = {
  sound_only_answer?: boolean;
  system_banners?: boolean;
  respect_fullscreen?: boolean;
+ fullscreen_detect?: boolean;
+ fullscreen_now?: boolean;
+ fullscreen_wayland?: boolean;
  silent_when_open?: boolean;
+ undo_offer?: {
+  kind?: string;
+  host?: string;
+  body?: string;
+  expires_at?: string;
+ };
+ quiet_reason?: string;
+ quieting?: boolean;
  decision_timeout_sec: number;
  reask_interval_sec: number;
  protect_paused_until?: string;
@@ -260,6 +271,8 @@ type Bridge = {
  UIResumeAsks(): Promise<string>;
  UIMigrateUXv2(switchToSafe: boolean): Promise<void>;
  UIUndoLastAlwaysAllow(): Promise<string>;
+ UITakeUndoOffer(): Promise<void>;
+ UIDismissUndoOffer(): Promise<void>;
  UITestProtection(): Promise<string>;
  UIBulkAlwaysAllow(hosts: string[]): Promise<string>;
  GetThreatLists(): Promise<ThreatListsView>;
@@ -375,6 +388,8 @@ export const api = {
  resumeAsks: () => bridge().UIResumeAsks(),
  migrateUXv2: (switchToSafe: boolean) => bridge().UIMigrateUXv2(switchToSafe),
  undoLastAlways: () => bridge().UIUndoLastAlwaysAllow(),
+ takeUndoOffer: () => bridge().UITakeUndoOffer(),
+ dismissUndoOffer: () => bridge().UIDismissUndoOffer(),
  testProtection: () => bridge().UITestProtection(),
  bulkAlwaysAllow: (hosts: string[]) => bridge().UIBulkAlwaysAllow(hosts) as Promise<string>,
  threatLists: () => bridge().GetThreatLists(),

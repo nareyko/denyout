@@ -211,9 +211,14 @@ func (a *App) runTray(ctx context.Context) error {
 
 				tooltip := "DenyOut - " + label
 				statusExtra := ""
+				quietPhrase := a.quietReason()
 				// Mirror chrome: Needs attention pill drops snooze/quiet extras.
 				if !needsAttention {
-					if snoozeUntil != "" {
+					if quietPhrase != "" {
+						tooltip += " · " + quietPhrase
+						statusExtra += " · " + quietPhrase
+					} else if snoozeUntil != "" {
+						// Fallback if phrase empty but snooze set (should not happen).
 						tooltip += " · snoozed"
 						statusExtra += " · snoozed"
 					}
@@ -226,6 +231,10 @@ func (a *App) runTray(ctx context.Context) error {
 							statusExtra += fmt.Sprintf(" · %d quiet", unread)
 						}
 					}
+					if a.undoOfferActive() {
+						tooltip += " · Undo available — open DenyOut"
+						statusExtra += " · Undo"
+					}
 					if statusExtra != "" {
 						statusItem.SetLabel(label + statusExtra)
 					}
@@ -233,9 +242,16 @@ func (a *App) runTray(ctx context.Context) error {
 				tray.SetTooltip(tooltip)
 
 				wrapsRunning := a.runningWrapCount() > 0
+				quieting := quietPhrase != ""
 				switch {
 				case needsAttention, strings.Contains(strings.ToLower(st), "error"), strings.Contains(st, "Needs"):
 					tray.SetIcon(iconAlertPNG)
+				case quieting:
+					// Slate-blue quiet icon — distinct from On (cream), Idle (white), Alert (brown).
+					tray.SetIcon(iconQuietPNG)
+					if threatWarn {
+						tray.SetTooltip(tooltip + " · Threat lists need a refresh")
+					}
 				case mode != ModeOff:
 					// Threat-list warn keeps the on icon (chrome: mode pill + warn chip).
 					tray.SetIcon(iconOnPNG)

@@ -14,19 +14,19 @@ import (
 )
 
 var (
-	mu               sync.Mutex
-	enabled          = true
-	level            = "quiet" // quiet | normal | detailed — new installs default Quiet
-	uiFocused        bool      // main window focused/visible
-	away             bool      // screen locked / idle
-	snoozeUntil      time.Time // zero = not snoozed
-	bannersAllowed   = true    // master: Allow system banners (protect_failed still passes when off)
-	silentWhenOpen   = true    // If DenyOut is open, stay silent in the system
-	respectFullscreen = true   // Respect fullscreen / games
-	fullscreen       bool      // runtime: currently fullscreen (Phase E detector wires this)
-	quietOvernight   = true    // No sound at night (sound gate; Emit banners unchanged)
-	soundOnlyAnswer  = true    // Sound only when you must answer
-	nowFunc          = time.Now // overridable in tests (night window)
+	mu                sync.Mutex
+	enabled           = true
+	level             = "quiet"  // quiet | normal | detailed — new installs default Quiet
+	uiFocused         bool       // main window focused/visible
+	away              bool       // screen locked / idle
+	snoozeUntil       time.Time  // zero = not snoozed
+	bannersAllowed    = true     // master: Allow system banners (protect_failed still passes when off)
+	silentWhenOpen    = true     // If DenyOut is open, stay silent in the system
+	respectFullscreen = true     // Respect fullscreen / games
+	fullscreen        bool       // runtime: currently fullscreen (Phase E detector wires this)
+	quietOvernight    = true     // No sound at night (sound gate; Emit banners unchanged)
+	soundOnlyAnswer   = true     // Sound only when you must answer
+	nowFunc           = time.Now // overridable in tests (night window)
 )
 
 // Kind is an OS-toast category. Only whitelisted kinds may reach the desktop.
@@ -459,6 +459,8 @@ func untrackWaitProc(p *os.Process) {
 
 // CloseAll dismisses lingering DenyOut OS banners (tracked --wait children + Linux pkill fallback).
 // Call on Quit unload and Uninstall so sticky Protect-failed / Undo toasts do not outlive the app.
+// Killing --wait notify-send processes removes the matching GNOME shade entries; orphaned
+// children reparented to systemd are caught by the pkill fallback.
 func CloseAll() {
 	waitProcsMu.Lock()
 	procs := waitProcs
@@ -470,10 +472,19 @@ func CloseAll() {
 		}
 	}
 	if runtime.GOOS == "linux" {
-		if _, err := exec.LookPath("pkill"); err == nil {
-			_ = exec.Command("pkill", "-f", "notify-send.*--app-name=DenyOut").Run()
-		}
+		killDenyOutNotifySend()
 	}
+}
+
+// killDenyOutNotifySend best-effort clears Linux notify-send processes that used --app-name=DenyOut
+// (including orphans whose parent already exited without CloseAll).
+func killDenyOutNotifySend() {
+	if _, err := exec.LookPath("pkill"); err != nil {
+		return
+	}
+	// Prefer the literal argv form Emit/EmitAction/Ask use; keep a looser pattern as backup.
+	_ = exec.Command("pkill", "-f", "notify-send --app-name=DenyOut").Run()
+	_ = exec.Command("pkill", "-f", "notify-send.*--app-name=DenyOut").Run()
 }
 
 func runNotifySendActions(kind Kind, title, body string, wait time.Duration, actions []Action) string {

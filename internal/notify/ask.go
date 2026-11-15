@@ -1,6 +1,7 @@
 package notify
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -86,11 +87,28 @@ func askNotifySend(title, body string) (AskAction, bool) {
 		title,
 		body,
 	)
-	out, err := cmd.Output()
-	if err != nil {
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	if err := cmd.Start(); err != nil {
 		return "", false
 	}
-	a := AskAction(strings.TrimSpace(string(out)))
+	trackWaitProc(cmd.Process)
+	defer untrackWaitProc(cmd.Process)
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+	const askWait = 122 * time.Second
+	select {
+	case err := <-done:
+		if err != nil {
+			return "", false
+		}
+	case <-time.After(askWait):
+		if cmd.Process != nil {
+			_ = cmd.Process.Kill()
+		}
+		return "", false
+	}
+	a := AskAction(strings.TrimSpace(stdout.String()))
 	switch a {
 	case AskOnce, AskAlways, AskDeny:
 		return a, true

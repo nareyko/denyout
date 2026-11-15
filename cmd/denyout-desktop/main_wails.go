@@ -184,7 +184,7 @@ func (b *Bridge) UISetNotifyUIFocused(on bool)          { b.app.UISetNotifyUIFoc
 func (b *Bridge) UISetQuietWhileAway(on bool) error     { return b.app.UISetQuietWhileAway(on) }
 func (b *Bridge) UIClearAwayUnread() error              { return b.app.UIClearAwayUnread() }
 func (b *Bridge) UIDismissAwayDigest() error            { return b.app.UIDismissAwayDigest() }
-func (b *Bridge) UISetNotifySnooze(choice string) error  { return b.app.UISetNotifySnooze(choice) }
+func (b *Bridge) UISetNotifySnooze(choice string) error { return b.app.UISetNotifySnooze(choice) }
 func (b *Bridge) UISetQuietOvernight(on bool) error     { return b.app.UISetQuietOvernight(on) }
 func (b *Bridge) UISetSoundOnlyAnswer(on bool) error    { return b.app.UISetSoundOnlyAnswer(on) }
 func (b *Bridge) UISetSystemBanners(on bool) error      { return b.app.UISetSystemBanners(on) }
@@ -243,7 +243,9 @@ func (b *Bridge) UIResumeAsks() string              { return b.app.UIResumeAsks(
 func (b *Bridge) UIUndoLastAlwaysAllow() (string, error) {
 	return b.app.UIUndoLastAlwaysAllow()
 }
-func (b *Bridge) UITestProtection() string { return b.app.UITestProtection() }
+func (b *Bridge) UITakeUndoOffer() error    { return b.app.UITakeUndoOffer() }
+func (b *Bridge) UIDismissUndoOffer() error { return b.app.UIDismissUndoOffer() }
+func (b *Bridge) UITestProtection() string  { return b.app.UITestProtection() }
 func (b *Bridge) UIBulkAlwaysAllow(hosts []string) (string, error) {
 	return b.app.UIBulkAlwaysAllow(hosts)
 }

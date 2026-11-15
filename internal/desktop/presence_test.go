@@ -235,7 +235,7 @@ func TestUndoBannerThrottleSameHost(t *testing.T) {
 	if host != "same.example" {
 		t.Fatalf("host=%q", host)
 	}
-	// Second call must be throttled (no second EmitAction wait). calls stay 0 until Undo clicked.
+	// Second call must be throttled (no second in-app offer). calls stay 0 until Undo taken.
 	_ = calls
 	a.emitAllowUndoBanner("other.example", "other", nil)
 	undoBannerMu.Lock()

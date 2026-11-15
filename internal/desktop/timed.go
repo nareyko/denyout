@@ -112,15 +112,15 @@ func (a *App) sweepTimedRules() {
 	if agents {
 		resumed = "Agents only is on again.\nUndo to pause again."
 	}
-	notify.EmitAction(notify.KindProtectResumed, "DenyOut",
-		resumed, notify.ExpireFor(notify.KindProtectResumed),
-		[]notify.Action{{ID: "undo", Label: "Undo"}},
-		func(id string) {
-			if id != "undo" {
-				return
-			}
-			// Same path as tray Off (in-app PauseModal when Wails).
-			a.stopProtectionFromTray()
-		},
-	)
+	ttl := notify.ExpireFor(notify.KindProtectResumed)
+	if ttl <= 0 {
+		ttl = undoOfferDefaultResume
+	}
+	// Pass 29: Undo only in-app (no OS --action=undo). Open window so the strip is visible.
+	a.armUndoOffer(undoOfferResumePause, "", resumed, ttl, func() {
+		a.stopProtectionFromTray()
+	})
+	if a.opts.OpenUI != nil {
+		a.RequestOpenUI("home")
+	}
 }

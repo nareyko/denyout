@@ -44,60 +44,60 @@ type DenialQuery struct {
 
 // UISnapshot is top-bar / settings state for the Wails shell.
 type UISnapshot struct {
-	Version             string      `json:"version"`
-	Status              string      `json:"status"`
-	Mode                string      `json:"mode"` // safe | agents | off | session
-	ModeLabel           string      `json:"mode_label"`
-	ProtectionOn        bool        `json:"protection_on"`
-	Notify              bool        `json:"notify"`
-	NotifyLevel         string      `json:"notify_level"`
-	DecisionTimeoutSec  int         `json:"decision_timeout_sec"`
-	ReaskIntervalSec    int         `json:"reask_interval_sec"`
-	ProtectPausedUntil  string      `json:"protect_paused_until,omitempty"`
-	ProtectPauseLast    string      `json:"protect_pause_last,omitempty"`
-	TimedAllows         []TimedRule `json:"timed_allows"`
-	TimedDenies         []TimedRule `json:"timed_denies"`
-	AskMode             bool        `json:"ask_mode"`
-	PolicyProfile       string      `json:"policy_profile"`
-	Autostart           bool        `json:"autostart"`
-	AlwaysAllow         []string    `json:"always_allow"`
-	RememberedKeeps     []string    `json:"remembered_keeps"`
-	LastDenyHost        string      `json:"last_deny_host"`
-	LastDenyURL         string      `json:"last_deny_url"`
-	LastDenySummary     string      `json:"last_deny_summary"`
-	LastDenyProcess     string      `json:"last_deny_process,omitempty"`
-	BlockedToday        int         `json:"blocked_today"`
-	YourSetupShown      bool        `json:"your_setup_shown"`
-	SetupDone           bool        `json:"setup_done"`
-	HelperOK            bool        `json:"helper_ok"`
-	ProtectConfirmTitle string      `json:"protect_confirm_title,omitempty"`
-	ProtectConfirmBody  string      `json:"protect_confirm_body,omitempty"`
-	NewDenials          int         `json:"new_denials"`
-	ControlURL          string      `json:"control_url,omitempty"`
-	AuditPath           string      `json:"audit_path"`
-	LogDir              string      `json:"log_dir"`
-	DismissedTips       []string    `json:"dismissed_tips"`
-	AskPaused           bool        `json:"ask_paused"`
-	ProblemsAlert       bool        `json:"problems_alert"`
-	YourSetupText       string      `json:"your_setup_text"`
-	ChecklistDone       bool        `json:"checklist_done"`
-	NeedsUXv2Migration  bool        `json:"needs_uxv2_migration"`
-	AskPausedUntil      string      `json:"ask_paused_until,omitempty"`
-	UpdateAvailable     bool        `json:"update_available"`
-	UpdateVersion       string      `json:"update_version,omitempty"`
-	UpdateURL           string      `json:"update_url,omitempty"`
-	UpdateNotes         string      `json:"update_notes,omitempty"`
-	AccountSignedIn     bool        `json:"account_signed_in"`
-	AccountEmail        string      `json:"account_email,omitempty"`
-	AccountTrustLine    string      `json:"account_trust_line,omitempty"`
-	SyncEnabled         bool        `json:"sync_enabled"`
-	ComputerAvailable   bool        `json:"computer_available"`
-	AgentsRunning       int         `json:"agents_running"`
-	ThreatListsWarn     bool        `json:"threat_lists_warn"` // lists on but missing/stale (not Protect failure)
-	Notice              string      `json:"notice,omitempty"`  // one-shot in-app note (e.g. legacy Session cleared)
-	QuietWhileAway      bool            `json:"quiet_while_away"` // Stay quiet while locked/idle (default on)
-	Away                bool            `json:"away"`             // currently treated as Away
-	AwayUnread          int             `json:"away_unread"`      // suppressed prompts while Away
+	Version             string          `json:"version"`
+	Status              string          `json:"status"`
+	Mode                string          `json:"mode"` // safe | agents | off | session
+	ModeLabel           string          `json:"mode_label"`
+	ProtectionOn        bool            `json:"protection_on"`
+	Notify              bool            `json:"notify"`
+	NotifyLevel         string          `json:"notify_level"`
+	DecisionTimeoutSec  int             `json:"decision_timeout_sec"`
+	ReaskIntervalSec    int             `json:"reask_interval_sec"`
+	ProtectPausedUntil  string          `json:"protect_paused_until,omitempty"`
+	ProtectPauseLast    string          `json:"protect_pause_last,omitempty"`
+	TimedAllows         []TimedRule     `json:"timed_allows"`
+	TimedDenies         []TimedRule     `json:"timed_denies"`
+	AskMode             bool            `json:"ask_mode"`
+	PolicyProfile       string          `json:"policy_profile"`
+	Autostart           bool            `json:"autostart"`
+	AlwaysAllow         []string        `json:"always_allow"`
+	RememberedKeeps     []string        `json:"remembered_keeps"`
+	LastDenyHost        string          `json:"last_deny_host"`
+	LastDenyURL         string          `json:"last_deny_url"`
+	LastDenySummary     string          `json:"last_deny_summary"`
+	LastDenyProcess     string          `json:"last_deny_process,omitempty"`
+	BlockedToday        int             `json:"blocked_today"`
+	YourSetupShown      bool            `json:"your_setup_shown"`
+	SetupDone           bool            `json:"setup_done"`
+	HelperOK            bool            `json:"helper_ok"`
+	ProtectConfirmTitle string          `json:"protect_confirm_title,omitempty"`
+	ProtectConfirmBody  string          `json:"protect_confirm_body,omitempty"`
+	NewDenials          int             `json:"new_denials"`
+	ControlURL          string          `json:"control_url,omitempty"`
+	AuditPath           string          `json:"audit_path"`
+	LogDir              string          `json:"log_dir"`
+	DismissedTips       []string        `json:"dismissed_tips"`
+	AskPaused           bool            `json:"ask_paused"`
+	ProblemsAlert       bool            `json:"problems_alert"`
+	YourSetupText       string          `json:"your_setup_text"`
+	ChecklistDone       bool            `json:"checklist_done"`
+	NeedsUXv2Migration  bool            `json:"needs_uxv2_migration"`
+	AskPausedUntil      string          `json:"ask_paused_until,omitempty"`
+	UpdateAvailable     bool            `json:"update_available"`
+	UpdateVersion       string          `json:"update_version,omitempty"`
+	UpdateURL           string          `json:"update_url,omitempty"`
+	UpdateNotes         string          `json:"update_notes,omitempty"`
+	AccountSignedIn     bool            `json:"account_signed_in"`
+	AccountEmail        string          `json:"account_email,omitempty"`
+	AccountTrustLine    string          `json:"account_trust_line,omitempty"`
+	SyncEnabled         bool            `json:"sync_enabled"`
+	ComputerAvailable   bool            `json:"computer_available"`
+	AgentsRunning       int             `json:"agents_running"`
+	ThreatListsWarn     bool            `json:"threat_lists_warn"` // lists on but missing/stale (not Protect failure)
+	Notice              string          `json:"notice,omitempty"`  // one-shot in-app note (e.g. legacy Session cleared)
+	QuietWhileAway      bool            `json:"quiet_while_away"`  // Stay quiet while locked/idle (default on)
+	Away                bool            `json:"away"`              // currently treated as Away
+	AwayUnread          int             `json:"away_unread"`       // suppressed prompts while Away
 	AwayDigest          *AwayDigestView `json:"away_digest,omitempty"`
 	NotifySnoozeUntil   string          `json:"notify_snooze_until,omitempty"` // RFC3339 if active
 	NotifySnoozeActive  bool            `json:"notify_snooze_active"`
@@ -105,14 +105,20 @@ type UISnapshot struct {
 	SoundOnlyAnswer     bool            `json:"sound_only_answer"`
 	SystemBanners       bool            `json:"system_banners"`
 	RespectFullscreen   bool            `json:"respect_fullscreen"`
+	FullscreenDetect    bool            `json:"fullscreen_detect"`  // can see fullscreen apps right now
+	FullscreenNow       bool            `json:"fullscreen_now"`     // active window fullscreen (only if detect)
+	FullscreenWayland   bool            `json:"fullscreen_wayland"` // session looks Wayland (copy hint)
 	SilentWhenOpen      bool            `json:"silent_when_open"`
+	UndoOffer           *UndoOfferView  `json:"undo_offer,omitempty"`   // in-app Undo (no OS button)
+	QuietReason         string          `json:"quiet_reason,omitempty"` // shared: Quiet · away · fullscreen · snoozed…
+	Quieting            bool            `json:"quieting"`               // any quiet reason active
 }
 
-	// AwayDigestView is the one-shot "Quiet items waiting" card (Away or fullscreen).
+// AwayDigestView is the one-shot "Quiet items waiting" card (Away or fullscreen).
 type AwayDigestView struct {
 	Pending      bool     `json:"pending"`
-	Blocks       int      `json:"blocks"`  // auto-kept / keep-repeat while Away
-	Waiting      int      `json:"waiting"` // hard-block Decide later while Away
+	Blocks       int      `json:"blocks"`        // auto-kept / keep-repeat while Away
+	Waiting      int      `json:"waiting"`       // hard-block Decide later while Away
 	Hosts        []string `json:"hosts"`         // block hosts only
 	WaitingHosts []string `json:"waiting_hosts"` // waiting-decision hosts
 }
@@ -161,6 +167,8 @@ func (a *App) GetUISnapshot() UISnapshot {
 	// Open threat cache outside a.mu so threat_lists_warn is honest on first paint
 	// (ensureThreatStore takes its own lock; calling it under a.mu deadlocks).
 	_ = a.ensureThreatStore(false)
+	// Refresh fullscreen detect outside a.mu (probes may exec; presence has its own lock).
+	a.pollFullscreenOnce()
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	mode := uiModeLocked(a)
@@ -294,7 +302,15 @@ func (a *App) GetUISnapshot() UISnapshot {
 		SoundOnlyAnswer:    !a.state.SoundOnlyAnswerOff,
 		SystemBanners:      !a.state.SystemBannersOff,
 		RespectFullscreen:  !a.state.RespectFullscreenOff,
-		SilentWhenOpen:     !a.state.SilentWhenOpenOff,
+		FullscreenDetect:   a.fullscreenDetectOK(),
+		FullscreenNow: func() bool {
+			a.presence.mu.Lock()
+			defer a.presence.mu.Unlock()
+			return a.presence.fsActive
+		}(),
+		FullscreenWayland: sessionLooksWayland(),
+		SilentWhenOpen:    !a.state.SilentWhenOpenOff,
+		UndoOffer:         a.undoOfferViewLocked(),
 	}
 	if until := activeNotifySnoozeUntil(a.state.NotifySnoozeUntil); until != "" {
 		snap.NotifySnoozeUntil = until
@@ -304,6 +320,11 @@ func (a *App) GetUISnapshot() UISnapshot {
 		a.state.NotifySnoozeUntil = ""
 		_ = SaveState(a.state)
 		notify.SetSnoozeUntil(time.Time{})
+	}
+	// After snooze expiry cleanup so Quiet · snoozed… matches NotifySnoozeActive.
+	if qr := a.quietReasonLocked(); qr != "" {
+		snap.QuietReason = qr
+		snap.Quieting = true
 	}
 	if snap.AskPausedUntil != "" {
 		if exp, err := time.Parse(time.RFC3339, snap.AskPausedUntil); err != nil || !time.Now().Before(exp) {

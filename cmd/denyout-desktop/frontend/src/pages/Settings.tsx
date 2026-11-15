@@ -744,7 +744,7 @@ export function Settings({
                   : ""}
                 {snap.quiet_overnight === false ? "Night quiet sound off. " : ""}
                 {snap.sound_only_answer === false
-                  ? "Sound may play for soft OS banners (Undo / Open / Protect or Agents resumed / tray-hidden) and Protect failed. "
+                  ? "Sound may play for soft OS banners (Open / tray-hidden) and Protect failed. "
                   : ""}
                 {snap.notify_snooze_active
                   ? ""
@@ -950,7 +950,7 @@ export function Settings({
             Sound only when you must answer
           </label>
           <p className="muted" style={{ marginTop: "0.25rem" }}>
-            Soft OS banners (Open / Undo / resumed / tray-hidden) stay silent. Protect failed
+            Soft OS banners (Open / tray-hidden) stay silent. Protect failed
             may still sound.
           </p>
             <label style={{ display: "block", marginTop: "0.5rem" }}>
@@ -1345,9 +1345,9 @@ export function Settings({
  <section className="card" id="settings-system-banners">
  <h2>System banners</h2>
  <p className="muted">
- How DenyOut may talk through the operating system. Decisions stay inside DenyOut.
- The OS may show Open DenyOut, Undo, Protect/Agents resumed, Protect failed, or the
- tray-hidden hint (window close).
+ How DenyOut may talk through the operating system. Decisions and Undo stay inside
+ DenyOut. The OS may show Open DenyOut, Protect failed, or the tray-hidden hint
+ (window close) — not Undo.
  </p>
  <label style={{ display: "block" }}>
  <input
@@ -1414,6 +1414,20 @@ export function Settings({
  still show). Quiet items still add to the tray/chrome count; when fullscreen ends (or
  you return from Away), a summary is ready to review or clear under Notifications.
  </p>
+ {snap.fullscreen_detect === false ? (
+ <p className="warn-box" style={{ marginTop: "0.5rem" }}>
+ DenyOut cannot see fullscreen apps on this desktop right now
+ {snap.fullscreen_wayland
+ ? " (common on locked-down GNOME Wayland)"
+ : ""}
+ . Stay quiet while away still covers lock and idle. This setting stays on for when
+ detection works (X11, Hyprland, Sway, or GNOME that allows window introspect).
+ </p>
+ ) : snap.fullscreen_now ? (
+ <p className="muted" style={{ marginTop: "0.5rem" }}>
+ Fullscreen is detected now — quiet rules for games / fullscreen are active.
+ </p>
+ ) : null}
  <label style={{ display: "block", marginTop: "0.5rem" }}>
  <input
  type="checkbox"
@@ -1436,13 +1450,14 @@ export function Settings({
  <strong style={{ fontWeight: 500, color: "inherit" }}>
  Decisions only inside DenyOut
  </strong>{" "}
- — always on. Allow / Keep / timed choices are in-app. The OS may still show Open /
- Undo / Protect or Agents resumed / Protect failed / tray-hidden.
+ — always on. Allow / Keep / timed choices and Undo are in-app (strip at the bottom;
+ tray tooltip says Undo available). The OS may still show Open / Protect failed /
+ tray-hidden — not Undo.
  </p>
  <p className="muted" style={{ marginTop: "0.35rem" }}>
  How long banners live: Protect failed stays · soft Open ~12s (banners on + A bit
- more+; not while snoozed/focused/fullscreen quiet) · Protect/Agents resumed ~5s
- (Detailed) · Undo ~10s · tray-hidden ~8s.
+ more+; not while snoozed/focused/fullscreen quiet) · in-app Undo ~10s after Allow
+ (~5s after auto-resume) · tray-hidden ~8s.
  </p>
  </section>
  )}

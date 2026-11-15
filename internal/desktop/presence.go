@@ -2,6 +2,7 @@ package desktop
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -29,6 +30,8 @@ type presence struct {
 	away          bool // last computed, for notify.SetAway edge updates
 	digestPending bool // Armed on Away→Present when unread > 0
 	softOpenSent  bool // Soft OS Open once per return cycle
+	fsDetectOK    bool // last probeFullscreen ok (honest Settings)
+	fsActive      bool // last known fullscreen when fsDetectOK
 }
 
 func (a *App) initPresence() {
@@ -235,14 +238,39 @@ func (a *App) pollPresenceOnce() {
 
 // pollFullscreenOnce updates notify.Fullscreen when a detector is available.
 // Leaving fullscreen with quiet unread arms the same return digest as Away→Present.
+// When detection is unavailable, clear fullscreen so we do not fake quiet.
 func (a *App) pollFullscreenOnce() {
-	if fs, ok := probeFullscreen(); ok {
-		was := notify.Fullscreen()
-		notify.SetFullscreen(fs)
-		if was && !fs {
-			a.armQuietReturnDigest()
+	fs, ok := probeFullscreen()
+	a.presence.mu.Lock()
+	a.presence.fsDetectOK = ok
+	a.presence.fsActive = ok && fs
+	a.presence.mu.Unlock()
+	if !ok {
+		if notify.Fullscreen() {
+			notify.SetFullscreen(false)
 		}
+		return
 	}
+	was := notify.Fullscreen()
+	notify.SetFullscreen(fs)
+	if was && !fs {
+		a.armQuietReturnDigest()
+	}
+}
+
+// fullscreenDetectOK reports whether the last poll could see fullscreen state.
+func (a *App) fullscreenDetectOK() bool {
+	a.presence.mu.Lock()
+	defer a.presence.mu.Unlock()
+	return a.presence.fsDetectOK
+}
+
+// sessionLooksWayland is used for honest Settings copy (not probe order).
+func sessionLooksWayland() bool {
+	if strings.EqualFold(os.Getenv("XDG_SESSION_TYPE"), "wayland") {
+		return true
+	}
+	return strings.TrimSpace(os.Getenv("WAYLAND_DISPLAY")) != ""
 }
 
 // isFullscreenQuiet: Respect fullscreen is on and a fullscreen app is in front.

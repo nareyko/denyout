@@ -518,26 +518,34 @@ export default function App() {
  const unreadAway = snap?.away_unread && snap.away_unread > 0 ? snap.away_unread : 0;
  const unreadSuffix =
  unreadAway === 1 ? " · 1 quiet" : unreadAway > 1 ? ` · ${unreadAway} quiet` : "";
- const snoozeSuffix = snap?.notify_snooze_active ? " · snoozed" : "";
+ // Pass 30: shared phrase with tray (Quiet · away · fullscreen · snoozed until …).
+ const quietReason = (snap?.quiet_reason || "").trim();
+ const quietReasonSuffix = quietReason ? ` · ${quietReason}` : "";
+ const snoozeSuffix =
+  !quietReason && snap?.notify_snooze_active ? " · snoozed" : "";
  const statusTextBase =
  snap?.threat_lists_warn && !snap?.problems_alert
  ? modeStatusText
  ? `${modeStatusText} · Threat lists need a refresh`
  : "Threat lists need a refresh"
  : modeStatusText;
- // Match pill + tray: Needs attention drops snooze/quiet extras.
- const statusExtras = snap?.problems_alert ? "" : `${snoozeSuffix}${unreadSuffix}`;
+ // Match pill + tray: Needs attention drops quiet extras.
+ const statusExtras = snap?.problems_alert
+  ? ""
+  : `${quietReasonSuffix || snoozeSuffix}${unreadSuffix}`;
  const statusText = statusTextBase
  ? `${statusTextBase}${statusExtras}`
  : snap?.problems_alert
    ? ""
-   : unreadAway
-     ? unreadAway === 1
-       ? `1 quiet${snoozeSuffix}`
-       : `${unreadAway} quiet${snoozeSuffix}`
-     : snoozeSuffix
-       ? "Snoozed"
-       : "";
+   : quietReason
+     ? `${quietReason}${unreadSuffix}`
+     : unreadAway
+       ? unreadAway === 1
+         ? `1 quiet${snoozeSuffix}`
+         : `${unreadAway} quiet${snoozeSuffix}`
+       : snoozeSuffix
+         ? "Snoozed"
+         : "";
  const pillLabelBase = !snap
  ? "Setup pending"
  : snap.problems_alert
@@ -565,7 +573,7 @@ export default function App() {
                : agentsOnlyOff
                  ? "Off · agents running"
                  : snap.mode_label || "Off";
- const pillLabel = `${pillLabelBase}${snap?.problems_alert ? "" : `${snoozeSuffix}${unreadSuffix}`}`;
+ const pillLabel = `${pillLabelBase}${snap?.problems_alert ? "" : `${quietReasonSuffix || snoozeSuffix}${unreadSuffix}`}`;
 
  type JumpItem = {
  label: string;
@@ -1350,8 +1358,57 @@ export default function App() {
  </div>
  ) : null}
 
+ {/* Pass 29: in-app Undo only (no OS Undo button). Below Decision (z=60). */}
+ {!decision && snap?.undo_offer?.body ? (
+ <div
+ className="notice-box"
+ style={{
+ position: "fixed",
+ bottom: "1rem",
+ left: "1rem",
+ right: "1rem",
+ zIndex: 52,
+ display: "flex",
+ flexWrap: "wrap",
+ gap: "0.5rem",
+ alignItems: "center",
+ }}
+ role="status"
+ >
+ <span style={{ flex: "1 1 12rem", whiteSpace: "pre-line" }}>
+ {snap.undo_offer.body}
+ </span>
+ <button
+ type="button"
+ className="btn primary"
+ disabled={quitBusy}
+ onClick={() => {
+ void api
+ .takeUndoOffer()
+ .then(() => refreshSnap())
+ .catch((e) => setOnboardToast(String(e) || "Could not undo."));
+ }}
+ >
+ Undo
+ </button>
+ <button
+ type="button"
+ className="btn subtle"
+ onClick={() => {
+ void api
+ .dismissUndoOffer()
+ .then(() => refreshSnap())
+ .catch(() => undefined);
+ }}
+ >
+ Dismiss
+ </button>
+ </div>
+ ) : null}
+
  {/* Never cover Ask/block (Decision z=60) — toast only when Decision is closed. */}
  {(!decision &&
+ !snap?.undo_offer?.body &&
  (trayPauseMsg ||
  (onboardMsg &&
  !showOnboarding &&

@@ -35,6 +35,9 @@ var iconIdlePNG []byte
 //go:embed icon-alert.png
 var iconAlertPNG []byte
 
+//go:embed icon-quiet.png
+var iconQuietPNG []byte
+
 // Keep default icon referenced for older tray paths / tests.
 var _ = iconPNG
 
@@ -77,6 +80,7 @@ type App struct {
 	lastAutostartCheck time.Time          // throttle login-entry repair while UI polls
 	legacySessionNote  string             // one-shot Home notice after clearing ScopeSession on restore
 	presence           presence           // Away / idle / lock (notify-presence wave)
+	undoOffer          *undoOffer         // in-app Undo (Pass 29; no OS Undo button)
 }
 
 func applyNotifyPrefs(st State) {
