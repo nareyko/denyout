@@ -15,11 +15,14 @@ export function Home({
  onOpenThreatSettings,
  onOpenAgents,
  onOpenSettingsDiagnostics,
+ onBeforeProtect,
 }: {
  snap: UISnapshot | null;
  pauseBlocked?: boolean;
  pauseCloseReq?: number;
  onPauseOpenChange?: (open: boolean) => void;
+ /** First-run: apply Quiet / A bit more before Protect turns on from Home peek. */
+ onBeforeProtect?: () => void | Promise<void>;
  onChanged?: () => void;
  onSeeHistory?: () => void;
  onOpenProblems?: () => void;
@@ -135,6 +138,7 @@ export function Home({
  setMsg("");
  setErr("");
  try {
+ if (onBeforeProtect) await onBeforeProtect();
  if (turnOnAgents) await api.retryProtect();
  else if (agentsOnly || sessionOn) await api.switchSafe();
  else await api.enableSafe();
@@ -348,8 +352,9 @@ export function Home({
  <section className="card">
  <h2>Nothing blocked yet - that is OK.</h2>
  <p className="muted">
- When DenyOut blocks something, you get an in-app Keep blocked / Allow this site prompt —
- and it shows up here.
+ {protectedOn || agentsOnly || sessionOn
+ ? "When DenyOut blocks something while you are here, you get an in-app Keep blocked / Allow this site prompt — and it shows up in History. While you are away (if Stay quiet while away is on), it stays quiet and shows one summary when you return."
+ : "Turn on Protect computer (or run My agents) to start recording blocks here. Everyday browsing stays unprotected until then."}
  </p>
  <button className="btn" onClick={() => onSeeHistory?.()}>
  See history

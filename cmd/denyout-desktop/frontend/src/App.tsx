@@ -31,6 +31,13 @@ export default function App() {
  setOnboardMsgWarn(!!msg && warn);
  }
  async function applyOnboardChatty() {
+ // Do not silently downgrade an existing Detailed preference.
+ try {
+  const s = snap ?? (await api.snapshot());
+  if ((s?.notify_level || "") === "detailed") return;
+ } catch {
+  /* preview / first paint */
+ }
  await api.setNotifyLevel(onboardChatty);
  }
  const [openNewProfile, setOpenNewProfile] = useState(false);
@@ -1020,6 +1027,7 @@ export default function App() {
  onPauseOpenChange={(open) => {
  pagePauseOpenRef.current = open;
  }}
+ onBeforeProtect={setupPending ? applyOnboardChatty : undefined}
  onChanged={() => void refreshSnap()}
  onSeeHistory={() => setRoute("activity")}
  onOpenProblems={() => {
@@ -1152,16 +1160,6 @@ export default function App() {
    onDismiss={() => {
     void dismissAwayDigest();
    }}
-   onOpenWaiting={
-    (awayDigest.waiting ?? 0) > 0
-     ? () => {
-        void dismissAwayDigest().then(() => {
-         setDeferOnboarding(true);
-         setRoute("activity");
-        });
-       }
-     : undefined
-   }
   />
  ) : null}
 
@@ -1495,17 +1493,19 @@ export default function App() {
  onClick={() => {
  setTrayProtectBusy(true);
  setOnboardToast("");
- void api
- .enableSafe()
- .then(() => {
- setTrayProtectConfirm(false);
- setDeferOnboarding(false);
- return refreshSnap();
- })
- .catch((e) =>
- setOnboardToast(String(e) || "Could not turn Protect on. Try again from Home."),
- )
- .finally(() => setTrayProtectBusy(false));
+ void (async () => {
+  try {
+   if (setupPending) await applyOnboardChatty();
+   await api.enableSafe();
+   setTrayProtectConfirm(false);
+   setDeferOnboarding(false);
+   await refreshSnap();
+  } catch (e) {
+   setOnboardToast(String(e) || "Could not turn Protect on. Try again from Home.");
+  } finally {
+   setTrayProtectBusy(false);
+  }
+ })();
  }}
  >
  Continue

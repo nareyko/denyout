@@ -234,15 +234,26 @@ export function Activity({
 
  {err && <p className="warn-box">{err}</p>}
  {info && !err ? <p className="muted">{info}</p> : null}
+ {snap &&
+ !snap.problems_alert &&
+ snap.mode !== "safe" &&
+ snap.mode !== "agents" &&
+ snap.mode !== "session" && (
+ <p className="notice-box">
+ Everyday browsing is not protected right now. History may be empty or only show My
+ agents blocks. Turn on Protect computer from Home when you want that.
+ </p>
+ )}
  {displayRows.length === 0 ? (
  <div className="empty card">
  <p>
  <strong>Nothing blocked yet - that is OK.</strong>
  </p>
  <p>
- Every block is recorded here. When you are at the computer, DenyOut asks Keep blocked /
- Allow this site in the app. While you are away, it stays quiet and shows one summary when
- you return.
+ Every block is recorded here.
+ {snap?.protection_on || snap?.mode === "safe" || snap?.mode === "agents" || snap?.mode === "session"
+ ? " When you are at the computer, DenyOut asks Keep blocked / Allow this site in the app. With Stay quiet while away on (default), it stays quiet while you are away and shows one summary when you return."
+ : " Turn on Protect computer (or run My agents) to start recording blocks here."}
  </p>
  <div className="row-actions">
  <button
@@ -338,7 +349,8 @@ export function Activity({
  <div className="row-actions">
  {looksLikeIP(selected.host) ? (
  <p className="muted" style={{ margin: 0 }}>
- Raw IPs cannot be always-allowed. Under Protect computer, public IPs are allowed.
+ Raw IPs cannot be always-allowed here. Under Protect computer, many public IPs are
+ allowed; some blocks still depend on the reason.
  </p>
  ) : (
  <button className="btn primary" onClick={() => requestAlwaysAllow(selected)}>

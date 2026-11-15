@@ -4,7 +4,6 @@ type Props = {
   hosts: string[];
   onReview: () => void;
   onDismiss: () => void;
-  onOpenWaiting?: () => void;
 };
 
 /** One-shot return card after Away (Phase C). Not an OS toast wall. */
@@ -14,7 +13,6 @@ export function AwayDigestModal({
   hosts,
   onReview,
   onDismiss,
-  onOpenWaiting,
 }: Props) {
   const top = (hosts || []).filter(Boolean).slice(0, 5);
   const hasWaiting = waiting > 0;
@@ -60,11 +58,6 @@ export function AwayDigestModal({
           <button type="button" className="btn primary" onClick={onReview}>
             Review history
           </button>
-          {hasWaiting && onOpenWaiting ? (
-            <button type="button" className="btn" onClick={onOpenWaiting}>
-              Open
-            </button>
-          ) : null}
           <button type="button" className="btn" onClick={onDismiss}>
             Dismiss
           </button>
