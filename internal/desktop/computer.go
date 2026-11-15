@@ -147,6 +147,8 @@ func (a *App) startComputer() error {
 	}
 	_ = SaveState(st)
 	ClearLastError()
+	// T1: never start a real TUN unless DENYOUT_TUN_E2E=1 (VM dogfood).
+	ensureTunAfterProtectOn(uid)
 
 	go func() {
 		_ = cmd.Wait()

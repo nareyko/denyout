@@ -2,11 +2,14 @@
 
 ## Unreleased
 
+## 0.4.8 - TUN T1 closed-loop (no device) (2026-11-16)
+
 ### Added
 
 - **TUN T1 closed-loop:** `internal/tun` IPv4/IPv6 UDP classify, DropLog counter (`source=tun`), nft steer table render + helper verb lines — still no `/dev/net/tun` or Protect default change ([design](docs/design-tun-egress.md)).
 - **TUN helper stubs:** `hostctl tun-start|tun-stop|tun-stats` and helper verbs reply `OK tun1 enabled=false` (no device). `quic-stats` lines now include `source=nft`.
-- **TUN Protect Off hook:** `quic_drop_stats` includes `source`; emits `tun_drop_stats` + `tun_stop` (stub). `hostctl render --tun` previews the T1 nft table without applying it.
+- **TUN Protect lifecycle:** Protect Off emits `tun_drop_stats` + `tun_stop`; Protect On emits `tun_start_skipped` unless `DENYOUT_TUN_E2E=1`. `hostctl render --tun` previews the T1 nft table without applying it.
+- **TUN coexistence denylist:** `tun.ShouldSkipIface` for docker/WireGuard/WARP/Tailscale/ZeroTier-style names (string contract only).
 
 ## 0.4.7 - AIza FP, QUIC stats, Cursor passthrough (2026-11-15)
 

@@ -7,6 +7,32 @@ import (
 	"github.com/nareyko/denyout/internal/tun"
 )
 
+// ensureTunAfterProtectOn is the Protect On lifecycle hook for T1.
+// Default: log tun_start_skipped (T0 nft path). Only with DENYOUT_TUN_E2E=1
+// does it call tun-start — and today's helper still replies enabled=false.
+func ensureTunAfterProtectOn(uid int) {
+	fields := map[string]any{
+		"uid":   uid,
+		"phase": string(tun.ActivePhase()),
+	}
+	if !tun.WantDevice() {
+		fields["reason"] = "flag_off"
+		LogEvent("tun_start_skipped", fields)
+		return
+	}
+	line, err := hostguard.HelperTunCall("tun-start", uid)
+	if err != nil {
+		fields["err"] = err.Error()
+		LogEvent("tun_start", fields)
+		return
+	}
+	fields["reply"] = line
+	if st, perr := tun.ParseHelperReply(line); perr == nil {
+		fields["enabled"] = st.Enabled
+	}
+	LogEvent("tun_start", fields)
+}
+
 // ensureTunStopped is the Protect Off lifecycle hook for T1.
 // Closed-loop: calls the helper/local stub (enabled=false); never opens a TUN.
 func ensureTunStopped(uid int) {
