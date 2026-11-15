@@ -236,6 +236,7 @@ func (a *App) UIQuitNeedsChoice() bool {
 // Quit always fully unloads (no leave-on / keep protection).
 func (a *App) UIQuit(choice string) error {
 	_ = strings.TrimSpace(strings.ToLower(choice))
+	notify.CloseAll()
 	a.mu.Lock()
 	live := a.proxyd != nil || a.session != nil
 	a.mu.Unlock()

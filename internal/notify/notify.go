@@ -1,6 +1,7 @@
 package notify
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -41,12 +42,15 @@ const (
 	// KindOpenApp is a soft "Open DenyOut" nudge (return digest / missed waiting).
 	// Quiet suppresses it; never while Away or while the UI is focused.
 	KindOpenApp Kind = "open_app"
+	// KindTrayHidden is the one-shot "window closed → still in tray" hint.
+	// Allowed even on Quiet / banners-off / focused so close≠Quit is never silent.
+	KindTrayHidden Kind = "tray_hidden"
 )
 
 // AllowedKind reports whether kind may emit an OS notification.
 func AllowedKind(kind Kind) bool {
 	switch kind {
-	case KindAllowUndo, KindProtectResumed, KindProtectFailed, KindOpenApp:
+	case KindAllowUndo, KindProtectResumed, KindProtectFailed, KindOpenApp, KindTrayHidden:
 		return true
 	default:
 		// keep_repeat and unknowns stay off the OS whitelist
@@ -232,6 +236,8 @@ func ExpireFor(kind Kind) time.Duration {
 		return 10 * time.Second
 	case KindOpenApp:
 		return 12 * time.Second
+	case KindTrayHidden:
+		return 8 * time.Second
 	case KindProtectResumed:
 		return 5 * time.Second
 	default:
@@ -304,7 +310,7 @@ func levelAllows(kind Kind) bool {
 	}
 	switch level {
 	case "quiet":
-		return kind == KindProtectFailed
+		return kind == KindProtectFailed || kind == KindTrayHidden
 	default: // normal, detailed
 		return true
 	}
@@ -315,15 +321,16 @@ func emitAllowed(kind Kind) bool {
 		return false
 	}
 	critical := kind == KindProtectFailed
-	if !bannersAllowed && !critical {
+	trayHint := kind == KindTrayHidden
+	if !bannersAllowed && !critical && !trayHint {
 		return false
 	}
-	if !snoozeUntil.IsZero() && time.Now().Before(snoozeUntil) && !critical {
+	if !snoozeUntil.IsZero() && time.Now().Before(snoozeUntil) && !critical && !trayHint {
 		return false
 	}
 	focusSuppress := uiFocused && silentWhenOpen
 	fsSuppress := fullscreen && respectFullscreen
-	if (focusSuppress || away || fsSuppress) && !critical {
+	if (focusSuppress || away || fsSuppress) && !critical && !trayHint {
 		return false
 	}
 	return true
@@ -418,6 +425,54 @@ func runNotifySendPlain(kind Kind, title, body string) {
 	}
 }
 
+var (
+	waitProcsMu sync.Mutex
+	waitProcs   []*os.Process
+)
+
+func trackWaitProc(p *os.Process) {
+	if p == nil {
+		return
+	}
+	waitProcsMu.Lock()
+	waitProcs = append(waitProcs, p)
+	waitProcsMu.Unlock()
+}
+
+func untrackWaitProc(p *os.Process) {
+	if p == nil {
+		return
+	}
+	waitProcsMu.Lock()
+	out := waitProcs[:0]
+	for _, x := range waitProcs {
+		if x != p {
+			out = append(out, x)
+		}
+	}
+	waitProcs = out
+	waitProcsMu.Unlock()
+}
+
+// CloseAll dismisses lingering DenyOut OS banners (tracked --wait children + Linux pkill fallback).
+// Call on Quit unload and Uninstall so sticky Protect-failed / Undo toasts do not outlive the app.
+func CloseAll() {
+	waitProcsMu.Lock()
+	procs := waitProcs
+	waitProcs = nil
+	waitProcsMu.Unlock()
+	for _, p := range procs {
+		if p != nil {
+			_ = p.Kill()
+		}
+	}
+	if runtime.GOOS == "linux" {
+		if _, err := exec.LookPath("pkill"); err == nil {
+			_ = exec.Command("pkill", "-f", "notify-send.*--app-name=DenyOut").Run()
+		}
+	}
+}
+
 func runNotifySendActions(kind Kind, title, body string, wait time.Duration, actions []Action) string {
 	args := []string{"--app-name=DenyOut"}
 	if kind == KindProtectFailed {
@@ -439,18 +494,22 @@ func runNotifySendActions(kind Kind, title, body string, wait time.Duration, act
 	}
 	args = append(args, title, body)
 	cmd := exec.Command("notify-send", args...)
-	done := make(chan string, 1)
-	go func() {
-		out, err := cmd.Output()
-		if err != nil {
-			done <- ""
-			return
-		}
-		done <- strings.TrimSpace(string(out))
-	}()
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	if err := cmd.Start(); err != nil {
+		fmt.Fprintf(os.Stderr, "denyout: notification: %v\n", err)
+		return ""
+	}
+	trackWaitProc(cmd.Process)
+	defer untrackWaitProc(cmd.Process)
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
 	select {
-	case id := <-done:
-		return id
+	case err := <-done:
+		if err != nil {
+			return ""
+		}
+		return strings.TrimSpace(stdout.String())
 	case <-time.After(wait + 2*time.Second):
 		if cmd.Process != nil {
 			_ = cmd.Process.Kill()

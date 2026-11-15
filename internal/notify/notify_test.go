@@ -43,6 +43,7 @@ func TestWhitelistKinds(t *testing.T) {
 		notify.KindProtectResumed,
 		notify.KindProtectFailed,
 		notify.KindOpenApp,
+		notify.KindTrayHidden,
 	} {
 		if !notify.AllowedKind(k) {
 			t.Fatalf("expected allowed: %s", k)
@@ -115,6 +116,23 @@ func TestQuietSuppressesOpenApp(t *testing.T) {
 	notify.Emit(notify.KindOpenApp, "DenyOut", "must stay off in Quiet")
 	notify.SetLevel("normal")
 	notify.Emit(notify.KindOpenApp, "DenyOut", "ok in Normal when unfocused")
+}
+
+func TestTrayHiddenAllowedOnQuietAndFocused(t *testing.T) {
+	notify.SetLevel("quiet")
+	notify.SetUIFocused(true)
+	notify.SetSilentWhenOpen(true)
+	notify.SetBannersAllowed(false)
+	notify.SetAway(false)
+	notify.SetFullscreen(false)
+	if !notify.AllowedKind(notify.KindTrayHidden) {
+		t.Fatal("tray_hidden must be whitelisted")
+	}
+	// Must not panic; emitAllowed must permit (Quiet + focused + banners off).
+	notify.Emit(notify.KindTrayHidden, "DenyOut", "still in tray")
+	notify.SetBannersAllowed(true)
+	notify.SetUIFocused(false)
+	notify.SetLevel("normal")
 }
 
 func TestSnoozeSuppressesNonCritical(t *testing.T) {

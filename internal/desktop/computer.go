@@ -272,15 +272,35 @@ func (a *App) trayQuitChoice() string {
 	a.mu.Lock()
 	hasProxyd := a.proxyd != nil
 	hasSession := a.session != nil
-	on := hasProxyd || hasSession || a.state.ProtectionOn || a.state.ComputerEnabled ||
-		problemsUnhealthyLocked(a)
+	unhealthy := problemsUnhealthyLocked(a)
+	// Inline currentMode (already hold a.mu — do not call currentMode()).
+	mode := ModeOff
+	if hasProxyd {
+		mode = ModeComputer
+	} else if hasSession {
+		mode = ModeSession
+	}
+	agentsIntent := normalizePolicyProfile(a.state.PolicyProfile) == PolicyProfileAgent
+	on := hasProxyd || hasSession || a.state.ProtectionOn || a.state.ComputerEnabled || unhealthy
 	a.mu.Unlock()
 	if !on {
 		return "off" // nothing live — exit
 	}
 	body := "Turn off protection and quit?\n\nCancel keeps DenyOut running."
 	primary := "Turn off and quit"
-	if hasSession && !hasProxyd {
+	switch {
+	case unhealthy && mode == ModeOff:
+		if agentsIntent {
+			body = "Agents only is not running. Quit clears restore intent.\n\nCancel keeps DenyOut open."
+			primary = "Clear intent and quit"
+		} else {
+			body = "Protect is not running. Quit clears restore intent.\n\nCancel keeps DenyOut open."
+			primary = "Clear intent and quit"
+		}
+	case mode == ModeComputer && agentsIntent:
+		body = "Quit turns off Agents only and stops My agents wraps.\n\nCancel keeps DenyOut running."
+		primary = "Turn off Agents only and quit"
+	case hasSession && !hasProxyd:
 		body = "Session protection stops when you quit. Quit and turn off?\n\nCancel keeps DenyOut running."
 		primary = "Quit and turn off"
 	}

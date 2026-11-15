@@ -10,6 +10,7 @@ import (
 	"github.com/gogpu/systray"
 
 	"github.com/nareyko/denyout/internal/hostguard"
+	"github.com/nareyko/denyout/internal/notify"
 )
 
 func (a *App) trayEnableProtectComputer() {
@@ -93,6 +94,7 @@ func (a *App) runTray(ctx context.Context) error {
 		if choice == "" {
 			return // cancel
 		}
+		notify.CloseAll()
 		// Quit always fully unloads (password OK if needed).
 		if err := a.quitUnload(); err != nil {
 			fmt.Fprintf(os.Stderr, "denyout desktop: quit cancelled or failed: %v\n", err)

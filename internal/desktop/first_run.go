@@ -503,7 +503,7 @@ func (a *App) maybeAskAutostart(kind string) {
 		body := "Start DenyOut automatically when you log in?\n\nRecommended so DenyOut is ready after reboot."
 		switch strings.ToLower(strings.TrimSpace(kind)) {
 		case "protect", "safe", "computer":
-			body = "Start DenyOut automatically when you log in?\n\nRecommended so Protect computer stays on after reboot."
+			body = "Start DenyOut automatically when you log in?\n\nRecommended so DenyOut can restore Protect after reboot when it was left on (Quit turns Protect off)."
 		case "agents":
 			body = "Start DenyOut automatically when you log in?\n\nRecommended so DenyOut is ready for My agents after reboot. Everyday browsing stays unprotected until you turn on Protect computer."
 		}

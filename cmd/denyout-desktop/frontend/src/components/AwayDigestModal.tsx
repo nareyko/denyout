@@ -43,7 +43,7 @@ export function AwayDigestModal({
   const hasBlocks = blocks > 0;
   const kept =
     (keptRunningLine || "").trim() ||
-    "Quiet time did not turn protection off by itself.";
+    "Protection was already off.";
 
   return (
     <div className="modal-backdrop" style={{ zIndex: 50 }} role="presentation">

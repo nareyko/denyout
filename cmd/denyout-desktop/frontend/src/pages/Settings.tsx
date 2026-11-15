@@ -105,6 +105,7 @@ const ADVANCED_FIND_KEYS = [
   "system banners",
   "notification",
   "notify",
+  "advanced",
 ];
 
 function findKeysMatch(keys: string[], findQ: string): boolean {
@@ -405,7 +406,9 @@ export function Settings({
         const advHit = findKeysMatch(ADVANCED_FIND_KEYS, q);
         // Prefer Advanced when only Advanced matches (e.g. remembered, login, helper).
         // "pause asks" / ask / resume stay Advanced; plain "pause" stays Basic.
-        if (
+        if (q === "advanced" || q.includes("advanced")) {
+          setTab("advanced");
+        } else if (
           /\basks?\b/.test(q) ||
           q.includes("resume") ||
           q.includes("system banner") ||
@@ -681,8 +684,8 @@ export function Settings({
  <p className="muted">
  Blocks always go to History. The tray shows a count.{" "}
  {snap.quiet_while_away === false
-  ? "Stay quiet while away is off — Ask and block dialogs can still appear while locked or idle (about 5 minutes)."
-  : "With Stay quiet while away on, Ask and block dialogs stay off while locked or idle (about 5 minutes); soft OS banners stay off (Protect failed can still show). Tray count grows. One summary when you return."}{" "}
+  ? "Stay quiet while away is off — Ask and block dialogs can still appear while locked or idle (about 5 minutes). Fullscreen quiet stays separate (Advanced → Respect fullscreen)."
+  : "With Stay quiet while away on, Ask and block dialogs stay off while locked or idle (about 5 minutes); soft OS banners stay off (Protect failed can still show). Tray count grows. One summary when you return. Fullscreen quiet stays separate (Advanced → Respect fullscreen)."}{" "}
  Ask and Keep blocked / Allow this site stay inside DenyOut.
  </p>
           {(snap.notify_snooze_active ||
@@ -832,8 +835,8 @@ export function Settings({
           </label>
           <p className="muted" style={{ marginTop: "0.25rem" }}>
             {snap.quiet_while_away === false
-              ? "Off: Ask and block dialogs can appear while the screen is locked or idle (about 5 minutes)."
-              : "When on: no Ask or block dialogs while locked or idle (about 5 minutes); soft OS banners stay off (Protect failed can still show). Tray count grows. One summary when you return. Live Away / quiet count stay in the notice above when active."}
+              ? "Off: Ask and block dialogs can appear while the screen is locked or idle (about 5 minutes). Fullscreen quiet stays separate (Advanced → Respect fullscreen)."
+              : "When on: no Ask or block dialogs while locked or idle (about 5 minutes); soft OS banners stay off (Protect failed can still show). Tray count grows. One summary when you return. Fullscreen quiet stays separate (Advanced → Respect fullscreen). Live Away / quiet count stay in the notice above when active."}
           </p>
           <div style={{ marginTop: "0.65rem" }}>
             <div style={{ fontWeight: 500, marginBottom: "0.35rem" }}>Snooze</div>
@@ -1341,12 +1344,13 @@ export function Settings({
  >
  <option value="quiet">Quiet</option>
  <option value="normal">A bit more (Normal)</option>
- <option value="detailed">Detailed</option>
+ <option value="detailed">Detailed (same banners as A bit more today)</option>
  </select>
  </label>
  <p className="muted" style={{ marginTop: "0.25rem" }}>
- Detailed today matches A bit more for which OS banner kinds appear. Quiet still
- limits to Protect failed.
+ Detailed today matches A bit more for which OS banner kinds appear — it is not a
+ louder third mode yet. Quiet still limits to Protect failed (and the tray-hidden
+ hint when you close the window).
  </p>
  <label style={{ display: "block", marginTop: "0.65rem" }}>
  <input
@@ -2340,5 +2344,8 @@ function protectionContinuityNow(snap: UISnapshot): string {
   if (snap.mode === "agents") return "Agents only stays on.";
   if (snap.mode === "session") return "Session protection stays on.";
   if ((snap.agents_running || 0) > 0) return "My agents keep running.";
+  if (snap.mode === "off" || !snap.mode || !snap.protection_on) {
+    return "Protection is already off.";
+  }
   return "Snooze and Away do not turn protection off by themselves.";
 }

@@ -1193,7 +1193,9 @@ export default function App() {
          ? "Session protection stayed on."
          : (snap?.agents_running || 0) > 0
            ? "My agents kept running."
-           : "Quiet time did not turn protection off by itself."
+           : snap?.mode === "off" || !snap?.protection_on
+             ? "Protection was already off."
+             : "Quiet time did not turn protection off by itself."
    }
    onReview={() => {
     void dismissAwayDigest().then(() => {

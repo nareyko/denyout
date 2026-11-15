@@ -352,7 +352,9 @@ func main() {
 			bridge.hideToast = true
 			bridge.mu.Unlock()
 			if !shown {
-				notify.Info("DenyOut", "Still running in the tray. Quit from the tray menu when you are done.")
+				// Info is a no-op; tray-hidden must reach the OS even on Quiet.
+				notify.Emit(notify.KindTrayHidden, "DenyOut",
+					"Still running in the tray — protection stays on until you Quit from the tray menu.")
 			}
 			return true
 		},
