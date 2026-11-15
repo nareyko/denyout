@@ -89,6 +89,20 @@ func ClearLastError() {
 	_ = os.Remove(LastErrorPath())
 }
 
+// clearObsoleteLastError drops last-error entries for bugs that shipped fixed
+// (so Problems / diagnostics are not stuck after upgrade).
+func clearObsoleteLastError() {
+	s := ReadLastError()
+	if s == "" {
+		return
+	}
+	if strings.Contains(s, "Cannot run program --action-id=com.denyout.hostctl") ||
+		strings.Contains(s, "elevate disabled in test/CI") {
+		ClearLastError()
+		AppendDesktopLog("INFO cleared obsolete last-error after fixed elevate path")
+	}
+}
+
 // RecordError persists the last error for tray "Open diagnostics" / "Copy last error".
 func RecordError(kind, detail string) {
 	AppendDesktopLog("ERROR [%s] %s", kind, detail)
