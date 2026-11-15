@@ -8,6 +8,42 @@ import (
 	"testing"
 )
 
+func TestEnsureTunAfterProtectOnSkipsByDefault(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+	t.Setenv("XDG_STATE_HOME", filepath.Join(dir, "state"))
+	t.Setenv("DENYOUT_TUN_E2E", "")
+
+	ensureTunAfterProtectOn(1000)
+
+	b, err := os.ReadFile(EventsLogPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var saw bool
+	for _, line := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+		if line == "" {
+			continue
+		}
+		var rec map[string]any
+		if err := json.Unmarshal([]byte(line), &rec); err != nil {
+			t.Fatal(err)
+		}
+		if rec["type"] == "tun_start_skipped" {
+			saw = true
+			if rec["reason"] != "flag_off" || rec["phase"] != "T0" {
+				t.Fatalf("%+v", rec)
+			}
+		}
+		if rec["type"] == "tun_start" {
+			t.Fatal("must not emit tun_start when flag off")
+		}
+	}
+	if !saw {
+		t.Fatalf("missing tun_start_skipped\n%s", b)
+	}
+}
+
 func TestLogQuicDropStatsEmitsSourceAndTunStop(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)

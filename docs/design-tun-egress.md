@@ -27,7 +27,7 @@ TUN would pull **L3** traffic into userspace so UDP is observable and policy can
 | Phase | Deliverable | Kernel touch | Exit criteria |
 | --- | --- | --- | --- |
 | **T0** (done) | nft `counter` on QUIC drop; `hostctl quic-stats`; `quic_drop_stats` event | only existing apply/remove | counters readable |
-| **T1** (closed-loop code) | Classify IPv4/IPv6 UDP; `DecideT1` + userspace `Counter`; helper line + nft steer **string** render; `source=tun\|nft` stats | **no** device yet | unit tests green; VM dogfood still required before Protect default |
+| **T1** (closed-loop code) | Classify IPv4/IPv6 UDP; `DecideT1` + userspace `Counter`; helper + Protect lifecycle stubs; `DENYOUT_TUN_E2E` gate; iface denylist; `source=tun\|nft` | **no** device yet | unit tests green; VM dogfood still required before Protect default |
 | **T2** | DNS awareness (fake-ip or resolved-name cache) for UDP policy | + DNS hijack care | host-labeled quic stats |
 | **T3** | Optional full-UID TCP via TUN (replace redirect) | larger routing surface | parity with current MITM; VPN coexistence matrix |
 | **T4** | QUIC MITM (optional) | QUIC+TLS stack | only if threat model demands decrypt |
@@ -91,3 +91,5 @@ Opening a real TUN requires an explicit `DENYOUT_TUN_E2E=1` test tag and root â€
 - Default Protect stays **nft redirect + QUIC drop** until T1 VM dogfood passes.
 - Cursor remains **TCP passthrough + QUIC drop** (no browser-only QUIC exception).
 - Protect On must **not** call `tun-start` until an explicit feature flag + VM green.
+- Gate: `DENYOUT_TUN_E2E=1` (`tun.WantDevice`); otherwise Protect On emits `tun_start_skipped` and stays on T0 nft drop.
+- Coexistence denylist: `tun.ShouldSkipIface` (`lo`, `docker0`, `br-*`, `veth*`, `wg*`, WARP/Tailscale/ZeroTier names).
