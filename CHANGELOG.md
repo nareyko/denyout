@@ -9,6 +9,7 @@
 ### Added
 
 - **QUIC drop counters:** nft UDP/443 drop rule now has a `counter`; `denyout-cli hostctl quic-stats` and an `events.jsonl` `quic_drop_stats` line on Protect Off (before rules are removed).
+- **Cursor TLS passthrough:** `*.cursor.sh` / `*.cursor.com` skip MITM under Protect (HTTP/2 agent APIs); L1 host/threat policy still applies. MITM handshake / HTTP/2 mismatches now audit as verdict `error` instead of silent close.
 
 ## 0.4.6 - Block browser QUIC + diagnostics (2026-11-15)
 
