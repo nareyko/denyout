@@ -68,7 +68,7 @@ DenyOut keeps **four books**. Do not merge them into one UI dump.
 | ID | Feed | Canonical URL(s) | Format | Refresh hint | Default (locked) | Category toggle |
 | --- | --- | --- | --- | --- | --- | --- |
 | `phishing-army` | Phishing Army domains | `https://phishing.army/download/phishing-army-domains.txt` (also hosts/adblock on same site) | one domain / line | author ~3-4 h. We poll **configurable, default 24 h** (+ on first install / Protect start) | **ON** | Phishing |
-| `urlhaus-hosts` | abuse.ch URLhaus hostfile | `https://urlhaus.abuse.ch/downloads/hostfile/` | hosts (`127.0.0.1 domain`) | author ≥5 min. We poll **same interval** | **ON after first successful fetch** (if fetch fails, Protect still OK. Treat as not-yet-active) | Malware |
+| `urlhaus-hosts` | URLhaus filter hosts (malware-filter mirror; abuse.ch keyless hostfile retired Oct 2026 / HTTP 410) | `https://malware-filter.gitlab.io/malware-filter/urlhaus-filter-hosts.txt` | hosts (`0.0.0.0` / `127.0.0.1 domain`) | poll **same interval** | **ON after first successful fetch** (if fetch fails, Protect still OK. Treat as not-yet-active) | Malware |
 | `hagezi-tif-medium` | HaGeZi TIF medium | `https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/domains/tif.medium.txt` (or documented domains/adblock path) | domain / ABP | 1-4x / day | **OFF** - nested under Malware + first-enable size warning | Malware (stronger) |
 
 **Do not** ship HaGeZi **full** TIF as default or silent upgrade (memory / breakage).

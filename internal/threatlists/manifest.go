@@ -63,14 +63,16 @@ func CoreCatalog() []Subscription {
 			Homepage:   "https://phishing.army/",
 		},
 		{
+			// abuse.ch retired keyless /downloads/hostfile/ (HTTP 410, Oct 2026; Auth-Key required).
+			// Community hosts rebuild from URLhaus data — no key, FormatHosts compatible.
 			ID:                 IDURLHaus,
-			URL:                "https://urlhaus.abuse.ch/downloads/hostfile/",
+			URL:                "https://malware-filter.gitlab.io/malware-filter/urlhaus-filter-hosts.txt",
 			Category:           CategoryMalware,
 			Format:             FormatHosts,
 			Enabled:            true,
 			ActiveAfterFirstOK: true,
-			LicenseURL:         "https://urlhaus.abuse.ch/",
-			Homepage:           "https://urlhaus.abuse.ch/",
+			LicenseURL:         "https://gitlab.com/malware-filter/urlhaus-filter",
+			Homepage:           "https://gitlab.com/malware-filter/urlhaus-filter",
 		},
 		{
 			ID:         IDHageziTIFMedium,

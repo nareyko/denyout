@@ -118,7 +118,7 @@ func threatFeedLabel(id string) string {
 	case threatlists.IDPhishingArmy:
 		return "Phishing Army"
 	case threatlists.IDURLHaus:
-		return "URLhaus (malware)"
+		return "URLhaus filter (malware)"
 	case threatlists.IDHageziTIFMedium:
 		return "Stronger threat list"
 	case threatlists.IDOISDSmall:
