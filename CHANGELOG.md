@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.4.10 - TUN VM preflight (closed-loop) (2026-11-16)
+
+### Added
+
+- **TUN VM dogfood preflight:** [`docs/tun-vm-dogfood.md`](docs/tun-vm-dogfood.md) + `scripts/closed-loop-tun-preflight.sh` (CI); invariant that stubs never claim `enabled=true`.
+- **`hostctl tun-rollback-plan`:** prints T1→T0 restore steps (not executed).
+
 ## 0.4.9 - TUN reasons + closed-loop CI smoke (2026-11-16)
 
 ### Added
