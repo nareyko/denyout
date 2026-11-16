@@ -54,8 +54,15 @@ echo "$plan" | grep -q 'tun-stop'
 echo "$plan" | grep -q 'denyout0'
 echo "$plan" | grep -q 'hostctl apply'
 
+echo "== vpn-egress-plan (DenyOut → VPN, not executed) =="
+vplan=$("$CLI" hostctl vpn-egress-plan --iface wg0)
+echo "$vplan" | grep -q 'fwmark 0x646e79'
+echo "$vplan" | grep -q 'dev wg0'
+echo "$vplan" | grep -q 'lookup 646'
+"$CLI" hostctl vpn-egress-rollback-plan | grep -q 'ip rule del'
+
 echo "== unit: gate + denylist + rollback (no kernel) =="
-(cd "$ROOT" && go test ./internal/tun/ -count=1 -run 'TestWantDeviceDefaultOff|TestShouldSkipIface|TestRollbackPlan|TestHelperReplyStartStopDisabled|TestEngineBatchQUICDrops')
+(cd "$ROOT" && go test ./internal/tun/ -count=1 -run 'TestWantDeviceDefaultOff|TestShouldSkipIface|TestRollbackPlan|TestHelperReplyStartStopDisabled|TestEngineBatchQUICDrops|TestBuildVPNEgressPlan|TestValidateVPNEgress|TestWantVPNEgressApply')
 
 echo "== live path note =="
 if [ -x "${HOME}/.local/bin/denyout-cli" ]; then

@@ -538,7 +538,7 @@ Profiles live in ~/.config/denyout/profiles/`)
 
 func cmdHostctl(args []string) int {
 	if len(args) == 0 || args[0] == "--help" || args[0] == "-h" {
-		fmt.Println(`Usage: denyout-cli hostctl apply|remove|teardown|render|proxyd|quic-stats|tun-stats|tun-start|tun-stop|tun-rollback-plan|helper-serve|helper-uninstall [flags]
+		fmt.Println(`Usage: denyout-cli hostctl apply|remove|teardown|render|proxyd|quic-stats|tun-stats|tun-start|tun-stop|tun-rollback-plan|vpn-egress-plan|vpn-egress-rollback-plan|helper-serve|helper-uninstall [flags]
 
   Privileged helper for Protect this computer (transparent redirect + CA trust).
   proxyd runs the transparent proxy (started after setcap so SO_MARK works).
@@ -546,6 +546,8 @@ func cmdHostctl(args []string) int {
   quic-stats prints nft UDP/443 drop counters (Linux; helper or root).
   tun-stats|tun-start|tun-stop  T1 helper protocol (disabled stub until VM dogfood; no /dev/net/tun).
   tun-rollback-plan  print T1→T0 restore steps (docs only; not executed).
+  vpn-egress-plan --iface IF  print DenyOut mark→VPN ip rule/route plan (not executed; see docs/design-vpn-egress.md).
+  vpn-egress-rollback-plan  print remove commands for that plan (not executed).
   helper-serve runs the root unix-socket helper (systemd; Linux).
   helper-uninstall stops/removes denyout-hostguard.service (Linux; used by uninstall).
 
@@ -554,6 +556,7 @@ Flags:
   --ca PATH    CA certificate PEM to trust
   --ca-dir D   persistent CA directory (proxyd)
   --uid N      desktop user uid (Unix)
+  --iface IF   VPN egress interface (vpn-egress-plan; e.g. wg0)
   --allow-quic allow UDP/443 (HTTP/3); default is drop QUIC so browsers use TCP MITM
   --tun        with render: append T1 steer table preview (not applied)
   --ask        Ask mode policy (proxyd)
@@ -607,6 +610,32 @@ Flags:
 	}
 	if action == "tun-rollback-plan" {
 		fmt.Print(tunRollbackPlan())
+		return 0
+	}
+	if action == "vpn-egress-plan" {
+		iface := ""
+		for i := 1; i < len(args); i++ {
+			a := args[i]
+			switch {
+			case strings.HasPrefix(a, "--iface="):
+				iface = strings.TrimPrefix(a, "--iface=")
+			case a == "--iface":
+				i++
+				if i < len(args) {
+					iface = args[i]
+				}
+			}
+		}
+		out, err := tun.FormatVPNEgressPlan(iface)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "denyout-cli hostctl vpn-egress-plan: %v\n", err)
+			return 2
+		}
+		fmt.Print(out)
+		return 0
+	}
+	if action == "vpn-egress-rollback-plan" {
+		fmt.Print(tun.FormatVPNEgressRollback())
 		return 0
 	}
 	if action == "helper-serve" {

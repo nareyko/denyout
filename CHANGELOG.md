@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- **DenyOut → VPN egress (locked):** [`docs/design-vpn-egress.md`](docs/design-vpn-egress.md) — policy first, then VPN via mark `0x646e79` → table `646`. `hostctl vpn-egress-plan --iface wg0` / `vpn-egress-rollback-plan` print `ip` commands only; kernel apply stays behind `DENYOUT_VPN_EGRESS_E2E=1`.
+
 ## 0.4.11 - Cursor passthrough tunnel half-close (2026-11-16)
 
 ### Fixed
