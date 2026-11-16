@@ -314,9 +314,9 @@ func isGoogleBrowserAPIHost(host string) bool {
 func scanTokenShapes(blob, reason string, skipGoogleAPIKey bool) []Hit {
 	var hits []Hit
 	checks := []struct {
-		det   string
-		re    *regexp.Regexp
-		skip  bool // when skipGoogleAPIKey
+		det  string
+		re   *regexp.Regexp
+		skip bool // when skipGoogleAPIKey
 	}{
 		{"known_token_prefixes", reOpenAI, false},
 		{"known_token_prefixes", reStripe, false},

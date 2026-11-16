@@ -13,10 +13,10 @@ import (
 type Phase string
 
 const (
-	PhaseT0NFTOnly Phase = "T0" // nft counter drop only (current production)
-	PhaseT1UDP443  Phase = "T1" // TUN for UDP/443 drop+log
-	PhaseT2DNS     Phase = "T2"
-	PhaseT3FullUID Phase = "T3"
+	PhaseT0NFTOnly  Phase = "T0" // nft counter drop only (current production)
+	PhaseT1UDP443   Phase = "T1" // TUN for UDP/443 drop+log
+	PhaseT2DNS      Phase = "T2"
+	PhaseT3FullUID  Phase = "T3"
 	PhaseT4QUICMITM Phase = "T4"
 )
 
@@ -35,10 +35,10 @@ type Packet struct {
 type Action string
 
 const (
-	ActionSkip       Action = "skip"        // our own marked traffic
-	ActionDropLog    Action = "drop_log"    // default QUIC policy
-	ActionDirect     Action = "direct"      // allow without inspect
-	ActionToProxyTCP Action = "to_proxy"    // future TCP→proxyd
+	ActionSkip        Action = "skip"     // our own marked traffic
+	ActionDropLog     Action = "drop_log" // default QUIC policy
+	ActionDirect      Action = "direct"   // allow without inspect
+	ActionToProxyTCP  Action = "to_proxy" // future TCP→proxyd
 	ActionUnsupported Action = "unsupported"
 )
 

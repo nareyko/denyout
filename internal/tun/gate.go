@@ -30,9 +30,9 @@ func SkipIfaceNames() []string {
 	return []string{
 		"lo",
 		"docker0",
-		"br-",     // bridge prefix
-		"veth",    // docker veth prefix
-		"wg",      // WireGuard prefix
+		"br-",  // bridge prefix
+		"veth", // docker veth prefix
+		"wg",   // WireGuard prefix
 		"cloudflare",
 		"tun0", // other VPNs; denyout0 is ours later
 		"zt",   // ZeroTier prefix

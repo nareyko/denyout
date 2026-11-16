@@ -236,9 +236,9 @@ func (b *Bridge) GetProblems() desktop.ProblemsView { return b.app.GetProblems()
 func (b *Bridge) GetLocalAnalytics(days int) desktop.LocalAnalytics {
 	return b.app.GetLocalAnalytics(days)
 }
-func (b *Bridge) UIOpenLogs() error { return b.app.UIOpenLogs() }
-func (b *Bridge) UICopyLastError() (string, error)  { return b.app.UICopyLastError() }
-func (b *Bridge) UIRetryProtect() error             { return b.app.UIRetryProtect() }
+func (b *Bridge) UIOpenLogs() error                { return b.app.UIOpenLogs() }
+func (b *Bridge) UICopyLastError() (string, error) { return b.app.UICopyLastError() }
+func (b *Bridge) UIRetryProtect() error            { return b.app.UIRetryProtect() }
 func (b *Bridge) ListProfileViews() ([]desktop.ProfileView, error) {
 	return b.app.ListProfileViews()
 }

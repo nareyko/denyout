@@ -93,25 +93,20 @@ func ServeHTTP3MITM(ctx context.Context, ln *quic.Listener, cfg MITMConfig, poli
 }
 
 func dialHTTP3Origin(ctx context.Context, cfg MITMConfig, host string) (*http.Response, error) {
-	h := host
-	if h == "" {
+	if host == "" {
 		return nil, fmt.Errorf("empty host")
 	}
-	if _, _, err := net.SplitHostPort(h); err == nil {
-		// already host:port
-	} else {
-		h = net.JoinHostPort(h, "443")
-	}
+	name := stripPort(host)
 	rt := &http3.Transport{
 		TLSClientConfig: &tls.Config{
-			ServerName:         stripPort(host),
+			ServerName:         name,
 			RootCAs:            cfg.RootCAs,
 			InsecureSkipVerify: cfg.InsecureSkipVerify,
 			MinVersion:         tls.VersionTLS13,
 		},
 	}
 	defer rt.Close()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://"+stripPort(host)+"/", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://"+name+"/", nil)
 	if err != nil {
 		return nil, err
 	}

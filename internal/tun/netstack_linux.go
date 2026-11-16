@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"sync"
 
 	"gvisor.dev/gvisor/pkg/buffer"
 	"gvisor.dev/gvisor/pkg/tcpip"
@@ -31,7 +30,6 @@ type Netstack struct {
 	stack   *stack.Stack
 	ep      *channel.Endpoint
 	handler TCPHandler
-	wg      sync.WaitGroup
 	stop    chan struct{}
 }
 

@@ -1,6 +1,7 @@
 package tun_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/nareyko/denyout/internal/tun"
@@ -50,12 +51,12 @@ func TestWantQUICMITMDefaultOff(t *testing.T) {
 
 func TestDefaultQUICInspectorSight(t *testing.T) {
 	insp := tun.DefaultQUICInspector{MITM: false}
-	dec := insp.Decide(nil, []byte{0xc0, 0x00, 0x00, 0x00, 0x01})
+	dec := insp.Decide(context.TODO(), []byte{0xc0, 0x00, 0x00, 0x00, 0x01})
 	if dec.Action != tun.QUICActionDrop && dec.Action != tun.QUICActionSight {
 		t.Fatalf("%+v", dec)
 	}
 	insp.MITM = true
-	dec = insp.Decide(nil, []byte("x"))
+	dec = insp.Decide(context.TODO(), []byte("x"))
 	if dec.Action != tun.QUICActionMITM && dec.Action != tun.QUICActionDrop {
 		t.Fatalf("%+v", dec)
 	}

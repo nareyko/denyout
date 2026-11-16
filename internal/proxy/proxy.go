@@ -34,16 +34,16 @@ type DenyHook func(host string, reasons []string, redactedURL string)
 
 // Config for the local proxy.
 type Config struct {
-	Engine        *policy.Engine
-	Audit         *audit.Sink
-	SessionID     string
-	PolicyHash    string
-	Version       string
-	TLSMode       TLSMode
-	CA            *SessionCA
-	ListenHost    string // default 127.0.0.1
-	ListenPort    int    // 0 = ephemeral
-	OnDeny        DenyHook
+	Engine             *policy.Engine
+	Audit              *audit.Sink
+	SessionID          string
+	PolicyHash         string
+	Version            string
+	TLSMode            TLSMode
+	CA                 *SessionCA
+	ListenHost         string // default 127.0.0.1
+	ListenPort         int    // 0 = ephemeral
+	OnDeny             DenyHook
 	Transparent        bool   // accept redirected raw TCP (SNI/Host), not only HTTP-proxy protocol
 	PolicyProfile      string // agent | browse (audit attribution)
 	Process            string // best-effort client label

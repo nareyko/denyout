@@ -70,11 +70,8 @@ func ParseHelperReply(resp string) (HelperStatus, error) {
 			st.Verb = strings.TrimPrefix(f, "verb=")
 		case strings.HasPrefix(f, "reason="):
 			st.Reason = strings.TrimPrefix(f, "reason=")
-		case strings.HasPrefix(f, "packets="), strings.HasPrefix(f, "bytes="),
-			strings.HasPrefix(f, "present="), strings.HasPrefix(f, "source="),
-			strings.HasPrefix(f, "sightings="), strings.HasPrefix(f, "last_sni="):
-			// filled via ParseDropStatsLine below
 		}
+		// packets=/bytes=/present=/source=/sightings=/last_sni= via ParseDropStatsLine below
 	}
 	if strings.Contains(resp, "packets=") {
 		ds, err := ParseDropStatsLine(resp)

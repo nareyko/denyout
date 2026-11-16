@@ -19,15 +19,15 @@ import (
 
 // SessionOptions starts a proxy wrap without necessarily spawning a child.
 type SessionOptions struct {
-	ConfigPath    string
-	Config        *policy.Config // if set, used instead of ConfigPath / default models
-	TLSMode       proxy.TLSMode
-	Version       string
-	Sandbox       string
-	OnDeny        proxy.DenyHook
-	ListenPort    int                  // 0 = ephemeral
-	CADir         string               // empty = temp session CA
-	PersistCA     bool                 // if true, do not shred CA on Stop
+	ConfigPath         string
+	Config             *policy.Config // if set, used instead of ConfigPath / default models
+	TLSMode            proxy.TLSMode
+	Version            string
+	Sandbox            string
+	OnDeny             proxy.DenyHook
+	ListenPort         int                  // 0 = ephemeral
+	CADir              string               // empty = temp session CA
+	PersistCA          bool                 // if true, do not shred CA on Stop
 	Transparent        bool                 // raw TCP redirect mode for hostguard
 	PolicyProfile      string               // agent | browse (audit attribution)
 	Process            string               // best-effort client label

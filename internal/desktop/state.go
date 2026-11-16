@@ -18,9 +18,9 @@ const (
 
 // State is persisted desktop preferences.
 type State struct {
-	SetupDone          bool        `json:"setup_done"`
-	Notify             bool        `json:"notify"`
-	NotifyLevel        string      `json:"notify_level,omitempty"` // quiet | normal | detailed
+	SetupDone   bool   `json:"setup_done"`
+	Notify      bool   `json:"notify"`
+	NotifyLevel string `json:"notify_level,omitempty"` // quiet | normal | detailed
 	// QuietWhileAwayOff: when true, Ask/Decision still appear while locked/idle.
 	// Default false = stay quiet while away (Presence wave).
 	QuietWhileAwayOff bool `json:"quiet_while_away_off,omitempty"`
@@ -50,8 +50,8 @@ type State struct {
 	TunDataplane bool `json:"tun_dataplane,omitempty"`
 	// QuicMITM: experimental HTTP/3 decrypt (G6 Q2). Default false; requires TunDataplane
 	// (or DENYOUT_TUN_E2E) and DENYOUT_QUIC_MITM=1 or this pref. Cursor hosts stay drop/sight.
-	QuicMITM bool `json:"quic_mitm,omitempty"`
-	AskMode  bool `json:"ask_mode"`
+	QuicMITM           bool        `json:"quic_mitm,omitempty"`
+	AskMode            bool        `json:"ask_mode"`
 	PolicyProfile      string      `json:"policy_profile,omitempty"` // browse (Safe desktop) | agent (Agents only)
 	ActiveProfileID    string      `json:"active_profile_id,omitempty"`
 	Scope              string      `json:"scope,omitempty"`

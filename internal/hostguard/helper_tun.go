@@ -32,7 +32,3 @@ func HelperVPNEgressRemove() (string, error) {
 func TunLocalReply(verb string) (string, error) {
 	return tun.HelperReply(verb)
 }
-
-func tunHelperReply(verb string) (string, error) {
-	return tun.HelperReply(verb)
-}

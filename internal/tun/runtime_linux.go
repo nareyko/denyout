@@ -266,7 +266,7 @@ func readLoop(dev wgtun.Device, r *Runtime, ns *Netstack, insp DefaultQUICInspec
 				if pok {
 					decideBuf = payload
 				}
-				dec := insp.Decide(nil, decideBuf)
+				dec := insp.Decide(context.TODO(), decideBuf)
 				if onSight != nil && (dec.Action == QUICActionSight || dec.Action == QUICActionMITM || dec.HasSNI()) {
 					onSight(dec)
 				}
