@@ -596,11 +596,14 @@ Flags:
 	if action == "tun-stats" || action == "tun-start" || action == "tun-stop" {
 		uid, _ := hostguard.CurrentUID()
 		real := false
+		mitm := false
 		for i := 1; i < len(args); i++ {
 			a := args[i]
 			switch {
 			case a == "--real":
 				real = true
+			case a == "--mitm":
+				mitm = true
 			case strings.HasPrefix(a, "--uid="):
 				fmt.Sscanf(strings.TrimPrefix(a, "--uid="), "%d", &uid)
 			case a == "--uid":
@@ -614,9 +617,12 @@ Flags:
 			line string
 			err  error
 		)
-		if real {
+		switch {
+		case real && mitm:
+			line, err = hostguard.HelperTunCallRealMITM(action, uid)
+		case real:
 			line, err = hostguard.HelperTunCallReal(action, uid)
-		} else {
+		default:
 			line, err = hostguard.HelperTunCall(action, uid)
 		}
 		if err != nil {
@@ -987,6 +993,9 @@ func cmdHostctlProxyd(args []string) int {
 		fmt.Fprintf(os.Stderr, "denyout-cli hostctl proxyd: %v\n", err)
 		return 2
 	}
+	if v := strings.TrimSpace(os.Getenv("DENYOUT_ALLOW_PRIVATE")); v == "1" || strings.EqualFold(v, "true") {
+		cfg.AllowPrivate = true
+	}
 	var threats policy.ThreatChecker
 	if att, err := threatlists.OpenAndRefresh(context.Background(), true); err != nil {
 		fmt.Fprintf(os.Stderr, "denyout-cli hostctl proxyd: threatlists: %v (continuing)\n", err)
@@ -994,17 +1003,22 @@ func cmdHostctlProxyd(args []string) int {
 		threats = att.Store
 	}
 	var sessRef *run.Session
+	insecureUp := false
+	if v := strings.TrimSpace(os.Getenv("DENYOUT_TLS_INSECURE_UPSTREAM")); v == "1" || strings.EqualFold(v, "true") {
+		insecureUp = true
+	}
 	sess, err := run.StartSession(run.SessionOptions{
-		Config:        cfg,
-		TLSMode:       proxy.TLSIntercept,
-		Version:       version,
-		CADir:         caDir,
-		PersistCA:     true,
-		Transparent:   true,
-		ListenPort:    port,
-		PolicyProfile: profile,
-		Process:       "proxyd",
-		Threats:       threats,
+		Config:             cfg,
+		TLSMode:            proxy.TLSIntercept,
+		Version:            version,
+		CADir:              caDir,
+		PersistCA:          true,
+		Transparent:        true,
+		ListenPort:         port,
+		PolicyProfile:      profile,
+		Process:            "proxyd",
+		Threats:            threats,
+		InsecureSkipVerify: insecureUp,
 		OnDeny: func(host string, reasons []string, redactedURL string) {
 			hostNotAllowed := false
 			for _, r := range reasons {

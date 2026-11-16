@@ -3,7 +3,9 @@
 package tun
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"net"
 	"os/exec"
 	"strings"
@@ -27,6 +29,7 @@ type StartOpts struct {
 	ProxyPort  int  // local proxyd for T3 TCP handoff
 	EnableTCP  bool // T3: steer TCP 80/443 into gVisor
 	QUICMITM   bool // Q2 gate (inspector); actual MITM sessions optional
+	MITM       MITMConfig
 	OnSighting func(QUICDecision)
 }
 
@@ -89,8 +92,6 @@ func (r *Runtime) StartRealOpts(opts StartOpts) error {
 				return
 			}
 			defer upstream.Close()
-			// Transparent handoff: proxyd expects redirected sockets; for TUN we
-			// currently relay bytes (policy still applies when proxyd sees HTTP/TLS).
 			errCh := make(chan struct{}, 2)
 			go func() { _, _ = copyClose(upstream, conn); errCh <- struct{}{} }()
 			go func() { _, _ = copyClose(conn, upstream); errCh <- struct{}{} }()
@@ -106,20 +107,67 @@ func (r *Runtime) StartRealOpts(opts StartOpts) error {
 		}
 	}
 
+	mitmOn := opts.QUICMITM || WantQUICMITM()
+	var bridge *quicTUNPacketConn
+	var mitmCancel context.CancelFunc
+	if mitmOn && opts.MITM.GetCertificate != nil {
+		bridge = newQUICTUNPacketConn(func(dst, src *net.UDPAddr, payload []byte) error {
+			pkt := buildIPv4UDP(src, dst, payload)
+			_, err := writeTUN(dev, pkt)
+			return err
+		})
+		mitmCtx, cancel := context.WithCancel(context.Background())
+		mitmCancel = cancel
+		ln, lerr := ListenMITM(mitmCtx, bridge, opts.MITM)
+		if lerr != nil {
+			cancel()
+			_ = bridge.Close()
+			if ns != nil {
+				ns.Close()
+			}
+			_ = dev.Close()
+			_ = destroyDeviceBestEffort()
+			_ = removeSteerBestEffort(uid)
+			return fmt.Errorf("tun: quic mitm listen: %w", lerr)
+		}
+		go func() {
+			_ = ServeHTTP3MITM(mitmCtx, ln, opts.MITM, nil)
+			_ = ln.Close()
+		}()
+	}
+
 	done := make(chan struct{})
 	var closed bool
-	insp := DefaultQUICInspector{MITM: opts.QUICMITM || WantQUICMITM()}
+	insp := DefaultQUICInspector{MITM: mitmOn}
 	onSight := opts.OnSighting
-	go readLoop(dev, r, ns, insp, onSight, done)
+	if onSight == nil {
+		onSight = func(dec QUICDecision) {
+			r.RecordSighting(dec.SNI)
+			log.Printf("denyout tun quic sight action=%s sni=%q reason=%s", dec.Action, dec.SNI, dec.Reason)
+		}
+	} else {
+		user := onSight
+		onSight = func(dec QUICDecision) {
+			r.RecordSighting(dec.SNI)
+			user(dec)
+		}
+	}
 	if ns != nil {
 		go func() {
 			_ = ns.ReadOutbound(&tunWriter{dev: dev})
 		}()
 	}
+	go readLoop(dev, r, ns, insp, onSight, bridge, done)
 	r.cancel = func() {
 		if !closed {
 			closed = true
 			close(done)
+		}
+		if mitmCancel != nil {
+			mitmCancel()
+		}
+		if bridge != nil {
+			_ = bridge.Close()
 		}
 		if ns != nil {
 			ns.Close()
@@ -128,16 +176,19 @@ func (r *Runtime) StartRealOpts(opts StartOpts) error {
 	}
 	r.active = true
 	r.uid = uid
-	r.packets.Store(0)
-	r.bytes.Store(0)
+	r.resetCountersLocked()
 	return nil
 }
 
+// tunWriteOffset is headroom for virtio_net_hdr required by wireguard-go TUN Write.
+const tunWriteOffset = 16
+
 type tunWriter struct{ dev wgtun.Device }
 
-func (t *tunWriter) Write(p []byte) (int, error) {
-	bufs := [][]byte{p}
-	n, err := t.dev.Write(bufs, 0)
+func writeTUN(dev wgtun.Device, p []byte) (int, error) {
+	buf := make([]byte, tunWriteOffset+len(p))
+	copy(buf[tunWriteOffset:], p)
+	n, err := dev.Write([][]byte{buf}, tunWriteOffset)
 	if err != nil {
 		return 0, err
 	}
@@ -145,6 +196,10 @@ func (t *tunWriter) Write(p []byte) (int, error) {
 		return len(p), nil
 	}
 	return 0, nil
+}
+
+func (t *tunWriter) Write(p []byte) (int, error) {
+	return writeTUN(t.dev, p)
 }
 
 func copyClose(dst, src net.Conn) (int64, error) {
@@ -187,7 +242,7 @@ func (r *Runtime) StopReal() error {
 	return nil
 }
 
-func readLoop(dev wgtun.Device, r *Runtime, ns *Netstack, insp DefaultQUICInspector, onSight func(QUICDecision), done <-chan struct{}) {
+func readLoop(dev wgtun.Device, r *Runtime, ns *Netstack, insp DefaultQUICInspector, onSight func(QUICDecision), bridge *quicTUNPacketConn, done <-chan struct{}) {
 	defer func() { _ = dev.Close() }()
 	bufs := make([][]byte, 1)
 	bufs[0] = make([]byte, 2048)
@@ -206,11 +261,18 @@ func readLoop(dev wgtun.Device, r *Runtime, ns *Netstack, insp DefaultQUICInspec
 			pkt := bufs[i][:sizes[i]]
 			cl, cerr := ClassifyIPPacket(pkt, SteerMark, 0)
 			if cerr == nil && strings.EqualFold(cl.Proto, "udp") && cl.DstPort == 443 {
-				dec := insp.Decide(nil, pkt[len(pkt)-cl.PayloadN-8:]) // best-effort; may be full IP
-				// Prefer scanning whole IP packet for SNI.
-				dec = insp.Decide(nil, pkt)
-				if onSight != nil && (dec.Action == QUICActionSight || dec.HasSNI()) {
+				src, dst, payload, pok := parseIPv4UDP(pkt)
+				decideBuf := pkt
+				if pok {
+					decideBuf = payload
+				}
+				dec := insp.Decide(nil, decideBuf)
+				if onSight != nil && (dec.Action == QUICActionSight || dec.Action == QUICActionMITM || dec.HasSNI()) {
 					onSight(dec)
+				}
+				if dec.Action == QUICActionMITM && bridge != nil && pok {
+					bridge.push(quicDatagram{payload: payload, from: src, to: dst})
+					continue
 				}
 				r.addDrop(len(pkt))
 				continue
@@ -220,7 +282,6 @@ func readLoop(dev wgtun.Device, r *Runtime, ns *Netstack, insp DefaultQUICInspec
 				continue
 			}
 			if ns != nil && cerr != nil {
-				// Non-UDP classify failure: still try inject (TCP/other).
 				ver := 0
 				if len(pkt) > 0 {
 					ver = int(pkt[0] >> 4)

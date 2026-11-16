@@ -19,6 +19,24 @@ func TestFormatParseDropStatsRoundTrip(t *testing.T) {
 	}
 }
 
+func TestFormatParseDropStatsSightings(t *testing.T) {
+	in := tun.DropStats{
+		Packets: 1, Bytes: 2, Present: true, Source: tun.SourceTUN,
+		Sightings: 3, LastSNI: "lab.denyout.test",
+	}
+	line := "OK tun1 " + tun.FormatDropStatsLine(in)
+	if !strings.Contains(line, "sightings=3") || !strings.Contains(line, "last_sni=lab.denyout.test") {
+		t.Fatal(line)
+	}
+	out, err := tun.ParseDropStatsLine(line)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Sightings != 3 || out.LastSNI != "lab.denyout.test" {
+		t.Fatalf("%+v", out)
+	}
+}
+
 func TestParseDropStatsLegacyNFTNoSource(t *testing.T) {
 	st, err := tun.ParseDropStatsLine("OK quic1 packets=3 bytes=10 present=true")
 	if err != nil {

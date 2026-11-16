@@ -10,6 +10,7 @@ type StartOpts struct {
 	ProxyPort  int
 	EnableTCP  bool
 	QUICMITM   bool
+	MITM       MITMConfig
 	OnSighting func(QUICDecision)
 }
 

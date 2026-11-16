@@ -32,6 +32,12 @@ go test ./internal/tun/ ./internal/hostguard/ ./internal/desktop/ -count=1
 
 Without `--real` / gates: no device, no MITM claims.
 
-## VM dogfood (required before defaults)
+## VM / Docker dogfood (required before defaults)
 
-See [tun-vm-dogfood.md](tun-vm-dogfood.md) G6 section: TCP via TUN, QUIC sight, optional MITM against a lab HTTP/3 origin, Protect Off rollback.
+See [tun-vm-dogfood.md](tun-vm-dogfood.md). Automated stand-in:
+
+```bash
+./scripts/closed-loop-tun-g6-docker-dogfood.sh
+```
+
+Covers TCP HTTPS via TUN, QUIC sight, QuicMITM lab HTTP/3, teardown. Chrome/Cursor still need a VM/laptop.

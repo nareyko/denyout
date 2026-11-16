@@ -104,9 +104,10 @@ func dialHTTP3Origin(ctx context.Context, cfg MITMConfig, host string) (*http.Re
 	}
 	rt := &http3.Transport{
 		TLSClientConfig: &tls.Config{
-			ServerName: stripPort(host),
-			RootCAs:    cfg.RootCAs,
-			MinVersion: tls.VersionTLS13,
+			ServerName:         stripPort(host),
+			RootCAs:            cfg.RootCAs,
+			InsecureSkipVerify: cfg.InsecureSkipVerify,
+			MinVersion:         tls.VersionTLS13,
 		},
 	}
 	defer rt.Close()

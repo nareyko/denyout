@@ -156,12 +156,24 @@ func helperTunVerb(verb string, uid int, real, mitm bool) (string, error) {
 		}
 		lastApplyMu.Lock()
 		port := lastApplySpec.ProxyPort
+		caPath := lastApplySpec.CACert
 		lastApplyMu.Unlock()
+		wantMITM := mitm || tun.WantQUICMITM()
 		opts := tun.StartOpts{
 			UID:       uid,
 			ProxyPort: port,
 			EnableTCP: true,
-			QUICMITM:  mitm || tun.WantQUICMITM(),
+			QUICMITM:  wantMITM,
+			OnSighting: func(dec tun.QUICDecision) {
+				fmt.Fprintf(os.Stderr, "denyout tun quic sight action=%s sni=%q reason=%s\n", dec.Action, dec.SNI, dec.Reason)
+			},
+		}
+		if wantMITM {
+			if cfg, err := mitmConfigFromCA(caPath); err == nil {
+				opts.MITM = cfg
+			} else {
+				fmt.Fprintf(os.Stderr, "denyout tun quic mitm ca: %v (sight/drop only)\n", err)
+			}
 		}
 		if err := rt.StartRealOpts(opts); err != nil {
 			return "", err

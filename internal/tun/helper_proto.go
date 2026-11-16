@@ -71,7 +71,8 @@ func ParseHelperReply(resp string) (HelperStatus, error) {
 		case strings.HasPrefix(f, "reason="):
 			st.Reason = strings.TrimPrefix(f, "reason=")
 		case strings.HasPrefix(f, "packets="), strings.HasPrefix(f, "bytes="),
-			strings.HasPrefix(f, "present="), strings.HasPrefix(f, "source="):
+			strings.HasPrefix(f, "present="), strings.HasPrefix(f, "source="),
+			strings.HasPrefix(f, "sightings="), strings.HasPrefix(f, "last_sni="):
 			// filled via ParseDropStatsLine below
 		}
 	}

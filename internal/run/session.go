@@ -28,10 +28,11 @@ type SessionOptions struct {
 	ListenPort    int                  // 0 = ephemeral
 	CADir         string               // empty = temp session CA
 	PersistCA     bool                 // if true, do not shred CA on Stop
-	Transparent   bool                 // raw TCP redirect mode for hostguard
-	PolicyProfile string               // agent | browse (audit attribution)
-	Process       string               // best-effort client label
-	Threats       policy.ThreatChecker // Book C; optional
+	Transparent        bool                 // raw TCP redirect mode for hostguard
+	PolicyProfile      string               // agent | browse (audit attribution)
+	Process            string               // best-effort client label
+	Threats            policy.ThreatChecker // Book C; optional
+	InsecureSkipVerify bool                 // lab dogfood: trust self-signed origins
 }
 
 // Status is a snapshot of an active wrap session.
@@ -137,19 +138,20 @@ func StartSession(opts SessionOptions) (*Session, error) {
 		}
 	}
 	srv, err := proxy.Start(ctx, proxy.Config{
-		Engine:        eng,
-		Audit:         sink,
-		SessionID:     sessionID,
-		PolicyHash:    policyHash,
-		Version:       opts.Version,
-		TLSMode:       opts.TLSMode,
-		CA:            ca,
-		ListenHost:    "127.0.0.1",
-		ListenPort:    opts.ListenPort,
-		OnDeny:        opts.OnDeny,
-		Transparent:   opts.Transparent,
-		PolicyProfile: profile,
-		Process:       opts.Process,
+		Engine:             eng,
+		Audit:              sink,
+		SessionID:          sessionID,
+		PolicyHash:         policyHash,
+		Version:            opts.Version,
+		TLSMode:            opts.TLSMode,
+		CA:                 ca,
+		ListenHost:         "127.0.0.1",
+		ListenPort:         opts.ListenPort,
+		OnDeny:             opts.OnDeny,
+		Transparent:        opts.Transparent,
+		PolicyProfile:      profile,
+		Process:            opts.Process,
+		InsecureSkipVerify: opts.InsecureSkipVerify,
 	})
 	if err != nil {
 		cancel()

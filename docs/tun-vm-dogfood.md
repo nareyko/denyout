@@ -1,7 +1,9 @@
 # TUN T1 VM dogfood (not the owner laptop)
 
-Status: **preflight only**. Real `denyout0` must first run on a **throwaway Linux VM**.
-Closed-loop gates live in `scripts/closed-loop-tun-preflight.sh` and CI.
+Status: **Docker G6 lab green** (privileged container). Throwaway VM still preferred before
+owner-laptop Protect; Chrome/Cursor click-through is out of scope for the Docker lab.
+Closed-loop gates: `scripts/closed-loop-tun-preflight.sh` + CI.
+G6 lab: `scripts/closed-loop-tun-g6-docker-dogfood.sh`.
 Roadmap gates G0–G6: [tun-implementation-plan.md](tun-implementation-plan.md).
 
 ## Why a VM first
@@ -28,15 +30,26 @@ Must pass:
 4. Coexistence names skipped: `lo`, `docker0`, `br-*`, `veth*`, `wg*`, WARP/Tailscale/ZeroTier-style.
 5. Rollback plan lists `tun-stop` → delete `denyout0` → T0 `hostctl apply`.
 
-## Without a full VM (limited)
+## Without a full VM (Docker lab)
 
 If you have Docker + `/dev/net/tun` but no throwaway VM yet:
 
 ```bash
-./scripts/closed-loop-tun-docker-dogfood.sh
+./scripts/closed-loop-tun-docker-dogfood.sh      # denyout0 lifecycle
+./scripts/closed-loop-tun-g6-docker-dogfood.sh   # G6 matrix (TCP HTTPS, QUIC sight, QuicMITM, teardown)
 ```
 
-That starts `helper-serve` in a privileged container and proves `denyout0` create/stats/stop (TUN FD must stay in a long-lived helper). It does **not** replace the G6 browser matrix below (Chrome/Cursor/HTTP3 lab still need a real VM or laptop).
+G6 Docker lab (stand-in until a throwaway VM exists):
+
+| Check | Assert |
+| --- | --- |
+| TCP HTTPS via TUN | curl → gVisor → proxyd → lab origin → `g6-lab-ok` |
+| QUIC sight | inject Initial → `tun-stats` `sightings=` / `last_sni=` |
+| Cursor SNI | inject `api.cursor.sh` → recorded; MITM refused by inspector |
+| QuicMITM | `--mitm` + HTTP/3 GET via TUN → status 200 |
+| Protect Off | `tun-stop` + teardown → no `denyout0` / fwmark / `denyout-tun` |
+
+Chrome/Cursor on the host are **not** exercised here.
 
 ## VM-only steps (root; not CI)
 
@@ -54,12 +67,14 @@ Only after preflight is green on the same binary:
 
 ## G6 matrix (T3 / Q1 / Q2)
 
-After G3–G5 steps above:
+Docker lab script above covers the automated path. On a VM / laptop (after snapshot):
 
 1. With TunDataplane: confirm TCP HTTPS still works (gVisor → proxyd). If broken, Protect Off must restore nft redirect.
 2. Generate QUIC to a lab host; check events/logs for sighting when SNI visible; default remains drop.
-3. Opt-in `DENYOUT_QUIC_MITM=1` or QuicMITM pref against a **lab** HTTP/3 origin only; Cursor hosts must stay non-MITM.
+3. Opt-in `DENYOUT_QUIC_MITM=1` / `--mitm` / QuicMITM pref against a **lab** HTTP/3 origin only; Cursor hosts must stay non-MITM.
 4. Protect Off restores T0; no leftover `denyout0` / fwmark rules.
+
+`TunDataplane` / `QuicMITM` defaults stay **false**.
 
 ## Exit criteria to change Protect default
 

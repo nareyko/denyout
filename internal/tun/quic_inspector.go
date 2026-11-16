@@ -72,6 +72,7 @@ var ErrQUICMITMNotReady = fmt.Errorf("tun: quic mitm not ready")
 
 // MITMConfig carries CA material for QUIC terminate/reencrypt.
 type MITMConfig struct {
-	GetCertificate func(chi *tls.ClientHelloInfo) (*tls.Certificate, error)
-	RootCAs        *x509.CertPool // for dialing origin (system + optional)
+	GetCertificate     func(chi *tls.ClientHelloInfo) (*tls.Certificate, error)
+	RootCAs            *x509.CertPool // for dialing origin (system + optional)
+	InsecureSkipVerify bool           // lab origins only
 }

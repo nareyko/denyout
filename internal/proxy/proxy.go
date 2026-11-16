@@ -44,9 +44,10 @@ type Config struct {
 	ListenHost    string // default 127.0.0.1
 	ListenPort    int    // 0 = ephemeral
 	OnDeny        DenyHook
-	Transparent   bool   // accept redirected raw TCP (SNI/Host), not only HTTP-proxy protocol
-	PolicyProfile string // agent | browse (audit attribution)
-	Process       string // best-effort client label
+	Transparent        bool   // accept redirected raw TCP (SNI/Host), not only HTTP-proxy protocol
+	PolicyProfile      string // agent | browse (audit attribution)
+	Process            string // best-effort client label
+	InsecureSkipVerify bool   // lab dogfood: trust self-signed origins
 }
 
 // Server is the HTTP proxy.
@@ -299,8 +300,9 @@ func (s *Server) roundTripIntercept(client io.ReadWriteCloser, req *http.Request
 		return
 	}
 	up := tls.Client(raw, &tls.Config{
-		ServerName: host,
-		MinVersion: tls.VersionTLS12,
+		ServerName:         host,
+		MinVersion:         tls.VersionTLS12,
+		InsecureSkipVerify: s.cfg.InsecureSkipVerify,
 	})
 	if err := up.Handshake(); err != nil {
 		_ = raw.Close()

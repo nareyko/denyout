@@ -17,10 +17,12 @@ const (
 
 // DropStats mirrors hostguard.QUICDropStats with an explicit source tag.
 type DropStats struct {
-	Packets uint64
-	Bytes   uint64
-	Present bool
-	Source  Source
+	Packets   uint64
+	Bytes     uint64
+	Present   bool
+	Source    Source
+	Sightings uint64 // QUIC Initial sightings (SNI best-effort)
+	LastSNI   string // last sighted SNI (may be empty)
 }
 
 // Counter accumulates DropLog decisions in userspace (T1 closed-loop).
@@ -65,7 +67,28 @@ func FormatDropStatsLine(st DropStats) string {
 	if src == "" {
 		src = SourceNFT
 	}
-	return fmt.Sprintf("packets=%d bytes=%d present=%t source=%s", st.Packets, st.Bytes, st.Present, src)
+	line := fmt.Sprintf("packets=%d bytes=%d present=%t source=%s", st.Packets, st.Bytes, st.Present, src)
+	if st.Sightings > 0 || st.LastSNI != "" {
+		line += fmt.Sprintf(" sightings=%d", st.Sightings)
+		if st.LastSNI != "" {
+			line += " last_sni=" + sanitizeSNIToken(st.LastSNI)
+		}
+	}
+	return line
+}
+
+func sanitizeSNIToken(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	// hostctl replies are space-delimited; keep SNI a single token.
+	return strings.Map(func(r rune) rune {
+		if r == ' ' || r == '\t' || r == '\n' {
+			return -1
+		}
+		return r
+	}, s)
 }
 
 // ParseDropStatsLine parses "OK … packets=… bytes=… present=… [source=…]" fields.
@@ -87,6 +110,10 @@ func ParseDropStatsLine(resp string) (DropStats, error) {
 			st.Present = v == "true" || v == "1"
 		case strings.HasPrefix(f, "source="):
 			st.Source = Source(strings.TrimPrefix(f, "source="))
+		case strings.HasPrefix(f, "sightings="):
+			st.Sightings, _ = strconv.ParseUint(strings.TrimPrefix(f, "sightings="), 10, 64)
+		case strings.HasPrefix(f, "last_sni="):
+			st.LastSNI = strings.TrimPrefix(f, "last_sni=")
 		}
 	}
 	return st, nil
