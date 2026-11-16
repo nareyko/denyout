@@ -36,7 +36,7 @@ If you have Docker + `/dev/net/tun` but no throwaway VM yet:
 ./scripts/closed-loop-tun-docker-dogfood.sh
 ```
 
-That proves `denyout0` create/stats/stop as root inside a privileged container (local `--real` path when helper-serve is absent). It does **not** replace the G6 browser matrix below (Chrome/Cursor/HTTP3 lab still need a real VM or laptop).
+That starts `helper-serve` in a privileged container and proves `denyout0` create/stats/stop (TUN FD must stay in a long-lived helper). It does **not** replace the G6 browser matrix below (Chrome/Cursor/HTTP3 lab still need a real VM or laptop).
 
 ## VM-only steps (root; not CI)
 
