@@ -16,6 +16,7 @@
 ### Fixed
 
 - **Orphan redirect blackhole:** uninstall and Protect Off no longer kill proxyd before removing nft/pf redirects (HTTPS `connection refused` to e.g. `api.github.com`). Concurrent `denyout uninstall` processes are excluded from the kill list.
+- **Cross-OS build:** non-Linux `helperTunCall` uses `tun.HelperReply` (was undefined `tunHelperReply`, breaking darwin/windows release builds).
 
 ## 0.4.11 - Cursor passthrough tunnel half-close (2026-11-16)
 

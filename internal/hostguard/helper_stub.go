@@ -2,6 +2,8 @@
 
 package hostguard
 
+import "github.com/nareyko/denyout/internal/tun"
+
 func helperAvailable() bool { return false }
 
 func helperCall(verb string, proxyPort int, caCert string, uid int, allowQUIC bool) error {
@@ -23,7 +25,7 @@ func helperTunCall(verb string, uid int, real, mitm bool) (string, error) {
 	_ = real
 	_ = mitm
 	// Non-Linux: still expose the closed-loop protocol string (no device).
-	return tunHelperReply(verb)
+	return tun.HelperReply(verb)
 }
 
 func helperCaps() (CapsReply, error) {
