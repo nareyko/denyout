@@ -171,16 +171,30 @@ func has(xs []string, want string) bool {
 
 func buildDenyout(t *testing.T) string {
 	t.Helper()
+	if bin := strings.TrimSpace(os.Getenv("DENYOUT_BIN")); bin != "" {
+		return bin
+	}
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "denyout")
-	cmd := exec.Command("go", "build", "-o", bin, "./cmd/denyout-cli")
-	cmd.Dir = findRepoRoot(t)
-	cmd.Env = os.Environ()
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("build: %v\n%s", err, out)
+	root := findRepoRoot(t)
+	var out []byte
+	var err error
+	// CI can SIGINT a nested `go build` under `go test ./...` when the runner
+	// is under memory pressure; retry a couple of times before failing.
+	for attempt := 0; attempt < 3; attempt++ {
+		cmd := exec.Command("go", "build", "-o", bin, "./cmd/denyout-cli")
+		cmd.Dir = root
+		cmd.Env = os.Environ()
+		out, err = cmd.CombinedOutput()
+		if err == nil {
+			return bin
+		}
+		if !strings.Contains(err.Error(), "interrupt") && !strings.Contains(string(out), "interrupt") {
+			break
+		}
 	}
-	return bin
+	t.Fatalf("build: %v\n%s", err, out)
+	return ""
 }
 
 func findRepoRoot(t *testing.T) string {
