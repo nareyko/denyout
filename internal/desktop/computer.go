@@ -147,8 +147,10 @@ func (a *App) startComputer() error {
 	}
 	_ = SaveState(st)
 	ClearLastError()
-	// T1: never start a real TUN unless DENYOUT_TUN_E2E=1 (VM dogfood).
-	ensureTunAfterProtectOn(uid)
+	// Refresh helper binary/caps after apply (stale helpers lack tun1/quic1).
+	ensureHelperFreshAfterProtectOn(uid)
+	// Real denyout0 only when DENYOUT_TUN_E2E=1 or TunDataplane pref (Linux).
+	a.ensureTunAfterProtectOn(uid)
 
 	go func() {
 		_ = cmd.Wait()
@@ -177,6 +179,9 @@ func (a *App) startComputer() error {
 // in one admin prompt (avoid Remove+Apply = two passwords).
 // When elevateRemove is true and Remove fails (password cancelled), returns error
 // and leaves leave-on state intact so Quit can abort (D19).
+//
+// When elevateRemove is true, nft/pf is removed WHILE proxyd is still listening.
+// Killing proxyd first leaves REDIRECT→dead local port (HTTPS connection refused).
 func (a *App) stopComputerOpts(keepRestore, elevateRemove bool) error {
 	a.mu.Lock()
 	cmd := a.proxyd
@@ -188,10 +193,6 @@ func (a *App) stopComputerOpts(keepRestore, elevateRemove bool) error {
 	wasProtectionOn := a.state.ProtectionOn
 	wasComputerEnabled := a.state.ComputerEnabled
 	wasScope := a.state.Scope
-	a.proxyd = nil
-	if hadProxyd {
-		a.proxyPort = 0
-	}
 	a.state.ComputerEnabled = false
 	if !keepRestore && a.state.Scope == ScopeComputer {
 		a.state.ProtectionOn = false
@@ -202,6 +203,38 @@ func (a *App) stopComputerOpts(keepRestore, elevateRemove bool) error {
 	st := a.state
 	a.mu.Unlock()
 	_ = SaveState(st)
+
+	// Only tear down hostguard when leaving computer mode for real.
+	// Session mode also stores proxyPort - must not trigger ElevateRemove/pkexec.
+	if shouldRemove {
+		uid, _ := hostguard.CurrentUID()
+		// Snapshot QUIC drops before Remove deletes the nft table (otherwise counters vanish).
+		logQuicDropStats("protect_off")
+		if err := hostguard.ElevateRemove(port, uid); err != nil {
+			// Restore leave-on so we do not pretend Protect is gone (D19).
+			// Proxyd is still alive here — no orphan-redirect blackhole.
+			a.mu.Lock()
+			a.state.ProtectionOn = wasProtectionOn
+			a.state.ComputerEnabled = wasComputerEnabled
+			a.state.Scope = wasScope
+			if wasProtectionOn {
+				a.status = "Needs admin"
+			}
+			st2 := a.state
+			a.mu.Unlock()
+			_ = SaveState(st2)
+			return err
+		}
+	}
+
+	a.mu.Lock()
+	if a.proxyd == cmd {
+		a.proxyd = nil
+		if hadProxyd {
+			a.proxyPort = 0
+		}
+	}
+	a.mu.Unlock()
 
 	if cmd != nil && cmd.Process != nil {
 		_ = cmd.Process.Signal(os.Interrupt)
@@ -214,27 +247,6 @@ func (a *App) stopComputerOpts(keepRestore, elevateRemove bool) error {
 		case <-done:
 		case <-time.After(2 * time.Second):
 			_ = cmd.Process.Kill()
-		}
-	}
-	// Only tear down hostguard when leaving computer mode for real.
-	// Session mode also stores proxyPort - must not trigger ElevateRemove/pkexec.
-	if shouldRemove {
-		uid, _ := hostguard.CurrentUID()
-		// Snapshot QUIC drops before Remove deletes the nft table (otherwise counters vanish).
-		logQuicDropStats("protect_off")
-		if err := hostguard.ElevateRemove(port, uid); err != nil {
-			// Restore leave-on so we do not pretend Protect is gone (D19).
-			a.mu.Lock()
-			a.state.ProtectionOn = wasProtectionOn
-			a.state.ComputerEnabled = wasComputerEnabled
-			a.state.Scope = wasScope
-			if wasProtectionOn {
-				a.status = "Needs admin"
-			}
-			st2 := a.state
-			a.mu.Unlock()
-			_ = SaveState(st2)
-			return err
 		}
 	}
 	return nil

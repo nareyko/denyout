@@ -45,7 +45,10 @@ type State struct {
 	// AllowBrowserQUIC: when true, Protect does not drop UDP/443 (HTTP/3 may bypass MITM).
 	// Default false = block QUIC so browsers fall back to TCP that DenyOut can inspect.
 	AllowBrowserQUIC bool `json:"allow_browser_quic,omitempty"`
-	AskMode          bool     `json:"ask_mode"`
+	// TunDataplane: experimental Linux UDP/443 via denyout0 (G3–G5). Default false;
+	// also enabled when DENYOUT_TUN_E2E=1. Prefer VM dogfood before flipping on a laptop.
+	TunDataplane bool `json:"tun_dataplane,omitempty"`
+	AskMode      bool `json:"ask_mode"`
 	PolicyProfile      string      `json:"policy_profile,omitempty"` // browse (Safe desktop) | agent (Agents only)
 	ActiveProfileID    string      `json:"active_profile_id,omitempty"`
 	Scope              string      `json:"scope,omitempty"`

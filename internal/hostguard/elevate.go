@@ -75,6 +75,23 @@ func ElevateTeardown(proxyPort int, uid int) error {
 	return elevate(exe, args)
 }
 
+// ElevateInstallHelper installs/restarts denyout-hostguard.service from the
+// current denyout-cli binary (Linux). Used when caps are stale after upgrade.
+func ElevateInstallHelper(ownerUID int) error {
+	if runtime.GOOS != "linux" {
+		return InstallHelper(ownerUID)
+	}
+	if os.Geteuid() == 0 {
+		return InstallHelper(ownerUID)
+	}
+	exe, err := SelfExe()
+	if err != nil {
+		return err
+	}
+	args := []string{"hostctl", "helper-install", "--uid", strconv.Itoa(ownerUID), "--no-elevate"}
+	return elevate(exe, args)
+}
+
 // ElevateUninstallHelper stops/removes denyout-hostguard.service (Linux).
 // Used as a belt-and-suspenders step after uninstall teardown.
 func ElevateUninstallHelper() error {

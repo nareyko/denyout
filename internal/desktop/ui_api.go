@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -106,6 +107,7 @@ type UISnapshot struct {
 	SystemBanners       bool            `json:"system_banners"`
 	RespectFullscreen   bool            `json:"respect_fullscreen"`
 	BlockBrowserQUIC    bool            `json:"block_browser_quic"` // inverse of AllowBrowserQUIC; default on
+	TunDataplane        bool            `json:"tun_dataplane"`      // experimental UDP via denyout0 (Linux)
 	FullscreenDetect    bool            `json:"fullscreen_detect"`  // can see fullscreen apps right now
 	FullscreenNow       bool            `json:"fullscreen_now"`     // active window fullscreen (only if detect)
 	FullscreenWayland   bool            `json:"fullscreen_wayland"` // session looks Wayland (copy hint)
@@ -304,6 +306,7 @@ func (a *App) GetUISnapshot() UISnapshot {
 		SystemBanners:      !a.state.SystemBannersOff,
 		RespectFullscreen:  !a.state.RespectFullscreenOff,
 		BlockBrowserQUIC:   !a.state.AllowBrowserQUIC,
+		TunDataplane:       a.state.TunDataplane && runtime.GOOS == "linux",
 		FullscreenDetect:   a.fullscreenDetectOK(),
 		FullscreenNow: func() bool {
 			a.presence.mu.Lock()
@@ -993,6 +996,29 @@ func (a *App) UISetBlockBrowserQUIC(on bool) error {
 	if live {
 		if err := a.restartActiveProtector(); err != nil {
 			return fmt.Errorf("Saved, but could not refresh Protect rules: %w", err)
+		}
+	}
+	return nil
+}
+
+// UISetTunDataplane toggles experimental UDP/443 via denyout0 (Linux; default off).
+// When Protect is live, restarts the protector so tun-start/stop matches.
+func (a *App) UISetTunDataplane(on bool) error {
+	if runtime.GOOS != "linux" && on {
+		return fmt.Errorf("UDP via DenyOut TUN is Linux-only")
+	}
+	a.mu.Lock()
+	a.state.TunDataplane = on
+	live := a.proxyd != nil
+	st := a.state
+	a.mu.Unlock()
+	if err := SaveState(st); err != nil {
+		return err
+	}
+	LogEvent("tun_dataplane_setting", map[string]any{"on": on, "live": live})
+	if live {
+		if err := a.restartActiveProtector(); err != nil {
+			return fmt.Errorf("Saved, but could not refresh Protect: %w", err)
 		}
 	}
 	return nil

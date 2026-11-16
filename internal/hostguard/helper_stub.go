@@ -18,10 +18,21 @@ func helperQUICStats(uid int) (QUICDropStats, error) {
 	return QUICDropStats{}, ErrHelperUnavailable
 }
 
-func helperTunCall(verb string, uid int) (string, error) {
+func helperTunCall(verb string, uid int, real bool) (string, error) {
 	_ = uid
+	_ = real
 	// Non-Linux: still expose the closed-loop protocol string (no device).
 	return tunHelperReply(verb)
+}
+
+func helperCaps() (CapsReply, error) {
+	return CapsReply{}, ErrHelperUnavailable
+}
+
+func helperVPNEgressCall(verb, iface string) (string, error) {
+	_ = verb
+	_ = iface
+	return "", ErrHelperUnavailable
 }
 
 // InstallHelper is a no-op outside Linux (macOS/Windows helpers are a later platform track).

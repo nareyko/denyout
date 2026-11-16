@@ -54,8 +54,32 @@ echo "$plan" | grep -q 'tun-stop'
 echo "$plan" | grep -q 'denyout0'
 echo "$plan" | grep -q 'hostctl apply'
 
+echo "== vpn-egress-plan (DenyOut → VPN, not executed) =="
+vplan=$("$CLI" hostctl vpn-egress-plan --iface wg0)
+echo "$vplan" | grep -q 'fwmark 0x646e79'
+echo "$vplan" | grep -q 'dev wg0'
+echo "$vplan" | grep -q 'lookup 646'
+"$CLI" hostctl vpn-egress-rollback-plan | grep -q 'ip rule del'
+
+echo "== tun-device-plan (denyout0 create, not executed) =="
+dplan=$("$CLI" hostctl tun-device-plan)
+echo "$dplan" | grep -q 'ip tuntap add mode tun denyout0'
+echo "$dplan" | grep -q '198.18.0.1/16'
+echo "$dplan" | grep -q 'DENYOUT_TUN_E2E'
+"$CLI" hostctl tun-device-rollback-plan | grep -q 'ip link delete denyout0'
+
+echo "== tun-start without --real stays stub =="
+stub=$("$CLI" hostctl tun-start)
+echo "$stub" | grep -q 'enabled=false'
+
+echo "== vpn-egress-apply refused without E2E env =="
+if DENYOUT_VPN_EGRESS_E2E= "$CLI" hostctl vpn-egress-apply --iface wg0 2>/dev/null; then
+  echo "vpn-egress-apply must refuse without DENYOUT_VPN_EGRESS_E2E=1" >&2
+  exit 1
+fi
+
 echo "== unit: gate + denylist + rollback (no kernel) =="
-(cd "$ROOT" && go test ./internal/tun/ -count=1 -run 'TestWantDeviceDefaultOff|TestShouldSkipIface|TestRollbackPlan|TestHelperReplyStartStopDisabled|TestEngineBatchQUICDrops')
+(cd "$ROOT" && go test ./internal/tun/ ./internal/hostguard/ -count=1 -run 'TestWantDeviceDefaultOff|TestShouldSkipIface|TestRollbackPlan|TestHelperReplyStartStopDisabled|TestEngineBatchQUICDrops|TestBuildVPNEgressPlan|TestValidateVPNEgress|TestWantVPNEgressApply|TestBuildDevicePlan|TestFormatDeviceRollback|TestFormatParseCapsReply|TestCapsSatisfied')
 
 echo "== live path note =="
 if [ -x "${HOME}/.local/bin/denyout-cli" ]; then

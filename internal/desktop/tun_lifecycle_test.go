@@ -14,7 +14,8 @@ func TestEnsureTunAfterProtectOnSkipsByDefault(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", filepath.Join(dir, "state"))
 	t.Setenv("DENYOUT_TUN_E2E", "")
 
-	ensureTunAfterProtectOn(1000)
+	a := &App{state: DefaultState()}
+	a.ensureTunAfterProtectOn(1000)
 
 	b, err := os.ReadFile(EventsLogPath())
 	if err != nil {

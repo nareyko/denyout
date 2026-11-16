@@ -67,6 +67,8 @@ Rollback: `tun-stop` + delete device + restore T0 nft-only rules in one elevate.
 - Helper must own lifecycle; crash must not leave blackhole routes.
 - First dogfood: **throwaway VM**, then owner laptop.
 
+**VPN egress order (locked):** policy first, then VPN — see [design-vpn-egress.md](design-vpn-egress.md). Marked proxyd dials (`0x646e79`) may use `ip rule fwmark → table denyout-vpn → wg0` (etc.). Foreign VPN ifaces are egress targets, never stolen as `denyout0`.
+
 ## 7. Closed-loop until VM dogfood
 
 Code under `internal/tun` may only:
@@ -90,10 +92,14 @@ Release verify without dogfood: `scripts/closed-loop-release-smoke.sh /path/to/e
 
 VM gate (still no device on CI/laptop): `scripts/closed-loop-tun-preflight.sh` + [tun-vm-dogfood.md](tun-vm-dogfood.md).
 
-## 8. Decision lock (pending owner)
+Actionable gates G0–G6 (what to build next, what is blocked): [tun-implementation-plan.md](tun-implementation-plan.md).
+G2: `hostctl tun-device-plan` / `tun-device-rollback-plan` (render only).
+
+## 8. Decision lock (owner)
 
 - Default Protect stays **nft redirect + QUIC drop** until T1 VM dogfood passes.
 - Cursor remains **TCP passthrough + QUIC drop** (no browser-only QUIC exception).
-- Protect On must **not** call `tun-start` until an explicit feature flag + VM green.
-- Gate: `DENYOUT_TUN_E2E=1` (`tun.WantDevice`); otherwise Protect On emits `tun_start_skipped` and stays on T0 nft drop.
+- Protect On calls real `tun-start` only when `DENYOUT_TUN_E2E=1` **or** desktop pref `TunDataplane` (default **false**).
+- Gate off → `tun_start_skipped` + T0 nft UDP/443 drop. Gate on → helper creates `denyout0`, steers UDP/443, userspace DropLog; failure leaves T0 path.
 - Coexistence denylist: `tun.ShouldSkipIface` (`lo`, `docker0`, `br-*`, `veth*`, `wg*`, WARP/Tailscale/ZeroTier names).
+- **DenyOut → then VPN:** locked in [design-vpn-egress.md](design-vpn-egress.md); kernel apply behind `DENYOUT_VPN_EGRESS_E2E=1`.

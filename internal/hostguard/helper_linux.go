@@ -11,9 +11,16 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 
 	"github.com/nareyko/denyout/internal/tun"
+)
+
+var (
+	lastApplyMu   sync.Mutex
+	lastApplySpec Spec
+	lastApplyOK   bool
 )
 
 const (
@@ -92,7 +99,7 @@ func helperQUICStats(uid int) (QUICDropStats, error) {
 	return ParseQUICDropStatsLine(resp)
 }
 
-func helperTunCall(verb string, uid int) (string, error) {
+func helperTunCall(verb string, uid int, real bool) (string, error) {
 	if !tun.IsHelperVerb(verb) {
 		return "", fmt.Errorf("hostguard: not a tun verb %q", verb)
 	}
@@ -102,7 +109,7 @@ func helperTunCall(verb string, uid int) (string, error) {
 		return tun.HelperReply(verb)
 	}
 	defer c.Close()
-	line, err := tun.HelperLine(verb, uid)
+	line, err := tun.HelperLineOpts(verb, uid, real)
 	if err != nil {
 		return "", err
 	}
@@ -119,6 +126,104 @@ func helperTunCall(verb string, uid int) (string, error) {
 		if strings.Contains(resp, "unknown verb") {
 			return tun.HelperReply(verb)
 		}
+		return "", fmt.Errorf("helper %s: %s", verb, resp)
+	}
+	return resp, nil
+}
+
+// helperTunVerb runs inside helper-serve.
+func helperTunVerb(verb string, uid int, real bool) (string, error) {
+	rt := tun.GlobalRuntime()
+	switch verb {
+	case "tun-stats":
+		st := rt.StatsSnapshot()
+		reason := "flag_off"
+		if real || rt.IsActive() || tun.WantDevice() {
+			if st.Present {
+				reason = "ok"
+			} else if tun.WantDevice() || real {
+				reason = "inactive"
+			}
+		}
+		return "OK " + tun.CapTag + " " + tun.FormatDropStatsLine(st) + " reason=" + reason, nil
+	case "tun-start":
+		if !real && !tun.WantDevice() {
+			return tun.HelperReply(verb)
+		}
+		if err := rt.StartReal(uid); err != nil {
+			return "", err
+		}
+		// Suppress T0 UDP/443 drop while TUN path handles it.
+		suppressT0QUICDrop(true)
+		return fmt.Sprintf("OK %s enabled=true verb=%s reason=ok", tun.CapTag, verb), nil
+	case "tun-stop":
+		_ = rt.StopReal()
+		suppressT0QUICDrop(false)
+		if !real && !tun.WantDevice() {
+			return tun.HelperReply(verb)
+		}
+		return fmt.Sprintf("OK %s enabled=false verb=%s reason=ok", tun.CapTag, verb), nil
+	default:
+		return "", fmt.Errorf("tun: unknown helper verb %q", verb)
+	}
+}
+
+func suppressT0QUICDrop(suppress bool) {
+	lastApplyMu.Lock()
+	defer lastApplyMu.Unlock()
+	if !lastApplyOK || lastApplySpec.ProxyPort <= 0 {
+		return
+	}
+	s := lastApplySpec
+	if suppress {
+		s.AllowQUIC = true // omit denyout-block-quic; TUN steers/drops instead
+	}
+	_ = Apply(s)
+}
+
+func helperCaps() (CapsReply, error) {
+	c, err := net.Dial("unix", helperSockPath)
+	if err != nil {
+		return CapsReply{}, fmt.Errorf("%w: %v", ErrHelperUnavailable, err)
+	}
+	defer c.Close()
+	if _, err := c.Write([]byte("caps 0 0 -\n")); err != nil {
+		return CapsReply{}, err
+	}
+	resp, err := bufio.NewReader(c).ReadString('\n')
+	if err != nil {
+		return CapsReply{}, err
+	}
+	resp = strings.TrimSpace(resp)
+	if !strings.HasPrefix(resp, "OK") {
+		if strings.Contains(resp, "unknown verb") {
+			return CapsReply{Raw: resp}, ErrStaleHelperCaps([]string{CapCaps, CapQUIC, CapTUN})
+		}
+		return CapsReply{}, fmt.Errorf("helper caps: %s", resp)
+	}
+	return ParseCapsReply(resp), nil
+}
+
+func helperVPNEgressCall(verb, iface string) (string, error) {
+	c, err := net.Dial("unix", helperSockPath)
+	if err != nil {
+		return "", fmt.Errorf("%w: %v", ErrHelperUnavailable, err)
+	}
+	defer c.Close()
+	// vpn-egress-apply|remove PORT UID IFACE
+	if iface == "" {
+		iface = "-"
+	}
+	line := fmt.Sprintf("%s 0 0 %s\n", verb, strings.ReplaceAll(iface, " ", ""))
+	if _, err := c.Write([]byte(line)); err != nil {
+		return "", err
+	}
+	resp, err := bufio.NewReader(c).ReadString('\n')
+	if err != nil {
+		return "", err
+	}
+	resp = strings.TrimSpace(resp)
+	if !strings.HasPrefix(resp, "OK") {
 		return "", fmt.Errorf("helper %s: %s", verb, resp)
 	}
 	return resp, nil
@@ -287,13 +392,33 @@ func handleHelperConn(c net.Conn, ownerUID int) {
 	spec := Spec{ProxyPort: port, UID: uid, CACert: ca, AllowQUIC: allowQUIC}
 	var opErr error
 	switch verb {
+	case "caps", "version":
+		exe := ""
+		if p, e := SelfExe(); e == nil {
+			exe = filepath.Base(p)
+		}
+		_, _ = c.Write([]byte(FormatCapsReply(exe, CapQUIC, CapTUN, CapVPN) + "\n"))
+		return
 	case "apply":
+		_ = tun.GlobalRuntime().StopReal()
 		opErr = Apply(spec)
+		if opErr == nil {
+			lastApplyMu.Lock()
+			lastApplySpec = spec
+			lastApplyOK = true
+			lastApplyMu.Unlock()
+		}
 	case "remove":
+		_ = tun.GlobalRuntime().StopReal()
+		_ = tun.RemoveVPNEgress()
 		opErr = Remove(spec)
 	case "teardown":
+		_ = tun.GlobalRuntime().StopReal()
+		_ = tun.RemoveVPNEgress()
 		opErr = Teardown(spec)
 	case "uninstall-helper":
+		_ = tun.GlobalRuntime().StopReal()
+		_ = tun.RemoveVPNEgress()
 		opErr = UninstallHelper()
 	case "quic-stats":
 		st, rerr := ReadQUICDropStats()
@@ -305,14 +430,35 @@ func handleHelperConn(c net.Conn, ownerUID int) {
 		_, _ = c.Write([]byte("OK quic1 " + FormatQUICDropStatsLine(st) + "\n"))
 		return
 	case "tun-start", "tun-stop", "tun-stats":
-		// Closed-loop: acknowledge protocol, never open /dev/net/tun here.
-		_ = uid
-		reply, rerr := tun.HelperReply(verb)
+		real := false
+		if len(parts) >= 4 && (parts[3] == "real" || strings.EqualFold(parts[3], "real=1")) {
+			real = true
+		}
+		if len(parts) >= 5 && (parts[4] == "real" || strings.EqualFold(parts[4], "real=1")) {
+			real = true
+		}
+		reply, rerr := helperTunVerb(verb, uid, real)
 		if rerr != nil {
 			_, _ = c.Write([]byte("ERR " + rerr.Error() + "\n"))
 			return
 		}
 		_, _ = c.Write([]byte(reply + "\n"))
+		return
+	case "vpn-egress-apply":
+		iface := ca // 4th field
+		if iface == "" || iface == "-" {
+			_, _ = c.Write([]byte("ERR vpn iface required\n"))
+			return
+		}
+		if err := tun.ApplyVPNEgress(iface); err != nil {
+			_, _ = c.Write([]byte("ERR " + err.Error() + "\n"))
+			return
+		}
+		_, _ = c.Write([]byte("OK " + CapVPN + " applied iface=" + iface + "\n"))
+		return
+	case "vpn-egress-remove":
+		_ = tun.RemoveVPNEgress()
+		_, _ = c.Write([]byte("OK " + CapVPN + " removed\n"))
 		return
 	default:
 		_, _ = c.Write([]byte("ERR unknown verb\n"))

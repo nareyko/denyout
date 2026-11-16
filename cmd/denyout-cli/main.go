@@ -538,15 +538,23 @@ Profiles live in ~/.config/denyout/profiles/`)
 
 func cmdHostctl(args []string) int {
 	if len(args) == 0 || args[0] == "--help" || args[0] == "-h" {
-		fmt.Println(`Usage: denyout-cli hostctl apply|remove|teardown|render|proxyd|quic-stats|tun-stats|tun-start|tun-stop|tun-rollback-plan|helper-serve|helper-uninstall [flags]
+		fmt.Println(`Usage: denyout-cli hostctl apply|remove|teardown|render|proxyd|quic-stats|tun-stats|tun-start|tun-stop|tun-rollback-plan|tun-device-plan|tun-device-rollback-plan|vpn-egress-plan|vpn-egress-rollback-plan|vpn-egress-apply|vpn-egress-remove|helper-serve|helper-install|helper-uninstall|caps [flags]
 
   Privileged helper for Protect this computer (transparent redirect + CA trust).
   proxyd runs the transparent proxy (started after setcap so SO_MARK works).
   teardown removes redirect rules and the system CA (used by denyout-cli uninstall).
   quic-stats prints nft UDP/443 drop counters (Linux; helper or root).
-  tun-stats|tun-start|tun-stop  T1 helper protocol (disabled stub until VM dogfood; no /dev/net/tun).
+  tun-stats|tun-start|tun-stop  T1 helper protocol (stub unless --real / DENYOUT_TUN_E2E / TunDataplane).
   tun-rollback-plan  print T1→T0 restore steps (docs only; not executed).
+  tun-device-plan  print ip tuntap create commands for denyout0 (not executed; see docs/tun-implementation-plan.md).
+  tun-device-rollback-plan  print delete denyout0 + T0 restore hint (not executed).
+  vpn-egress-plan --iface IF  print DenyOut mark→VPN ip rule/route plan (not executed; see docs/design-vpn-egress.md).
+  vpn-egress-rollback-plan  print remove commands for that plan (not executed).
+  vpn-egress-apply --iface IF  apply mark→VPN routes (requires DENYOUT_VPN_EGRESS_E2E=1 + admin/helper).
+  vpn-egress-remove  remove VPN egress routes (admin/helper).
+  caps  print helper capability tags (quic1 tun1 vpn1).
   helper-serve runs the root unix-socket helper (systemd; Linux).
+  helper-install installs/restarts denyout-hostguard.service from this binary (Linux; root).
   helper-uninstall stops/removes denyout-hostguard.service (Linux; used by uninstall).
 
 Flags:
@@ -554,6 +562,8 @@ Flags:
   --ca PATH    CA certificate PEM to trust
   --ca-dir D   persistent CA directory (proxyd)
   --uid N      desktop user uid (Unix)
+  --iface IF   VPN egress interface (vpn-egress-plan/apply; e.g. wg0)
+  --real       with tun-start|stop: request real denyout0 (helper; Linux)
   --allow-quic allow UDP/443 (HTTP/3); default is drop QUIC so browsers use TCP MITM
   --tun        with render: append T1 steer table preview (not applied)
   --ask        Ask mode policy (proxyd)
@@ -585,9 +595,12 @@ Flags:
 	}
 	if action == "tun-stats" || action == "tun-start" || action == "tun-stop" {
 		uid, _ := hostguard.CurrentUID()
+		real := false
 		for i := 1; i < len(args); i++ {
 			a := args[i]
 			switch {
+			case a == "--real":
+				real = true
 			case strings.HasPrefix(a, "--uid="):
 				fmt.Sscanf(strings.TrimPrefix(a, "--uid="), "%d", &uid)
 			case a == "--uid":
@@ -597,7 +610,15 @@ Flags:
 				}
 			}
 		}
-		line, err := hostguard.HelperTunCall(action, uid)
+		var (
+			line string
+			err  error
+		)
+		if real {
+			line, err = hostguard.HelperTunCallReal(action, uid)
+		} else {
+			line, err = hostguard.HelperTunCall(action, uid)
+		}
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "denyout-cli hostctl %s: %v\n", action, err)
 			return 2
@@ -605,8 +626,121 @@ Flags:
 		fmt.Println(line)
 		return 0
 	}
+	if action == "caps" {
+		c, err := hostguard.HelperCaps()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "denyout-cli hostctl caps: %v\n", err)
+			return 2
+		}
+		fmt.Println(c.Raw)
+		return 0
+	}
 	if action == "tun-rollback-plan" {
 		fmt.Print(tunRollbackPlan())
+		return 0
+	}
+	if action == "tun-device-plan" {
+		fmt.Print(tun.FormatDevicePlan())
+		return 0
+	}
+	if action == "tun-device-rollback-plan" {
+		fmt.Print(tun.FormatDeviceRollback())
+		return 0
+	}
+	if action == "vpn-egress-plan" {
+		iface := ""
+		for i := 1; i < len(args); i++ {
+			a := args[i]
+			switch {
+			case strings.HasPrefix(a, "--iface="):
+				iface = strings.TrimPrefix(a, "--iface=")
+			case a == "--iface":
+				i++
+				if i < len(args) {
+					iface = args[i]
+				}
+			}
+		}
+		out, err := tun.FormatVPNEgressPlan(iface)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "denyout-cli hostctl vpn-egress-plan: %v\n", err)
+			return 2
+		}
+		fmt.Print(out)
+		return 0
+	}
+	if action == "vpn-egress-rollback-plan" {
+		fmt.Print(tun.FormatVPNEgressRollback())
+		return 0
+	}
+	if action == "vpn-egress-apply" {
+		if !tun.WantVPNEgressApply() {
+			fmt.Fprintf(os.Stderr, "denyout-cli hostctl vpn-egress-apply: set %s=1 (VM only)\n", tun.EnvVPNEgressE2E)
+			return 2
+		}
+		iface := ""
+		for i := 1; i < len(args); i++ {
+			a := args[i]
+			switch {
+			case strings.HasPrefix(a, "--iface="):
+				iface = strings.TrimPrefix(a, "--iface=")
+			case a == "--iface":
+				i++
+				if i < len(args) {
+					iface = args[i]
+				}
+			}
+		}
+		line, err := hostguard.HelperVPNEgressApply(iface)
+		if err != nil {
+			// Fallback: elevated/local apply when helper missing.
+			if applyErr := tun.ApplyVPNEgress(iface); applyErr != nil {
+				fmt.Fprintf(os.Stderr, "denyout-cli hostctl vpn-egress-apply: %v (helper: %v)\n", applyErr, err)
+				return 2
+			}
+			fmt.Printf("OK vpn1 applied iface=%s source=local\n", iface)
+			return 0
+		}
+		fmt.Println(line)
+		return 0
+	}
+	if action == "vpn-egress-remove" {
+		if line, err := hostguard.HelperVPNEgressRemove(); err == nil {
+			fmt.Println(line)
+			return 0
+		}
+		_ = tun.RemoveVPNEgress()
+		fmt.Println("OK vpn1 removed source=local")
+		return 0
+	}
+	if action == "helper-install" {
+		uid, _ := hostguard.CurrentUID()
+		noElevate := false
+		for i := 1; i < len(args); i++ {
+			a := args[i]
+			switch {
+			case a == "--no-elevate":
+				noElevate = true
+			case strings.HasPrefix(a, "--uid="):
+				fmt.Sscanf(strings.TrimPrefix(a, "--uid="), "%d", &uid)
+			case a == "--uid":
+				i++
+				if i < len(args) {
+					fmt.Sscanf(args[i], "%d", &uid)
+				}
+			}
+		}
+		if !noElevate {
+			if err := hostguard.ElevateInstallHelper(uid); err != nil {
+				fmt.Fprintf(os.Stderr, "denyout-cli hostctl helper-install: %v\n", err)
+				return 2
+			}
+			return 0
+		}
+		if err := hostguard.InstallHelper(uid); err != nil {
+			fmt.Fprintf(os.Stderr, "denyout-cli hostctl helper-install: %v\n", err)
+			return 2
+		}
 		return 0
 	}
 	if action == "helper-serve" {

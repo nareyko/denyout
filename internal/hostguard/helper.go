@@ -36,3 +36,8 @@ func HelperUninstallHelper() error {
 func HelperQUICStats(uid int) (QUICDropStats, error) {
 	return helperQUICStats(uid)
 }
+
+// HelperCaps asks the helper for capability tags (caps1/quic1/tun1/…).
+func HelperCaps() (CapsReply, error) {
+	return helperCaps()
+}
