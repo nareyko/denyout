@@ -211,6 +211,8 @@ func (b *Bridge) UISetSoundOnlyAnswer(on bool) error    { return b.app.UISetSoun
 func (b *Bridge) UISetSystemBanners(on bool) error      { return b.app.UISetSystemBanners(on) }
 func (b *Bridge) UISetRespectFullscreen(on bool) error  { return b.app.UISetRespectFullscreen(on) }
 func (b *Bridge) UISetBlockBrowserQUIC(on bool) error   { return b.app.UISetBlockBrowserQUIC(on) }
+func (b *Bridge) UISetTunDataplane(on bool) error       { return b.app.UISetTunDataplane(on) }
+func (b *Bridge) UISetQuicMITM(on bool) error           { return b.app.UISetQuicMITM(on) }
 func (b *Bridge) UISetSilentWhenOpen(on bool) error     { return b.app.UISetSilentWhenOpen(on) }
 func (b *Bridge) UISetDecisionTimeoutSec(sec int) error { return b.app.UISetDecisionTimeoutSec(sec) }
 func (b *Bridge) UISetReaskIntervalSec(sec int) error   { return b.app.UISetReaskIntervalSec(sec) }

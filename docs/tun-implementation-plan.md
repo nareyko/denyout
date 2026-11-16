@@ -14,13 +14,13 @@ VM dogfood: [tun-vm-dogfood.md](tun-vm-dogfood.md). VPN: [design-vpn-egress.md](
 | **Q1** | QUIC sighting (SNI best-effort) + audit/decide Drop/Sight | **landed** |
 | **Q2a** | QUIC terminate+reencrypt skeleton (`quic-go` + DenyOut CA hook) | **landed (gated)** |
 | **Q2b** | HTTP/3 into policy via `ServeHTTP3MITM` + `HTTP3PolicyFunc` | **landed (API+tests)** |
-| **Q2c** | Pref UI `QuicMITM`, dogfood matrix, Cursor = no QUIC MITM | **landed (docs+pref)** |
+| **Q2c** | Pref UI `QuicMITM`, dogfood matrix, Cursor = no QUIC MITM | **landed (Settings → Experimental)** |
 
 ## How to turn on (Linux)
 
 1. Protect On (helper refresh).
-2. Enable **TunDataplane** (Settings) or `DENYOUT_TUN_E2E=1`.
-3. Optional MITM: **QuicMITM** pref or `DENYOUT_QUIC_MITM=1` (requires TunDataplane).
+2. Enable **TunDataplane** under **Settings → Advanced → Experimental**, or `DENYOUT_TUN_E2E=1`.
+3. Optional MITM: **QuicMITM** in the same Experimental card, or `DENYOUT_QUIC_MITM=1` (requires TunDataplane).
 4. Cursor `*.cursor.sh` / `*.cursor.com`: QUIC MITM **refused** (drop/sight only).
 
 ## Closed-loop (CI)

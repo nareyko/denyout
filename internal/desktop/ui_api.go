@@ -109,6 +109,7 @@ type UISnapshot struct {
 	BlockBrowserQUIC    bool            `json:"block_browser_quic"` // inverse of AllowBrowserQUIC; default on
 	TunDataplane        bool            `json:"tun_dataplane"`      // experimental UDP via denyout0 (Linux)
 	QuicMITM            bool            `json:"quic_mitm"`          // experimental HTTP/3 MITM (Linux; needs TunDataplane)
+	ExperimentalLinux   bool            `json:"experimental_linux"` // show Settings → Experimental (GOOS==linux)
 	FullscreenDetect    bool            `json:"fullscreen_detect"`  // can see fullscreen apps right now
 	FullscreenNow       bool            `json:"fullscreen_now"`     // active window fullscreen (only if detect)
 	FullscreenWayland   bool            `json:"fullscreen_wayland"` // session looks Wayland (copy hint)
@@ -309,6 +310,7 @@ func (a *App) GetUISnapshot() UISnapshot {
 		BlockBrowserQUIC:   !a.state.AllowBrowserQUIC,
 		TunDataplane:       a.state.TunDataplane && runtime.GOOS == "linux",
 		QuicMITM:           a.state.QuicMITM && runtime.GOOS == "linux",
+		ExperimentalLinux:  runtime.GOOS == "linux",
 		FullscreenDetect:   a.fullscreenDetectOK(),
 		FullscreenNow: func() bool {
 			a.presence.mu.Lock()

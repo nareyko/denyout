@@ -100,7 +100,7 @@ G2: `hostctl tun-device-plan` / `tun-device-rollback-plan` (render only).
 
 - Default Protect stays **nft redirect + QUIC drop** until T1 VM dogfood passes.
 - Cursor remains **TCP passthrough + QUIC drop** (no browser-only QUIC exception).
-- Protect On calls real `tun-start` only when `DENYOUT_TUN_E2E=1` **or** desktop pref `TunDataplane` (default **false**).
+- Protect On calls real `tun-start` only when `DENYOUT_TUN_E2E=1` **or** desktop pref `TunDataplane` (Settings → Advanced → Experimental; default **false**).
 - Gate off → `tun_start_skipped` + T0 nft UDP/443 drop. Gate on → helper creates `denyout0`, steers UDP/443, userspace DropLog; failure leaves T0 path.
 - Coexistence denylist: `tun.ShouldSkipIface` (`lo`, `docker0`, `br-*`, `veth*`, `wg*`, WARP/Tailscale/ZeroTier names).
 - **DenyOut → then VPN:** locked in [design-vpn-egress.md](design-vpn-egress.md); kernel apply behind `DENYOUT_VPN_EGRESS_E2E=1`.

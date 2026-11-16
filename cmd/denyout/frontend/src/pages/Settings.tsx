@@ -129,6 +129,14 @@ const ADVANCED_FIND_KEYS = [
   "chrome bypass",
   "block quic",
   "browser quic",
+  "experimental",
+  "tun",
+  "tun dataplane",
+  "dataplane",
+  "denyout0",
+  "quic mitm",
+  "http3 mitm",
+  "gvisor",
 ];
 
 function findKeysMatch(keys: string[], findQ: string): boolean {
@@ -1321,9 +1329,10 @@ export function Settings({
  dismissed={tipGone(dismissed, "settings-advanced")}
  onDismiss={onChanged}
  >
- Advanced: system banners (including Detailed), Browser QUIC, allowed/silenced sites,
- optional lists, Asks, diagnostics, account, and whole-PC Agents only. Allowed/silenced
- hosts are the permanent allow controls — other cards here are prefs and tools.
+ Advanced: system banners (including Detailed), Browser QUIC, Experimental (Linux TUN /
+ HTTP/3 MITM), allowed/silenced sites, optional lists, Asks, diagnostics, account, and
+ whole-PC Agents only. Allowed/silenced hosts are the permanent allow controls — other
+ cards here are prefs and tools.
  </Tip>
  )}
 
@@ -1505,6 +1514,69 @@ export function Settings({
  On by default. Turn off if a site or app needs HTTP/3 and you accept that Protect
  may miss that traffic. Off/Quit always clears the drop. Changing this while Protect
  is live re-applies network rules (helper or password prompt).
+ </p>
+ </section>
+ )}
+
+ {snap.experimental_linux &&
+ showSection(
+ [
+ "experimental",
+ "tun",
+ "tun dataplane",
+ "dataplane",
+ "denyout0",
+ "quic mitm",
+ "http3 mitm",
+ "http/3",
+ "gvisor",
+ "mitm",
+ ],
+ "experimental",
+ ) && (
+ <section className="card" id="settings-experimental">
+ <h2>Experimental</h2>
+ <p className="muted">
+ Linux-only. Default off. Prefer a throwaway VM before enabling on your main
+ laptop — a bad TUN/MITM path can break browsing until Protect Off. Same gates as{" "}
+ <span className="mono">DENYOUT_TUN_E2E=1</span> /{" "}
+ <span className="mono">DENYOUT_QUIC_MITM=1</span>.
+ </p>
+ <label style={{ display: "block" }}>
+ <input
+ type="checkbox"
+ checked={!!snap.tun_dataplane}
+ onChange={(e) =>
+ void api
+ .setTunDataplane(e.target.checked)
+ .then(reload)
+ .catch((err) => fail(err))
+ }
+ />{" "}
+ TunDataplane — UDP/443 via <span className="mono">denyout0</span> (gVisor TCP)
+ </label>
+ <p className="muted" style={{ marginTop: "0.25rem" }}>
+ When Protect is on, starts a real TUN and steers marked traffic. Off restores the
+ usual Browser QUIC drop path. Cursor stays TLS passthrough (no TCP MITM).
+ </p>
+ <label style={{ display: "block", marginTop: "0.75rem" }}>
+ <input
+ type="checkbox"
+ checked={!!snap.quic_mitm}
+ disabled={!snap.tun_dataplane}
+ onChange={(e) =>
+ void api
+ .setQuicMITM(e.target.checked)
+ .then(reload)
+ .catch((err) => fail(err))
+ }
+ />{" "}
+ QuicMITM — decrypt HTTP/3 (needs TunDataplane)
+ </label>
+ <p className="muted" style={{ marginTop: "0.25rem" }}>
+ Early <span className="mono">quic-go</span> path; expect breakage on some sites.
+ Cursor hosts (<span className="mono">*.cursor.sh</span> /{" "}
+ <span className="mono">*.cursor.com</span>) are never QUIC-MITM’d (sight/drop only).
  </p>
  </section>
  )}

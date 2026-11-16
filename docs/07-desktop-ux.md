@@ -254,6 +254,10 @@ Tip: lists, diagnostics, whole-PC Agents only.
 
 **Account** (optional) - trust line: *Sign in to sync settings across computers. DenyOut works fully without an account.* Email one-time code - Sign in - Sign out - **Sync settings when signed in** - **Sync now** - **Delete cloud data** (cloud account only. Local Protect unchanged). API base under a collapsed advanced detail (local/stub). **Protect never requires an account.** Detail: [`cloud-sync.md`](cloud-sync.md).
 
+**Browser QUIC** - drop UDP/443 while Protect is on (default on).
+
+**Experimental** (Linux only) - **TunDataplane** (`denyout0` / gVisor; default off) and **QuicMITM** (needs TunDataplane; Cursor never QUIC-MITM). Same as `DENYOUT_TUN_E2E` / `DENYOUT_QUIC_MITM`. Prefer a VM. Detail: [`tun-vm-dogfood.md`](tun-vm-dogfood.md).
+
 **Sites I've allowed or silenced** - Allowed + Silenced (Keep blocked) + filter + Undo last allow. 
 
 **Optional lists (not core)** - OISD small / OISD big / StevenBlack (default off. Ad/tracker warning on enable). Not network-wide adblocking. 

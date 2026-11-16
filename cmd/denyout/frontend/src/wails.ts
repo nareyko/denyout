@@ -54,6 +54,9 @@ export type UISnapshot = {
  system_banners?: boolean;
  respect_fullscreen?: boolean;
  block_browser_quic?: boolean;
+ tun_dataplane?: boolean;
+ quic_mitm?: boolean;
+ experimental_linux?: boolean;
  fullscreen_detect?: boolean;
  fullscreen_now?: boolean;
  fullscreen_wayland?: boolean;
@@ -257,6 +260,8 @@ type Bridge = {
  UISetSystemBanners(on: boolean): Promise<void>;
  UISetRespectFullscreen(on: boolean): Promise<void>;
  UISetBlockBrowserQUIC(on: boolean): Promise<void>;
+ UISetTunDataplane(on: boolean): Promise<void>;
+ UISetQuicMITM(on: boolean): Promise<void>;
  UISetSilentWhenOpen(on: boolean): Promise<void>;
  UISetDecisionTimeoutSec(sec: number): Promise<void>;
  UISetReaskIntervalSec(sec: number): Promise<void>;
@@ -373,6 +378,8 @@ export const api = {
  setSystemBanners: (on: boolean) => bridge().UISetSystemBanners(on),
  setRespectFullscreen: (on: boolean) => bridge().UISetRespectFullscreen(on),
  setBlockBrowserQUIC: (on: boolean) => bridge().UISetBlockBrowserQUIC(on),
+ setTunDataplane: (on: boolean) => bridge().UISetTunDataplane(on),
+ setQuicMITM: (on: boolean) => bridge().UISetQuicMITM(on),
  setSilentWhenOpen: (on: boolean) => bridge().UISetSilentWhenOpen(on),
  setDecisionTimeout: (sec: number) => bridge().UISetDecisionTimeoutSec(sec),
  setReaskInterval: (sec: number) => bridge().UISetReaskIntervalSec(sec),

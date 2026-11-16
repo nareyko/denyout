@@ -58,7 +58,7 @@ Only after preflight is green on the same binary:
 1. Snapshot the VM.
 2. Protect On once so helper refreshes (`hostctl caps` should list `quic1 tun1 vpn1`).
 3. Real TUN: `DENYOUT_TUN_E2E=1 denyout-cli hostctl tun-start --real`  
-   (or enable **TunDataplane** in Settings → Advanced, then Protect On).
+   (or enable **TunDataplane** in Settings → Advanced → Experimental, then Protect On).
 4. Check: `ip link show denyout0`, `hostctl tun-stats` → `present=true`, TCP Protect still OK.
 5. Confirm Protect Off / `tun-stop --real` deletes `denyout0` and restores T0 UDP drop.
 6. Matrix: plain eth, Docker bridge present, WireGuard up/down, WARP if available.
@@ -71,7 +71,7 @@ Docker lab script above covers the automated path. On a VM / laptop (after snaps
 
 1. With TunDataplane: confirm TCP HTTPS still works (gVisor → proxyd). If broken, Protect Off must restore nft redirect.
 2. Generate QUIC to a lab host; check events/logs for sighting when SNI visible; default remains drop.
-3. Opt-in `DENYOUT_QUIC_MITM=1` / `--mitm` / QuicMITM pref against a **lab** HTTP/3 origin only; Cursor hosts must stay non-MITM.
+3. Opt-in `DENYOUT_QUIC_MITM=1` / `--mitm` / **QuicMITM** (Settings → Advanced → Experimental) against a **lab** HTTP/3 origin only; Cursor hosts must stay non-MITM.
 4. Protect Off restores T0; no leftover `denyout0` / fwmark rules.
 
 `TunDataplane` / `QuicMITM` defaults stay **false**.
