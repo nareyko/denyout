@@ -54,12 +54,13 @@ Rollback: `tun-stop` + delete device + restore T0 nft-only rules in one elevate.
 
 ## 5. Threat-model honesty
 
-| Goal | T0/T1 | T4 |
-| --- | --- | --- |
-| Stop Chrome HTTP/3 bypass | yes (drop) | decrypt optional |
-| Stop Cursor HTTP/3 bypass | yes (drop; TCP passthrough for API) | same |
-| See secret-in-URL on QUIC | **no** | only with QUIC MITM |
-| See Cursor API body | **no** (passthrough) | still no unless MITM Cursor |
+| Goal | T0/G4 drop | Q1 sight | Q2 MITM (opt-in) |
+| --- | --- | --- | --- |
+| Stop Chrome HTTP/3 bypass | yes | yes | yes (or decrypt) |
+| Stop Cursor HTTP/3 bypass | yes (TCP passthrough for API) | yes | **no MITM** (drop only) |
+| See QUIC destination (SNI) | no | best-effort | yes |
+| See secret-in-URL on HTTP/3 | **no** | no | **yes** when MITM works |
+| Full TCP via TUN (T3) | n/a | n/a | gated TunDataplane + gVisor |
 
 ## 6. Coexistence risks
 

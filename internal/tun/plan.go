@@ -74,22 +74,31 @@ func EnabledForPhase(ph Phase) bool {
 
 // HelperLine formats a helper protocol line (closed-loop / stub path).
 func HelperLine(verb string, uid int) (string, error) {
-	return HelperLineOpts(verb, uid, false)
+	return HelperLineOpts(verb, uid, false, false)
 }
 
 // HelperLineReal requests real denyout0 work from the helper (G3+).
 func HelperLineReal(verb string, uid int) (string, error) {
-	return HelperLineOpts(verb, uid, true)
+	return HelperLineOpts(verb, uid, true, false)
 }
 
-// HelperLineOpts formats tun-start|stop|stats [real].
-func HelperLineOpts(verb string, uid int, real bool) (string, error) {
+// HelperLineRealMITM requests real denyout0 + QUIC MITM gate (G6 Q2).
+func HelperLineRealMITM(verb string, uid int) (string, error) {
+	return HelperLineOpts(verb, uid, true, true)
+}
+
+// HelperLineOpts formats tun-start|stop|stats [real] [mitm].
+func HelperLineOpts(verb string, uid int, real, mitm bool) (string, error) {
 	switch verb {
 	case "tun-start", "tun-stop", "tun-stats":
+		extra := ""
 		if real {
-			return fmt.Sprintf("%s 0 %d - real\n", verb, uid), nil
+			extra += " real"
 		}
-		return fmt.Sprintf("%s 0 %d -\n", verb, uid), nil
+		if mitm {
+			extra += " mitm"
+		}
+		return fmt.Sprintf("%s 0 %d -%s\n", verb, uid, extra), nil
 	default:
 		return "", fmt.Errorf("tun: unknown verb %q", verb)
 	}

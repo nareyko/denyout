@@ -99,17 +99,21 @@ func helperQUICStats(uid int) (QUICDropStats, error) {
 	return ParseQUICDropStatsLine(resp)
 }
 
-func helperTunCall(verb string, uid int, real bool) (string, error) {
+func helperTunCall(verb string, uid int, real, mitm bool) (string, error) {
 	if !tun.IsHelperVerb(verb) {
 		return "", fmt.Errorf("hostguard: not a tun verb %q", verb)
 	}
 	c, err := net.Dial("unix", helperSockPath)
 	if err != nil {
+		// Root + --real: run dataplane locally (Docker/VM dogfood without helper-serve).
+		if real && os.Geteuid() == 0 {
+			return helperTunVerb(verb, uid, real, mitm)
+		}
 		// Closed-loop fallback: local stub reply (no elevate, no device).
 		return tun.HelperReply(verb)
 	}
 	defer c.Close()
-	line, err := tun.HelperLineOpts(verb, uid, real)
+	line, err := tun.HelperLineOpts(verb, uid, real, mitm)
 	if err != nil {
 		return "", err
 	}
@@ -132,7 +136,7 @@ func helperTunCall(verb string, uid int, real bool) (string, error) {
 }
 
 // helperTunVerb runs inside helper-serve.
-func helperTunVerb(verb string, uid int, real bool) (string, error) {
+func helperTunVerb(verb string, uid int, real, mitm bool) (string, error) {
 	rt := tun.GlobalRuntime()
 	switch verb {
 	case "tun-stats":
@@ -150,15 +154,24 @@ func helperTunVerb(verb string, uid int, real bool) (string, error) {
 		if !real && !tun.WantDevice() {
 			return tun.HelperReply(verb)
 		}
-		if err := rt.StartReal(uid); err != nil {
+		lastApplyMu.Lock()
+		port := lastApplySpec.ProxyPort
+		lastApplyMu.Unlock()
+		opts := tun.StartOpts{
+			UID:       uid,
+			ProxyPort: port,
+			EnableTCP: true,
+			QUICMITM:  mitm || tun.WantQUICMITM(),
+		}
+		if err := rt.StartRealOpts(opts); err != nil {
 			return "", err
 		}
-		// Suppress T0 UDP/443 drop while TUN path handles it.
-		suppressT0QUICDrop(true)
-		return fmt.Sprintf("OK %s enabled=true verb=%s reason=ok", tun.CapTag, verb), nil
+		// Suppress T0 UDP drop + TCP redirect while TUN/gVisor owns those paths.
+		suppressT0ForTUN(true)
+		return fmt.Sprintf("OK %s enabled=true verb=%s reason=ok tcp=1 mitm=%v", tun.CapTag, verb, opts.QUICMITM), nil
 	case "tun-stop":
 		_ = rt.StopReal()
-		suppressT0QUICDrop(false)
+		suppressT0ForTUN(false)
 		if !real && !tun.WantDevice() {
 			return tun.HelperReply(verb)
 		}
@@ -168,7 +181,7 @@ func helperTunVerb(verb string, uid int, real bool) (string, error) {
 	}
 }
 
-func suppressT0QUICDrop(suppress bool) {
+func suppressT0ForTUN(suppress bool) {
 	lastApplyMu.Lock()
 	defer lastApplyMu.Unlock()
 	if !lastApplyOK || lastApplySpec.ProxyPort <= 0 {
@@ -177,6 +190,7 @@ func suppressT0QUICDrop(suppress bool) {
 	s := lastApplySpec
 	if suppress {
 		s.AllowQUIC = true // omit denyout-block-quic; TUN steers/drops instead
+		s.TunTCP = true    // omit TCP redirect; gVisor owns TCP
 	}
 	_ = Apply(s)
 }
@@ -430,14 +444,16 @@ func handleHelperConn(c net.Conn, ownerUID int) {
 		_, _ = c.Write([]byte("OK quic1 " + FormatQUICDropStatsLine(st) + "\n"))
 		return
 	case "tun-start", "tun-stop", "tun-stats":
-		real := false
-		if len(parts) >= 4 && (parts[3] == "real" || strings.EqualFold(parts[3], "real=1")) {
-			real = true
+		real, mitm := false, false
+		for _, p := range parts[3:] {
+			switch strings.ToLower(p) {
+			case "real", "real=1":
+				real = true
+			case "mitm", "mitm=1":
+				mitm = true
+			}
 		}
-		if len(parts) >= 5 && (parts[4] == "real" || strings.EqualFold(parts[4], "real=1")) {
-			real = true
-		}
-		reply, rerr := helperTunVerb(verb, uid, real)
+		reply, rerr := helperTunVerb(verb, uid, real, mitm)
 		if rerr != nil {
 			_, _ = c.Write([]byte("ERR " + rerr.Error() + "\n"))
 			return

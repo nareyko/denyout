@@ -55,7 +55,19 @@ func (a *App) ensureTunAfterProtectOn(uid int) {
 	} else {
 		fields["pref"] = "tun_dataplane"
 	}
-	line, err := hostguard.HelperTunCallReal("tun-start", uid)
+	a.mu.Lock()
+	mitm := a.state.QuicMITM || tun.WantQUICMITM()
+	a.mu.Unlock()
+	fields["quic_mitm"] = mitm
+	var (
+		line string
+		err  error
+	)
+	if mitm {
+		line, err = hostguard.HelperTunCallRealMITM("tun-start", uid)
+	} else {
+		line, err = hostguard.HelperTunCallReal("tun-start", uid)
+	}
 	if err != nil {
 		fields["err"] = err.Error()
 		LogEvent("tun_start", fields)

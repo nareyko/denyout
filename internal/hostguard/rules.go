@@ -30,8 +30,12 @@ func renderLinuxNFT(spec Spec) string {
 	fmt.Fprintf(&b, "  chain output {\n")
 	fmt.Fprintf(&b, "    type nat hook output priority -100; policy accept;\n")
 	fmt.Fprintf(&b, "    meta mark %d return\n", mark)
-	fmt.Fprintf(&b, "    meta skuid %d tcp dport { 80, 443 } ip daddr != 127.0.0.0/8 redirect to :%d\n", spec.UID, spec.ProxyPort)
-	fmt.Fprintf(&b, "    meta skuid %d tcp dport { 80, 443 } ip6 daddr != ::1 redirect to :%d\n", spec.UID, spec.ProxyPort)
+	if !spec.TunTCP {
+		fmt.Fprintf(&b, "    meta skuid %d tcp dport { 80, 443 } ip daddr != 127.0.0.0/8 redirect to :%d\n", spec.UID, spec.ProxyPort)
+		fmt.Fprintf(&b, "    meta skuid %d tcp dport { 80, 443 } ip6 daddr != ::1 redirect to :%d\n", spec.UID, spec.ProxyPort)
+	} else {
+		fmt.Fprintf(&b, "    # TunTCP: TCP 80/443 steered to denyout0 / gVisor (no redirect)\n")
+	}
 	fmt.Fprintf(&b, "  }\n")
 	if !spec.AllowQUIC {
 		fmt.Fprintf(&b, "  chain output_filter {\n")

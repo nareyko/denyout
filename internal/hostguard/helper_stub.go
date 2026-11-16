@@ -18,9 +18,10 @@ func helperQUICStats(uid int) (QUICDropStats, error) {
 	return QUICDropStats{}, ErrHelperUnavailable
 }
 
-func helperTunCall(verb string, uid int, real bool) (string, error) {
+func helperTunCall(verb string, uid int, real, mitm bool) (string, error) {
 	_ = uid
 	_ = real
+	_ = mitm
 	// Non-Linux: still expose the closed-loop protocol string (no device).
 	return tunHelperReply(verb)
 }

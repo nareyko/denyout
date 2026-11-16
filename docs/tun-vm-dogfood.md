@@ -28,6 +28,16 @@ Must pass:
 4. Coexistence names skipped: `lo`, `docker0`, `br-*`, `veth*`, `wg*`, WARP/Tailscale/ZeroTier-style.
 5. Rollback plan lists `tun-stop` → delete `denyout0` → T0 `hostctl apply`.
 
+## Without a full VM (limited)
+
+If you have Docker + `/dev/net/tun` but no throwaway VM yet:
+
+```bash
+./scripts/closed-loop-tun-docker-dogfood.sh
+```
+
+That proves `denyout0` create/stats/stop as root inside a privileged container (local `--real` path when helper-serve is absent). It does **not** replace the G6 browser matrix below (Chrome/Cursor/HTTP3 lab still need a real VM or laptop).
+
 ## VM-only steps (root; not CI)
 
 Only after preflight is green on the same binary:
@@ -42,9 +52,18 @@ Only after preflight is green on the same binary:
 7. Optional VPN egress: `DENYOUT_VPN_EGRESS_E2E=1 hostctl vpn-egress-apply --iface wg0` then `vpn-egress-remove`.
 8. Easy rollback: `hostctl tun-stop --real` then T0 apply; if stuck, restore VM snapshot.
 
+## G6 matrix (T3 / Q1 / Q2)
+
+After G3–G5 steps above:
+
+1. With TunDataplane: confirm TCP HTTPS still works (gVisor → proxyd). If broken, Protect Off must restore nft redirect.
+2. Generate QUIC to a lab host; check events/logs for sighting when SNI visible; default remains drop.
+3. Opt-in `DENYOUT_QUIC_MITM=1` or QuicMITM pref against a **lab** HTTP/3 origin only; Cursor hosts must stay non-MITM.
+4. Protect Off restores T0; no leftover `denyout0` / fwmark rules.
+
 ## Exit criteria to change Protect default
 
 - Preflight green in CI on every PR.
-- VM dogfood green for the matrix above.
+- VM dogfood green for the matrix above (incl. G6).
 - Owner decision lock in [design-tun-egress.md](design-tun-egress.md) §8 updated.
-- Then — and only then — consider Protect On calling real `tun-start`.
+- Then — and only then — consider TunDataplane / QuicMITM defaults.
