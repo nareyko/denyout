@@ -34,32 +34,6 @@ func SightQUICInitial(udpPayload []byte) (QUICSight, bool) {
 	return out, true
 }
 
-func readQUICVarint(b []byte) (uint64, int) {
-	if len(b) < 1 {
-		return 0, 0
-	}
-	prefix := b[0] >> 6
-	switch prefix {
-	case 0:
-		return uint64(b[0] & 0x3f), 1
-	case 1:
-		if len(b) < 2 {
-			return 0, 0
-		}
-		return uint64(binary.BigEndian.Uint16(b[:2]) & 0x3fff), 2
-	case 2:
-		if len(b) < 4 {
-			return 0, 0
-		}
-		return uint64(binary.BigEndian.Uint32(b[:4]) & 0x3fffffff), 4
-	default:
-		if len(b) < 8 {
-			return 0, 0
-		}
-		return binary.BigEndian.Uint64(b[:8]) & 0x3fffffffffffffff, 8
-	}
-}
-
 // extractTLSSNI finds server_name in a TLS ClientHello blob (best-effort scan).
 func extractTLSSNI(buf []byte) (string, bool) {
 	// Look for handshake type client_hello (1) after content type 22.

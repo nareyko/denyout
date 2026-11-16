@@ -11,15 +11,15 @@ import (
 
 // LocalAnalytics is the History “This week” payload (local JSONL only; no upload).
 type LocalAnalytics struct {
-	Days            int                  `json:"days"`
-	Blocked         int                  `json:"blocked"`
-	YouAllowed      int                  `json:"you_allowed"`
-	Asked           int                  `json:"asked"`
-	QuietWeek       bool                 `json:"quiet_week"`
-	ProtectTimeline []AnalyticsTimeline  `json:"protect_timeline"`
-	BannersShown    int                  `json:"banners_shown"`
-	BannersHeldBack int                  `json:"banners_held_back"`
-	PrivacyNote     string               `json:"privacy_note"`
+	Days            int                 `json:"days"`
+	Blocked         int                 `json:"blocked"`
+	YouAllowed      int                 `json:"you_allowed"`
+	Asked           int                 `json:"asked"`
+	QuietWeek       bool                `json:"quiet_week"`
+	ProtectTimeline []AnalyticsTimeline `json:"protect_timeline"`
+	BannersShown    int                 `json:"banners_shown"`
+	BannersHeldBack int                 `json:"banners_held_back"`
+	PrivacyNote     string              `json:"privacy_note"`
 }
 
 // AnalyticsTimeline is one Protect lifecycle line for the UI.

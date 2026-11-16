@@ -7,9 +7,9 @@ import (
 
 // DevicePlan is the closed-loop command list to create denyout0 (not executed here).
 type DevicePlan struct {
-	Name   string
-	Addr   string
-	Lines  []string
+	Name  string
+	Addr  string
+	Lines []string
 }
 
 // BuildDevicePlan returns ip tuntap / addr / link commands for T1 device bring-up.

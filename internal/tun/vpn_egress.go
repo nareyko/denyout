@@ -28,11 +28,11 @@ func WantVPNEgressApply() bool {
 
 // VPNEgressPlan is the closed-loop command list (not executed here).
 type VPNEgressPlan struct {
-	Iface  string
-	Mark   uint32
-	Table  int
+	Iface    string
+	Mark     uint32
+	Table    int
 	Priority int
-	Lines  []string // shell-like commands for operators / future helper
+	Lines    []string // shell-like commands for operators / future helper
 }
 
 // ValidateVPNEgressIface rejects loopback, our TUN, and coexistence denylist names
