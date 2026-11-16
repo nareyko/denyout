@@ -5,6 +5,11 @@
 ### Added
 
 - **DenyOut → VPN egress (locked):** [`docs/design-vpn-egress.md`](docs/design-vpn-egress.md) — policy first, then VPN via mark `0x646e79` → table `646`. `hostctl vpn-egress-plan --iface wg0` / `vpn-egress-rollback-plan` print `ip` commands only; kernel apply stays behind `DENYOUT_VPN_EGRESS_E2E=1`.
+- **TUN G2 device plan:** [`docs/tun-implementation-plan.md`](docs/tun-implementation-plan.md) (gates G0–G6); `hostctl tun-device-plan` / `tun-device-rollback-plan` print `ip tuntap` for `denyout0` (not executed).
+
+### Fixed
+
+- **Orphan redirect blackhole:** uninstall and Protect Off no longer kill proxyd before removing nft/pf redirects (HTTPS `connection refused` to e.g. `api.github.com`). Concurrent `denyout uninstall` processes are excluded from the kill list.
 
 ## 0.4.11 - Cursor passthrough tunnel half-close (2026-11-16)
 

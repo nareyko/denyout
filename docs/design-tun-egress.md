@@ -92,6 +92,9 @@ Release verify without dogfood: `scripts/closed-loop-release-smoke.sh /path/to/e
 
 VM gate (still no device on CI/laptop): `scripts/closed-loop-tun-preflight.sh` + [tun-vm-dogfood.md](tun-vm-dogfood.md).
 
+Actionable gates G0–G6 (what to build next, what is blocked): [tun-implementation-plan.md](tun-implementation-plan.md).
+G2: `hostctl tun-device-plan` / `tun-device-rollback-plan` (render only).
+
 ## 8. Decision lock (owner)
 
 - Default Protect stays **nft redirect + QUIC drop** until T1 VM dogfood passes.

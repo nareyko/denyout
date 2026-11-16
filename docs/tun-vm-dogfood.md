@@ -2,6 +2,7 @@
 
 Status: **preflight only**. Real `denyout0` must first run on a **throwaway Linux VM**.
 Closed-loop gates live in `scripts/closed-loop-tun-preflight.sh` and CI.
+Roadmap gates G0–G6: [tun-implementation-plan.md](tun-implementation-plan.md).
 
 ## Why a VM first
 

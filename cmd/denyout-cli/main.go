@@ -538,7 +538,7 @@ Profiles live in ~/.config/denyout/profiles/`)
 
 func cmdHostctl(args []string) int {
 	if len(args) == 0 || args[0] == "--help" || args[0] == "-h" {
-		fmt.Println(`Usage: denyout-cli hostctl apply|remove|teardown|render|proxyd|quic-stats|tun-stats|tun-start|tun-stop|tun-rollback-plan|vpn-egress-plan|vpn-egress-rollback-plan|helper-serve|helper-uninstall [flags]
+		fmt.Println(`Usage: denyout-cli hostctl apply|remove|teardown|render|proxyd|quic-stats|tun-stats|tun-start|tun-stop|tun-rollback-plan|tun-device-plan|tun-device-rollback-plan|vpn-egress-plan|vpn-egress-rollback-plan|helper-serve|helper-uninstall [flags]
 
   Privileged helper for Protect this computer (transparent redirect + CA trust).
   proxyd runs the transparent proxy (started after setcap so SO_MARK works).
@@ -546,6 +546,8 @@ func cmdHostctl(args []string) int {
   quic-stats prints nft UDP/443 drop counters (Linux; helper or root).
   tun-stats|tun-start|tun-stop  T1 helper protocol (disabled stub until VM dogfood; no /dev/net/tun).
   tun-rollback-plan  print T1→T0 restore steps (docs only; not executed).
+  tun-device-plan  print ip tuntap create commands for denyout0 (not executed; see docs/tun-implementation-plan.md).
+  tun-device-rollback-plan  print delete denyout0 + T0 restore hint (not executed).
   vpn-egress-plan --iface IF  print DenyOut mark→VPN ip rule/route plan (not executed; see docs/design-vpn-egress.md).
   vpn-egress-rollback-plan  print remove commands for that plan (not executed).
   helper-serve runs the root unix-socket helper (systemd; Linux).
@@ -610,6 +612,14 @@ Flags:
 	}
 	if action == "tun-rollback-plan" {
 		fmt.Print(tunRollbackPlan())
+		return 0
+	}
+	if action == "tun-device-plan" {
+		fmt.Print(tun.FormatDevicePlan())
+		return 0
+	}
+	if action == "tun-device-rollback-plan" {
+		fmt.Print(tun.FormatDeviceRollback())
 		return 0
 	}
 	if action == "vpn-egress-plan" {

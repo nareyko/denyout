@@ -28,9 +28,9 @@ func StopPreviousInstances() {
 func stopPreviousUnix(selfPID int) {
 	out, err := exec.Command("ps", "-eo", "pid=,args=").Output()
 	if err != nil {
-		// Best-effort fallbacks.
+		// Best-effort fallbacks. Avoid pkill -x denyout: that also kills
+		// concurrent `denyout uninstall` and recreates the stacked-uninstall race.
 		_ = exec.Command("pkill", "-f", `denyout-cli[[:space:]]+desktop`).Run()
-		_ = exec.Command("pkill", "-x", `denyout`).Run()
 		_ = exec.Command("pkill", "-f", `denyout-cli[[:space:]]+hostctl[[:space:]]+proxyd`).Run()
 		return
 	}
@@ -106,6 +106,11 @@ func isDenyoutDesktopOrProxyd(args string) bool {
 		base = strings.TrimSuffix(base, ".exe")
 		// Wails GUI binary is named exactly "denyout".
 		if base == "denyout" {
+			// Never kill a concurrent uninstall — stacked uninstalls would
+			// SIGKILL each other and leave nft redirects half-torn-down.
+			if hasUninstallSubcommand(parts, i) {
+				return false
+			}
 			return true
 		}
 		if base != "denyout-cli" {
@@ -115,12 +120,30 @@ func isDenyoutDesktopOrProxyd(args string) bool {
 			continue
 		}
 		next := parts[i+1]
+		if next == "uninstall" {
+			return false
+		}
 		if next == "desktop" {
 			return true
 		}
 		// `denyout-cli hostctl proxyd ...`
 		if next == "hostctl" && i+2 < len(parts) && parts[i+2] == "proxyd" {
 			return true
+		}
+	}
+	return false
+}
+
+// hasUninstallSubcommand reports argv like `denyout uninstall` / `denyout.exe uninstall`.
+func hasUninstallSubcommand(parts []string, binIdx int) bool {
+	for j := binIdx + 1; j < len(parts); j++ {
+		a := strings.Trim(parts[j], ":")
+		if a == "uninstall" {
+			return true
+		}
+		// Stop at first non-flag token that is not uninstall.
+		if !strings.HasPrefix(a, "-") {
+			return false
 		}
 	}
 	return false
@@ -136,11 +159,18 @@ Get-CimInstance Win32_Process | Where-Object {
   if ($_.ProcessId -eq $me) { return }
   $cmd = $_.CommandLine
   $name = $_.Name
+  if ($null -eq $cmd) {
+    if ($name -eq 'denyout.exe') {
+      Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+    }
+    return
+  }
+  # Do not kill concurrent uninstall (avoids stacked-uninstall races).
+  if ($cmd -match 'denyout(\.exe)?(\s+.*)?\s+uninstall(\s|$)' -or $cmd -match 'denyout-cli(\.exe)?\s+uninstall(\s|$)') { return }
   if ($name -eq 'denyout.exe') {
     Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
     return
   }
-  if ($null -eq $cmd) { return }
   if ($cmd -match 'denyout-cli(\.exe)?\s+desktop' -or $cmd -match 'denyout-cli(\.exe)?\s+hostctl\s+proxyd') {
     Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
   }

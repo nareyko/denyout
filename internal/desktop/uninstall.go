@@ -18,13 +18,15 @@ type UninstallOptions struct {
 	SkipElevate bool // tests / already-root callers: run Teardown without pkexec
 }
 
-// Uninstall fully tears down a machine install: processes, hostguard+system CA,
-// NSS trust, autostart, optional XDG data, and binaries in DefaultInstallDir.
-// Does not delete source trees or cloud account data.
+// Uninstall fully tears down a machine install: hostguard+system CA first,
+// then processes, NSS trust, autostart, optional XDG data, and binaries in
+// DefaultInstallDir. Does not delete source trees or cloud account data.
+//
+// Order matters: remove nft/pf redirects while proxyd may still be alive.
+// Killing proxyd first leaves REDIRECT→dead port and blackholes HTTPS
+// (connection refused to github.com/api.github.com, etc.) until teardown finishes.
 func Uninstall(opts UninstallOptions) error {
 	_ = opts.Yes
-	fmt.Fprintln(os.Stderr, "denyout uninstall: stopping tray/proxyd...")
-	StopPreviousInstances()
 	// Dismiss OS banners before teardown (and again at end — orphans can appear mid-run).
 	notify.CloseAll()
 
@@ -51,6 +53,9 @@ func Uninstall(opts UninstallOptions) error {
 		fmt.Fprintf(os.Stderr, "denyout uninstall: warning: helper unit: %v\n", err)
 		fmt.Fprintln(os.Stderr, "  (if denyout-hostguard.service is still active: sudo systemctl disable --now denyout-hostguard.service)")
 	}
+
+	fmt.Fprintln(os.Stderr, "denyout uninstall: stopping tray/proxyd...")
+	StopPreviousInstances()
 
 	fmt.Fprintln(os.Stderr, "denyout uninstall: removing browser NSS CA (if any)...")
 	if err := hostguard.UntrustCAForUserBrowsers(); err != nil {
