@@ -108,7 +108,10 @@ func (s *Server) serveTransparentTLS(conn net.Conn, host string, port int) {
 		rv.Inspection = "passthrough"
 		ips, _ := lookupIPs(host)
 		rv.DestIPs = ips
-		s.tunnel(conn, host, fmt.Sprintf("%d", port), ips, s.cfg.Engine.Cfg.AllowPrivate)
+		if err := s.tunnel(conn, host, fmt.Sprintf("%d", port), ips, s.cfg.Engine.Cfg.AllowPrivate); err != nil {
+			s.logPassthroughError(rv, err, start)
+			return
+		}
 		s.logDecision(rv, d, start)
 		return
 	}
@@ -186,6 +189,15 @@ type prefixConn struct {
 
 func (c *prefixConn) Read(p []byte) (int, error) {
 	return c.r.Read(p)
+}
+
+// CloseWrite forwards half-close to the underlying TCP conn (passthrough relay).
+func (c *prefixConn) CloseWrite() error {
+	type closer interface{ CloseWrite() error }
+	if cw, ok := c.Conn.(closer); ok {
+		return cw.CloseWrite()
+	}
+	return nil
 }
 
 // parseSNI extracts server_name from a TLS ClientHello (best-effort).
