@@ -178,7 +178,10 @@ func (s *Server) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 
 	if s.useTLSPassthrough(host) {
 		rv.Inspection = "passthrough"
-		s.tunnel(clientConn, host, port, ips, s.cfg.Engine.Cfg.AllowPrivate)
+		if err := s.tunnel(clientConn, host, port, ips, s.cfg.Engine.Cfg.AllowPrivate); err != nil {
+			s.logPassthroughError(rv, err, start)
+			return
+		}
 		s.logDecision(rv, d, start)
 		return
 	}
@@ -421,22 +424,52 @@ func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
 	_, _ = io.Copy(w, resp.Body)
 }
 
-func (s *Server) tunnel(client net.Conn, host, port string, ips []net.IP, allowPrivate bool) {
+func (s *Server) tunnel(client net.Conn, host, port string, ips []net.IP, allowPrivate bool) error {
 	defer client.Close()
 	ip, err := safeDialIP(host, ips, allowPrivate)
 	if err != nil {
-		return
+		return fmt.Errorf("passthrough_dial_ip: %w", err)
 	}
 	addr := net.JoinHostPort(ip.String(), port)
 	up, err := s.dialTCP(addr, 15*time.Second)
 	if err != nil {
-		return
+		return fmt.Errorf("passthrough_dial_tcp: %w", err)
 	}
 	defer up.Close()
-	errCh := make(chan struct{}, 2)
-	go func() { _, _ = io.Copy(up, client); errCh <- struct{}{} }()
-	go func() { _, _ = io.Copy(client, up); errCh <- struct{}{} }()
-	<-errCh
+	return relayBidirectional(client, up)
+}
+
+// relayBidirectional copies both directions and waits for both to finish.
+// Closing one side only half-closes the peer writer so HTTP/2 streams can drain
+// (a single <-errCh + full Close used to RST Cursor/api2 early → silent agent).
+func relayBidirectional(a, b net.Conn) error {
+	errCh := make(chan error, 2)
+	go func() {
+		_, err := io.Copy(b, a)
+		closeWrite(b)
+		errCh <- err
+	}()
+	go func() {
+		_, err := io.Copy(a, b)
+		closeWrite(a)
+		errCh <- err
+	}()
+	err1 := <-errCh
+	err2 := <-errCh
+	if err1 != nil && err1 != io.EOF {
+		return err1
+	}
+	if err2 != nil && err2 != io.EOF {
+		return err2
+	}
+	return nil
+}
+
+func closeWrite(c net.Conn) {
+	type closer interface{ CloseWrite() error }
+	if cw, ok := c.(closer); ok {
+		_ = cw.CloseWrite()
+	}
 }
 
 func (s *Server) useTLSPassthrough(host string) bool {
@@ -448,6 +481,21 @@ func (s *Server) useTLSPassthrough(host string) bool {
 
 func (s *Server) logMitmError(rv policy.RequestView, reason string, start time.Time) {
 	rv.Inspection = "intercept"
+	s.logDecision(rv, policy.Decision{Verdict: "error", Reasons: []string{reason}}, start)
+}
+
+func (s *Server) logPassthroughError(rv policy.RequestView, err error, start time.Time) {
+	rv.Inspection = "passthrough"
+	reason := "passthrough_tunnel_error"
+	if err != nil {
+		msg := err.Error()
+		switch {
+		case strings.Contains(msg, "passthrough_dial_ip"):
+			reason = "passthrough_dial_ip"
+		case strings.Contains(msg, "passthrough_dial_tcp"):
+			reason = "passthrough_dial_tcp"
+		}
+	}
 	s.logDecision(rv, policy.Decision{Verdict: "error", Reasons: []string{reason}}, start)
 }
 

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.4.11 - Cursor passthrough tunnel half-close (2026-11-16)
+
+### Fixed
+
+- **Cursor silent under Protect:** TLS passthrough tunnels now wait for both copy directions and half-close with `CloseWrite` instead of RSTing the peer after the first EOF (api2 reconnect storm). Dial failures audit as `passthrough_dial_*` / `passthrough_tunnel_error`.
+
 ## 0.4.10 - TUN VM preflight (closed-loop) (2026-11-16)
 
 ### Added
