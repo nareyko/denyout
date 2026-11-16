@@ -23,21 +23,17 @@ docker run --rm --privileged \
   -e DENYOUT_TUN_E2E=1 \
   "$IMAGE" bash -ec '
     set -euo pipefail
-    go build -o /tmp/denyout-cli ./cmd/denyout-cli
+    go build -buildvcs=false -o /tmp/denyout-cli ./cmd/denyout-cli
     echo "== tun-start --real (root in container) =="
-    /tmp/denyout-cli hostctl tun-start --real --uid 1000 || true
-    # Helper may be absent; exercise local/runtime via elevated path if root:
+    /tmp/denyout-cli hostctl tun-start --real --uid 1000
+    ip link show denyout0
+    /tmp/denyout-cli hostctl tun-stats
+    /tmp/denyout-cli hostctl tun-stop --real --uid 1000
     if ip link show denyout0 >/dev/null 2>&1; then
-      echo "denyout0 present"
-      /tmp/denyout-cli hostctl tun-stats || true
-      /tmp/denyout-cli hostctl tun-stop --real --uid 1000 || true
-      ip link delete denyout0 2>/dev/null || true
-      echo "rollback ok"
-    else
-      echo "NOTE: denyout0 not created (helper stub path without helper-serve)."
-      echo "In-container direct unit: go test ./internal/tun/ -count=1"
-      go test ./internal/tun/ -count=1
+      echo "denyout0 still present after stop" >&2
+      exit 1
     fi
+    echo "rollback ok"
   '
 
 echo "closed-loop-tun-docker-dogfood OK (full browser matrix still needs a real VM)"
