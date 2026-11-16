@@ -23,6 +23,8 @@ docker run --rm --privileged \
   -e DENYOUT_TUN_E2E=1 \
   "$IMAGE" bash -ec '
     set -euo pipefail
+    apt-get update -qq
+    apt-get install -y -qq iproute2 >/dev/null
     go build -buildvcs=false -o /tmp/denyout-cli ./cmd/denyout-cli
     echo "== tun-start --real (root in container) =="
     /tmp/denyout-cli hostctl tun-start --real --uid 1000
