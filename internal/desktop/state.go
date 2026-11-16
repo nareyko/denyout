@@ -48,7 +48,10 @@ type State struct {
 	// TunDataplane: experimental Linux UDP/443 via denyout0 (G3–G5). Default false;
 	// also enabled when DENYOUT_TUN_E2E=1. Prefer VM dogfood before flipping on a laptop.
 	TunDataplane bool `json:"tun_dataplane,omitempty"`
-	AskMode      bool `json:"ask_mode"`
+	// QuicMITM: experimental HTTP/3 decrypt (G6 Q2). Default false; requires TunDataplane
+	// (or DENYOUT_TUN_E2E) and DENYOUT_QUIC_MITM=1 or this pref. Cursor hosts stay drop/sight.
+	QuicMITM bool `json:"quic_mitm,omitempty"`
+	AskMode  bool `json:"ask_mode"`
 	PolicyProfile      string      `json:"policy_profile,omitempty"` // browse (Safe desktop) | agent (Agents only)
 	ActiveProfileID    string      `json:"active_profile_id,omitempty"`
 	Scope              string      `json:"scope,omitempty"`

@@ -6,6 +6,7 @@
 
 - **DenyOut → VPN egress (locked):** [`docs/design-vpn-egress.md`](docs/design-vpn-egress.md) — policy first, then VPN via mark `0x646e79` → table `646`. `hostctl vpn-egress-plan` (render) + `vpn-egress-apply` / `vpn-egress-remove` behind `DENYOUT_VPN_EGRESS_E2E=1`.
 - **TUN G2–G5:** [`docs/tun-implementation-plan.md`](docs/tun-implementation-plan.md) — real `denyout0` + UDP/443 steer/drop in helper (`tun-start --real`); Protect On gated by `DENYOUT_TUN_E2E=1` or `TunDataplane` pref (default off); `hostctl tun-device-plan` / `caps` / `helper-install`.
+- **TUN G6 epic (opt-in):** gVisor TCP-via-TUN (T3); QUIC SNI sighting (Q1); `quic-go` MITM skeleton + HTTP/3 policy hook (Q2); prefs `TunDataplane` / `QuicMITM` (default off); Cursor never QUIC-MITM.
 - **Helper refresh:** Protect On runs `EnsureHelperFresh` so stale helpers pick up `quic1`/`tun1`/`vpn1` caps.
 
 ### Fixed

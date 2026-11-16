@@ -46,6 +46,8 @@ type Spec struct {
 	// AllowQUIC: when true, do not drop UDP/443 (Chrome HTTP/3 may bypass MITM).
 	// Default false = block QUIC so browsers fall back to TCP HTTPS that Protect inspects.
 	AllowQUIC bool
+	// TunTCP: when true, omit nft TCP redirect (gVisor on denyout0 owns TCP 80/443).
+	TunTCP bool
 }
 
 // Status is a short machine-readable state for the tray/UI.

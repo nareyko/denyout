@@ -108,6 +108,7 @@ type UISnapshot struct {
 	RespectFullscreen   bool            `json:"respect_fullscreen"`
 	BlockBrowserQUIC    bool            `json:"block_browser_quic"` // inverse of AllowBrowserQUIC; default on
 	TunDataplane        bool            `json:"tun_dataplane"`      // experimental UDP via denyout0 (Linux)
+	QuicMITM            bool            `json:"quic_mitm"`          // experimental HTTP/3 MITM (Linux; needs TunDataplane)
 	FullscreenDetect    bool            `json:"fullscreen_detect"`  // can see fullscreen apps right now
 	FullscreenNow       bool            `json:"fullscreen_now"`     // active window fullscreen (only if detect)
 	FullscreenWayland   bool            `json:"fullscreen_wayland"` // session looks Wayland (copy hint)
@@ -307,6 +308,7 @@ func (a *App) GetUISnapshot() UISnapshot {
 		RespectFullscreen:  !a.state.RespectFullscreenOff,
 		BlockBrowserQUIC:   !a.state.AllowBrowserQUIC,
 		TunDataplane:       a.state.TunDataplane && runtime.GOOS == "linux",
+		QuicMITM:           a.state.QuicMITM && runtime.GOOS == "linux",
 		FullscreenDetect:   a.fullscreenDetectOK(),
 		FullscreenNow: func() bool {
 			a.presence.mu.Lock()
@@ -1009,6 +1011,9 @@ func (a *App) UISetTunDataplane(on bool) error {
 	}
 	a.mu.Lock()
 	a.state.TunDataplane = on
+	if !on {
+		a.state.QuicMITM = false
+	}
 	live := a.proxyd != nil
 	st := a.state
 	a.mu.Unlock()
@@ -1017,6 +1022,32 @@ func (a *App) UISetTunDataplane(on bool) error {
 	}
 	LogEvent("tun_dataplane_setting", map[string]any{"on": on, "live": live})
 	if live {
+		if err := a.restartActiveProtector(); err != nil {
+			return fmt.Errorf("Saved, but could not refresh Protect: %w", err)
+		}
+	}
+	return nil
+}
+
+// UISetQuicMITM toggles experimental HTTP/3 MITM (Linux; default off; needs TunDataplane).
+func (a *App) UISetQuicMITM(on bool) error {
+	if runtime.GOOS != "linux" && on {
+		return fmt.Errorf("HTTP/3 MITM is Linux-only")
+	}
+	a.mu.Lock()
+	if on && !a.state.TunDataplane {
+		a.mu.Unlock()
+		return fmt.Errorf("enable TunDataplane first (UDP via DenyOut TUN)")
+	}
+	a.state.QuicMITM = on
+	live := a.proxyd != nil
+	st := a.state
+	a.mu.Unlock()
+	if err := SaveState(st); err != nil {
+		return err
+	}
+	LogEvent("quic_mitm_setting", map[string]any{"on": on, "live": live})
+	if live && a.state.TunDataplane {
 		if err := a.restartActiveProtector(); err != nil {
 			return fmt.Errorf("Saved, but could not refresh Protect: %w", err)
 		}
