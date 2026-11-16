@@ -33,11 +33,14 @@ Must pass:
 Only after preflight is green on the same binary:
 
 1. Snapshot the VM.
-2. Export `DENYOUT_TUN_E2E=1` for the dogfood shell only.
-3. Implement/enable real `tun-start` (still absent in stubs: `reason=stub_no_device`).
-4. Confirm Protect Off always runs `tun-stop` + restores T0 nft.
-5. Matrix: plain eth, Docker bridge present, WireGuard up/down, WARP if available.
-6. Easy rollback: `hostctl tun-stop` then T0 apply; if stuck, restore VM snapshot.
+2. Protect On once so helper refreshes (`hostctl caps` should list `quic1 tun1 vpn1`).
+3. Real TUN: `DENYOUT_TUN_E2E=1 denyout-cli hostctl tun-start --real`  
+   (or enable **TunDataplane** in Settings → Advanced, then Protect On).
+4. Check: `ip link show denyout0`, `hostctl tun-stats` → `present=true`, TCP Protect still OK.
+5. Confirm Protect Off / `tun-stop --real` deletes `denyout0` and restores T0 UDP drop.
+6. Matrix: plain eth, Docker bridge present, WireGuard up/down, WARP if available.
+7. Optional VPN egress: `DENYOUT_VPN_EGRESS_E2E=1 hostctl vpn-egress-apply --iface wg0` then `vpn-egress-remove`.
+8. Easy rollback: `hostctl tun-stop --real` then T0 apply; if stuck, restore VM snapshot.
 
 ## Exit criteria to change Protect default
 

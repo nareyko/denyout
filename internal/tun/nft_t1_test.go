@@ -15,7 +15,8 @@ func TestRenderT1SteerTable(t *testing.T) {
 		fmt.Sprintf("meta mark %d return", tun.DenyOutMark),
 		"meta skuid 1000 udp dport 443",
 		"denyout-tun-quic",
-		"counter drop",
+		"meta mark set",
+		"type route hook output",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("missing %q in:\n%s", want, out)

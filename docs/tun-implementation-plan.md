@@ -4,53 +4,49 @@ Status: **active**. Design intent: [design-tun-egress.md](design-tun-egress.md).
 VM dogfood checklist: [tun-vm-dogfood.md](tun-vm-dogfood.md).
 VPN after policy: [design-vpn-egress.md](design-vpn-egress.md).
 
-Owner laptop stays on **T0** (nft redirect + QUIC drop) until G5. No real `denyout0` without `DENYOUT_TUN_E2E=1` on a throwaway VM.
+Owner laptop stays on **T0** until `TunDataplane` pref or `DENYOUT_TUN_E2E=1`. Prefer a throwaway VM before flipping the pref.
 
 ## Gates
 
 | Gate | Deliverable | Kernel | Where | Status |
 | --- | --- | --- | --- | --- |
 | **G0** | nft QUIC drop + counters; `quic-stats` | yes (existing Protect) | production | shipped |
-| **G1** | Classify / DecideT1 / Engine; helper stubs; `DENYOUT_TUN_E2E`; iface denylist; Protect lifecycle skip | no | CI + laptop | shipped |
-| **G2** | Device **plan** strings (`ip tuntap` add/del); `hostctl tun-device-plan`; preflight asserts | no | CI | this wave |
-| **G3** | Real `ip tuntap` create/delete in helper when E2E=1 | yes | VM only | later |
-| **G4** | Steer UDP/443 → `denyout0` + userspace DropLog counters | yes | VM | later |
-| **G5** | Protect On may call real `tun-start` (still flag-gated) | yes | after VM matrix green | owner lock |
-| **G6** | T2 DNS labels / T3 full-UID TCP / T4 QUIC MITM | later | out of scope now | — |
+| **G1** | Classify / DecideT1 / Engine; helper stubs; denylist; Protect lifecycle skip | no | CI + laptop | shipped |
+| **G2** | Device **plan** strings; `hostctl tun-device-plan`; preflight | no | CI | shipped |
+| **G3** | Real `denyout0` create/delete + TUN fd in helper when `--real` / gate | yes | VM / pref | **landed** |
+| **G4** | Steer UDP/443 → `denyout0` + userspace DropLog counters | yes | VM / pref | **landed** |
+| **G5** | Protect On → real `tun-start` when `DENYOUT_TUN_E2E=1` **or** `TunDataplane` pref (default pref **false**) | yes | gated | **landed** |
+| **G6** | T2 DNS labels / T3 full-UID TCP / T4 QUIC MITM | later | out of scope | — |
+
+Helper refresh: Protect On calls `EnsureHelperFresh` (caps `quic1`/`tun1`; `helper-install` if stale).
+
+VPN egress apply: `DENYOUT_VPN_EGRESS_E2E=1` + `hostctl vpn-egress-apply --iface wg0` (helper or root).
 
 ## Closed-loop test matrix (every PR)
 
 ```bash
-go test ./internal/tun/ -count=1
+go test ./internal/tun/ ./internal/hostguard/ ./internal/desktop/ -count=1
 ./scripts/closed-loop-tun-preflight.sh
-# optional release binary:
-# DENYOUT_BIN=/path/to/denyout-cli ./scripts/closed-loop-tun-preflight.sh
 ```
 
-Must hold:
+Must hold without root:
 
-1. `DENYOUT_TUN_E2E` unset → `WantDevice` false; Protect On would emit `tun_start_skipped`.
-2. `hostctl tun-start|stop|stats` → `enabled=false` (`flag_off` or `stub_no_device`).
-3. `hostctl render --tun` shows T0 + T1 preview (preview not applied by `apply`).
-4. `hostctl tun-device-plan` / `tun-device-rollback-plan` print commands; never execute.
-5. Coexistence denylist: `lo`, `docker0`, `br-*`, `veth*`, `wg*`, WARP/Tailscale/ZeroTier-style.
-6. VPN egress plan (mark → table 646) remains render-only unless `DENYOUT_VPN_EGRESS_E2E=1`.
+1. Gate off → `tun_start_skipped` / stub `enabled=false`.
+2. `hostctl tun-start` **without** `--real` → stub (even if helper is installed).
+3. `hostctl tun-device-plan` / `vpn-egress-plan` print only.
+4. Coexistence denylist unchanged.
 
-## VM dogfood (G3–G4)
+## VM dogfood (G3–G5)
 
-Only after G2 preflight is green on the **same** binary:
+1. Snapshot the VM; install this binary; ensure helper caps include `tun1` (`hostctl caps` after Protect On).
+2. `DENYOUT_TUN_E2E=1 denyout-cli hostctl tun-start --real` **or** enable Settings → Advanced → TunDataplane then Protect On.
+3. Confirm `denyout0` exists, `tun-stats` `present=true`, UDP/443 counted; TCP Protect still works.
+4. Protect Off / `tun-stop --real` removes device + steer; T0 UDP drop restored.
+5. Matrix: plain eth, Docker bridge, WireGuard up/down.
+6. Optional: `DENYOUT_VPN_EGRESS_E2E=1 hostctl vpn-egress-apply --iface wg0` then remove.
 
-1. Snapshot the VM.
-2. Export `DENYOUT_TUN_E2E=1` for the dogfood shell only.
-3. Helper creates `denyout0` (`198.18.0.1/16`); Protect Off always `tun-stop` + delete + T0 apply.
-4. Matrix: plain eth, Docker bridge present, WireGuard up/down, WARP if available.
-5. Easy rollback: `hostctl tun-stop` then T0 apply; if stuck, restore snapshot.
+## Non-goals until G6
 
-Exit to G5: preflight green in CI, VM matrix green, [design-tun-egress.md](design-tun-egress.md) §8 updated by owner.
-
-## Non-goals until G5+
-
-- Opening `/dev/net/tun` in CI or default Protect.
-- Vendoring gVisor for T1 stubs.
-- Stealing foreign VPN ifaces as ingress (`denyout0` is DenyOut-owned only).
-- Making full-tunnel VPN the host default before DenyOut policy.
+- QUIC MITM / gVisor
+- Full-UID TCP via TUN
+- Enabling `TunDataplane` by default in releases before VM matrix sign-off

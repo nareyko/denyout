@@ -1,7 +1,6 @@
 # Decision lock: DenyOut policy, then VPN egress
 
-Status: **locked (owner)**. Step A shipped: `internal/tun` plan + `hostctl vpn-egress-plan` / `vpn-egress-rollback-plan` (render only).
-Kernel `ip rule` apply stays behind `DENYOUT_VPN_EGRESS_E2E=1` / VM dogfood — not default Protect.
+Status: **locked (owner)**. Plan + apply landed: `vpn-egress-plan` (render) and `vpn-egress-apply` / `vpn-egress-remove` (helper/root) behind `DENYOUT_VPN_EGRESS_E2E=1`. Not default Protect.
 
 ## 1. Goal
 

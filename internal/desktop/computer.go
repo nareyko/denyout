@@ -147,8 +147,10 @@ func (a *App) startComputer() error {
 	}
 	_ = SaveState(st)
 	ClearLastError()
-	// T1: never start a real TUN unless DENYOUT_TUN_E2E=1 (VM dogfood).
-	ensureTunAfterProtectOn(uid)
+	// Refresh helper binary/caps after apply (stale helpers lack tun1/quic1).
+	ensureHelperFreshAfterProtectOn(uid)
+	// Real denyout0 only when DENYOUT_TUN_E2E=1 or TunDataplane pref (Linux).
+	a.ensureTunAfterProtectOn(uid)
 
 	go func() {
 		_ = cmd.Wait()

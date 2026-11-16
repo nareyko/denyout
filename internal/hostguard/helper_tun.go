@@ -3,9 +3,24 @@ package hostguard
 import "github.com/nareyko/denyout/internal/tun"
 
 // HelperTunCall sends tun-start|tun-stop|tun-stats (or returns the local disabled stub).
-// Never creates a TUN from the CLI path alone; real device work stays helper+VM gated.
+// Without real=true the helper keeps the closed-loop stub (safe for preflight).
 func HelperTunCall(verb string, uid int) (string, error) {
-	return helperTunCall(verb, uid)
+	return helperTunCall(verb, uid, false)
+}
+
+// HelperTunCallReal asks the helper to create/steer denyout0 (G3+).
+func HelperTunCallReal(verb string, uid int) (string, error) {
+	return helperTunCall(verb, uid, true)
+}
+
+// HelperVPNEgressApply asks the helper to install mark→VPN routes.
+func HelperVPNEgressApply(iface string) (string, error) {
+	return helperVPNEgressCall("vpn-egress-apply", iface)
+}
+
+// HelperVPNEgressRemove asks the helper to remove VPN egress routes.
+func HelperVPNEgressRemove() (string, error) {
+	return helperVPNEgressCall("vpn-egress-remove", "")
 }
 
 // TunLocalReply is the closed-loop disabled contract without dialing the helper.
