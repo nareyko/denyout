@@ -28,6 +28,16 @@ Must pass:
 4. Coexistence names skipped: `lo`, `docker0`, `br-*`, `veth*`, `wg*`, WARP/Tailscale/ZeroTier-style.
 5. Rollback plan lists `tun-stop` → delete `denyout0` → T0 `hostctl apply`.
 
+## Without a full VM (limited)
+
+If you have Docker + `/dev/net/tun` but no throwaway VM yet:
+
+```bash
+./scripts/closed-loop-tun-docker-dogfood.sh
+```
+
+That proves `denyout0` create/stats/stop as root inside a privileged container (local `--real` path when helper-serve is absent). It does **not** replace the G6 browser matrix below (Chrome/Cursor/HTTP3 lab still need a real VM or laptop).
+
 ## VM-only steps (root; not CI)
 
 Only after preflight is green on the same binary:

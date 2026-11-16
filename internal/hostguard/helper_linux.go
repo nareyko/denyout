@@ -105,6 +105,10 @@ func helperTunCall(verb string, uid int, real, mitm bool) (string, error) {
 	}
 	c, err := net.Dial("unix", helperSockPath)
 	if err != nil {
+		// Root + --real: run dataplane locally (Docker/VM dogfood without helper-serve).
+		if real && os.Geteuid() == 0 {
+			return helperTunVerb(verb, uid, real, mitm)
+		}
 		// Closed-loop fallback: local stub reply (no elevate, no device).
 		return tun.HelperReply(verb)
 	}
