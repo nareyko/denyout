@@ -495,15 +495,43 @@ func UnsafeIP(ip net.IP, allowPrivate bool) bool {
 	if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
 		return true
 	}
+	if ip.IsMulticast() || ip.IsInterfaceLocalMulticast() {
+		return true
+	}
+	// Cloud metadata endpoints are never reachable, even with allow_private.
+	if ip.Equal(net.ParseIP("fd00:ec2::254")) || ip.Equal(net.ParseIP("100.100.100.200")) {
+		return true
+	}
 	if ip4 := ip.To4(); ip4 != nil {
 		if ip4[0] == 169 && ip4[1] == 254 {
 			return true
 		}
+		if ip4[0] == 255 && ip4[1] == 255 && ip4[2] == 255 && ip4[3] == 255 { // broadcast
+			return true
+		}
+		if ip4[0] == 0 { // 0.0.0.0/8 "this network"
+			return true
+		}
+		if !allowPrivate && ip4[0] == 100 && ip4[1]&0xc0 == 64 { // 100.64.0.0/10 CGNAT
+			return true
+		}
+	} else if len(ip) == net.IPv6len && ip[0] == 0x00 && ip[1] == 0x64 && ip[2] == 0xff && ip[3] == 0x9b &&
+		allZero(ip[4:12]) { // NAT64 64:ff9b::/96 — judge the embedded IPv4
+		return UnsafeIP(net.IP(ip[12:16]), allowPrivate)
 	}
 	if !allowPrivate && (ip.IsPrivate() || ip.IsUnspecified()) {
 		return true
 	}
 	return false
+}
+
+func allZero(b []byte) bool {
+	for _, c := range b {
+		if c != 0 {
+			return false
+		}
+	}
+	return true
 }
 
 func uniq(in []string) []string {

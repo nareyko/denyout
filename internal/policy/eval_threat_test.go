@@ -133,3 +133,18 @@ func TestUserOnceBeatsThreatList(t *testing.T) {
 		t.Fatalf("%+v", d)
 	}
 }
+
+func TestUnsafeIPExtendedRanges(t *testing.T) {
+	for ip, want := range map[string]bool{
+		"127.0.0.1": true, "169.254.169.254": true, "100.100.100.200": true, "100.64.1.1": true,
+		"0.0.0.1": true, "224.0.0.1": true, "255.255.255.255": true, "fd00:ec2::254": true,
+		"64:ff9b::7f00:1": true, "64:ff9b::808:808": false, "8.8.8.8": false, "10.0.0.1": true, "::1": true,
+	} {
+		if got := policy.UnsafeIP(net.ParseIP(ip), false); got != want {
+			t.Errorf("policy.UnsafeIP(%s,false)=%v want %v", ip, got, want)
+		}
+	}
+	if policy.UnsafeIP(net.ParseIP("100.64.1.1"), true) || !policy.UnsafeIP(net.ParseIP("100.100.100.200"), true) || !policy.UnsafeIP(net.ParseIP("fd00:ec2::254"), true) {
+		t.Error("allow_private semantics wrong")
+	}
+}
