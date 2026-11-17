@@ -13,6 +13,8 @@ type EnvDoc struct {
 // OtherEnv lists the remaining DENYOUT_* variables. A test keeps this list and
 // docs/configuration.md in sync with the source tree.
 var OtherEnv = []EnvDoc{
+	{"DENYOUT_FAIL_POLICY", "helper watchdog", "open | closed: what the watchdog does when the proxy stops answering (DENYOUT_FAIL_CLOSED=1 always wins).", "closed keeps the redirect and blocks HTTPS while the proxy is down."},
+	{"DENYOUT_DEBUG_STATS", "denyout-cli proxyd", "Set to 1 to print goroutine/fd counts on SIGUSR1 (soak test).", "Diagnostics only."},
 	{"DENYOUT_NOTIFY", "denyout-cli run", "Set to 0 to suppress CLI notifications.", ""},
 	{"DENYOUT_DESKTOP_NOTIFY", "denyout-cli run", "Set to 1 to also raise desktop notifications.", ""},
 	{"DENYOUT_OPEN_UI", "desktop", "Set to 1 to open the window at start.", ""},

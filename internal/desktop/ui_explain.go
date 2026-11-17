@@ -21,10 +21,9 @@ const (
 // "Allow once" is a 15 minute timed allow: DenyOut has no per-request grant,
 // so it is the shortest existing timed allow and expires on its own.
 
-// StatusReasonHook lets the protection-state model supply a plain-language
-// reason for the current status line. It is nil until that model registers
-// one; Diagnostics shows the reason when present and nothing otherwise.
-var StatusReasonHook func(a *App) string
+// StatusReasonHook supplies the plain-language reason for the current status line
+// (default: the protectstate reason). Tests may override it.
+var StatusReasonHook = func(a *App) string { return a.ProtectReason() }
 
 // UIDenialAction applies one of the three one-click choices to a blocked host
 // without opening logs. process may be "wrap:<profileID>" for agent blocks.

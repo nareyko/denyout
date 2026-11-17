@@ -110,6 +110,8 @@ Everything else:
 | `DENYOUT_TUN_E2E` | tun gate | enables experimental TUN data plane | experimental |
 | `DENYOUT_QUIC_MITM` | tun gate | enables experimental HTTP/3 decryption | experimental |
 | `DENYOUT_VPN_EGRESS_E2E` | tun gate | VPN-egress lab path | lab only |
+| `DENYOUT_FAIL_POLICY` | helper watchdog | `open` | `closed`: proxy-loss behaviour (`DENYOUT_FAIL_CLOSED=1` always wins) | `closed` blocks HTTPS while the proxy is down |
+| `DENYOUT_DEBUG_STATS` | denyout-cli proxyd | `1` prints goroutine/fd counts on SIGUSR1 (soak test) | diagnostics only |
 | `DENYOUT_TEST_NO_ELEVATE` | hostguard | tests never prompt for elevation | tests only |
 | `DENYOUT_UNINSTALL_NO_ELEVATE` | uninstall | skip elevated uninstall step | |
 | `DENYOUT_INSTALL_DIR` | reinstall, `install.sh` | install directory | |
