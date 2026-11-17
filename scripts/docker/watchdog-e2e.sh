@@ -2,7 +2,7 @@
 # Runs inside a NET_ADMIN container. $1 = denyout-cli. Checks helper watchdog + IPv6 listener.
 set -u
 BIN=$1
-apt-get update -qq >/dev/null 2>&1; apt-get install -y -qq iproute2 nftables ca-certificates >/dev/null 2>&1
+apt-get update -qq >/dev/null 2>&1; apt-get install -y -qq iproute2 nftables ca-certificates procps >/dev/null 2>&1
 id -u owner >/dev/null 2>&1 || useradd -u 1000 -M -s /usr/sbin/nologin owner
 mkdir -p /var/lib/denyout; echo 1000 > /var/lib/denyout/owner_uid
 CA=/tmp/ca; mkdir -p $CA; PORT=18443; fail=0
@@ -37,5 +37,28 @@ $BIN hostctl remove --port $PORT --uid 1000 --no-elevate >/dev/null 2>&1
 has_table && bad "rules still present after remove" || ok "rules removed by remove"
 kill $PP 2>/dev/null; wait $PP 2>/dev/null; sleep 1; start_proxy; sleep 6
 has_table && bad "watchdog re-applied rules after Protect Off" || ok "no resurrection after Protect Off"
+echo "== helper crash (kill -9): intent restored from disk, watchdog active again"
+kill $PP 2>/dev/null; wait $PP 2>/dev/null; start_proxy
+$BIN hostctl apply --port $PORT --ca $CA/ca.crt --uid 1000 >/dev/null 2>&1
+has_table && ok "re-applied before crash" || bad "apply before crash failed"
+[ -s /var/lib/denyout/helper_state.json ] && ok "helper_state.json persisted" || bad "no persisted state"
+[ "$(stat -c %a /var/lib/denyout/helper_state.json 2>/dev/null)" = 600 ] && ok "state file mode 600" || bad "state file mode not 600"
+pkill -9 -f "hostctl helper-serve"; sleep 0.5; rm -f /run/denyout-hostguard.sock
+has_table && ok "rules survive helper crash (as in production)" || bad "rules vanished"
+$BIN hostctl helper-serve >/tmp/helper3.log 2>&1 &
+for i in $(seq 1 50); do [ -S /run/denyout-hostguard.sock ] && break; sleep 0.1; done
+sleep 1
+grep -q restored /run/denyout-hostguard.state 2>/dev/null && ok "state=restored_after_restart" || bad "no reconcile after restart"
+kill $PP; wait $PP 2>/dev/null
+for i in $(seq 1 12); do has_table || break; sleep 1; done
+has_table && bad "watchdog inactive after restart (orphan redirect)" || ok "watchdog active after restart: rules removed with dead proxy"
+
+echo "== reboot-like: state present but rules gone -> must NOT re-apply"
+pkill -9 -f "hostctl helper-serve"; sleep 0.5; rm -f /run/denyout-hostguard.sock
+nft flush ruleset; printf '%s' '{"version":1,"spec":{"ProxyPort":18443,"UID":1000,"CACert":"'$CA'/ca.crt"}}' > /var/lib/denyout/helper_state.json
+$BIN hostctl helper-serve >/tmp/helper4.log 2>&1 &
+for i in $(seq 1 50); do [ -S /run/denyout-hostguard.sock ] && break; sleep 0.1; done; sleep 1
+has_table && bad "boot silently re-enabled protection" || ok "no silent re-enable when rules are gone"
+
 [ $fail = 0 ] && echo "watchdog-e2e: OK" || echo "watchdog-e2e: FAILED"
 exit $fail

@@ -207,6 +207,7 @@ func clearApplied() {
 	tunSuppressed = false
 	lastApplyMu.Unlock()
 	_ = os.Remove(helperStateFile)
+	forgetHelperState()
 }
 
 func suppressT0ForTUN(suppress bool) {
@@ -410,6 +411,7 @@ func ServeHelper() error {
 	// Stale TUN/VPN state from a previous crashed helper must not linger.
 	_ = tun.GlobalRuntime().StopReal()
 	_ = tun.RemoveVPNEgress()
+	reconcileHelperOnStart(owner)
 	// On SIGTERM/SIGINT (systemctl stop) remove our rules so a stopped helper
 	// never leaves a REDIRECT to a dead proxy (orphan blackhole).
 	sigc := make(chan os.Signal, 1)
@@ -501,6 +503,7 @@ func handleHelperConn(c net.Conn, ownerUID int) {
 			lastApplySpec = spec
 			lastApplyOK = true
 			lastApplyMu.Unlock()
+			persistHelperState(spec)
 		}
 	case "remove":
 		clearApplied() // Protect Off: the watchdog must not re-apply rules later
