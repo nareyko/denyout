@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/binary"
 	"fmt"
+	"github.com/nareyko/denyout/internal/inspect"
 	"io"
 	"net"
 	"net/http"
@@ -169,7 +170,7 @@ func (s *Server) handleTransparentHTTP(conn net.Conn, req *http.Request, host st
 		Inspection: "transparent",
 		RawURL:     raw,
 		Headers:    req.Header, // header + body scanners must see cleartext traffic too
-		BodyPrefix: peekRequestBody(req, bodyMax),
+		BodyPrefix: inspect.BodyView(req, bodyMax),
 	}
 	d := s.cfg.Engine.Evaluate(rv)
 	if d.Verdict == "deny" {

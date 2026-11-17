@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/nareyko/denyout/internal/inspect"
 	"github.com/nareyko/denyout/internal/policy"
-	"github.com/nareyko/denyout/internal/secrets"
 )
 
 const (
@@ -30,7 +30,7 @@ func URL(cfg *policy.Config, rawURL string) (*Result, error) {
 		return nil, err
 	}
 	return &Result{
-		URL:     secrets.RedactURL(rawURL),
+		URL:     inspect.RedactURL(rawURL),
 		Verdict: d.Verdict,
 		Reasons: d.Reasons,
 		Mode:    cfg.Mode,
