@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.4.13 - Security review, refactor series, signed releases (2026-11-18)
+
 ### Security
 
 Full code review (stability + security); details and residual risks in [`docs/security-review-2026-11.md`](docs/security-review-2026-11.md).
