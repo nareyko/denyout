@@ -193,6 +193,40 @@ fetch() {
 fetch "${TMP}/${ARCHIVE}" "${ASSET_BASE}/${ARCHIVE}"
 fetch "${TMP}/${SUMS}" "${ASSET_BASE}/${SUMS}"
 
+# Verify the Sigstore (cosign keyless) signature of SHA256SUMS when possible.
+#   DENYOUT_VERIFY_SIG=auto (default)  verify if cosign + signature are available, else warn
+#   DENYOUT_VERIFY_SIG=require         fail unless the signature verifies
+#   DENYOUT_VERIFY_SIG=skip            checksum only (corruption check, NOT authenticity)
+verify_signature() {
+  mode="${DENYOUT_VERIFY_SIG:-auto}"
+  case "$mode" in auto|require|skip) ;; *) echo "denyout install: DENYOUT_VERIFY_SIG must be auto|require|skip" >&2; exit 1 ;; esac
+  [ "$mode" = skip ] && { echo "denyout install: WARNING signature check skipped (checksum only)" >&2; return 0; }
+  sig_ok=0
+  if command -v cosign >/dev/null 2>&1 \
+     && curl_fetch "${TMP}/${SUMS}.sig" "${ASSET_BASE}/${SUMS}.sig" \
+     && curl_fetch "${TMP}/${SUMS}.pem" "${ASSET_BASE}/${SUMS}.pem"; then
+    if cosign verify-blob \
+        --certificate "${TMP}/${SUMS}.pem" --signature "${TMP}/${SUMS}.sig" \
+        --certificate-identity-regexp "^https://github.com/${REPO}/\.github/workflows/release\.yml@refs/tags/v" \
+        --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+        "${TMP}/${SUMS}" >/dev/null 2>&1; then
+      echo "denyout install: signature ok (cosign, GitHub Actions identity)"
+      sig_ok=1
+    else
+      echo "denyout install: SIGNATURE VERIFICATION FAILED for ${SUMS}" >&2
+      exit 1
+    fi
+  fi
+  if [ "$sig_ok" -ne 1 ]; then
+    if [ "$mode" = require ]; then
+      echo "denyout install: signature required but cosign/signature unavailable (install cosign: https://docs.sigstore.dev)" >&2
+      exit 1
+    fi
+    echo "denyout install: note: signature not verified (cosign or ${SUMS}.sig missing). Checksum only protects against corruption." >&2
+  fi
+}
+verify_signature
+
 # Verify checksum for this archive line in SHA256SUMS
 expected=$(awk -v f="$ARCHIVE" '$2 == f || $2 == "./"f {print $1; exit}' "${TMP}/${SUMS}")
 # Exact file-name match only (no substring match against other archives).
