@@ -21,7 +21,7 @@ Updated: 2026-11-13.
 | Install (MVP) | Releases + SHA256SUMS. `Install.sh` -> `~/.local/bin` (Linux/macOS). Windows zip + short EN doc. CA installed when Protect computer is enabled. Homebrew/winget stretch - [`07-desktop.md`](07-desktop.md) §3 |
 | Phone / mobile | Out of scope for MVP |
 | Server identity | One proxy instance = one policy (sidecar-per-workload) |
-| Release checksums | SHA256SUMS with releases. SBOM/cosign recommended when time allows |
+| Release checksums | SHA256SUMS with releases. keyless cosign signature of SHA256SUMS in CI (verified by install.sh); SBOM when time allows |
 | Preset `models` | Versioned in-repo. Changelog on host changes. No silent cloud updates |
 | GitHub canon | `nareyko/denyout` |
 | Author | Vadim Nareyko - [Arviser](https://arviser.com) |
