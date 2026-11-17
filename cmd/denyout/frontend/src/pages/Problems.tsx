@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ConfirmModal } from "../components/ConfirmModal";
+import { DiagnosticsPanel, SelfCheckPanel } from "../components/Diagnostics";
 import { PauseModal } from "../components/PauseModal";
 import { api, ProblemsView } from "../wails";
 
@@ -498,6 +499,8 @@ export function Problems({
           )}
         </div>
       </details>
+      <SelfCheckPanel />
+      <DiagnosticsPanel />
     </div>
   );
 }

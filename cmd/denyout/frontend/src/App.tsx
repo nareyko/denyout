@@ -7,6 +7,7 @@ import { Tip, tipGone } from "./components/Tip";
 import { Activity } from "./pages/Activity";
 import { Home } from "./pages/Home";
 import { Problems } from "./pages/Problems";
+import { SelfCheckPanel } from "./components/Diagnostics";
 import { Profiles, profileEditOpen } from "./pages/Profiles";
 import { Settings } from "./pages/Settings";
 import { api, UISnapshot } from "./wails";
@@ -1749,6 +1750,9 @@ export default function App() {
  </p>
  </>
  )}
+ {snap.protection_on && !afterAgentsSetup ? (
+ <SelfCheckPanel autoRun onDone={() => void refreshSnap()} />
+ ) : null}
  <div className="row-actions">
  <button
  className="btn primary"

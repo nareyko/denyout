@@ -21,6 +21,43 @@ export type DenialView = {
  detectors?: string[];
  policy_profile?: string;
  remembered: boolean;
+ title?: string;
+ explain?: string;
+ rule?: string;
+ fix?: string;
+ allow_helps?: boolean;
+};
+
+export type DiagCheck = {
+ id: string;
+ name: string;
+ status: "ok" | "warn" | "fail" | "skip";
+ detail?: string;
+ fix?: string;
+ fix_label?: string;
+};
+
+export type DiagDenial = {
+ ts: string;
+ host: string;
+ url: string;
+ reasons: string[];
+ why: string;
+ rule: string;
+ process?: string;
+};
+
+export type DiagReport = {
+ generated_at: string;
+ version: string;
+ os: string;
+ arch: string;
+ go_version: string;
+ checks: DiagCheck[];
+ denials: DiagDenial[];
+ last_error?: string;
+ status?: string;
+ status_reason?: string;
 };
 
 export type TimedRule = {
@@ -304,6 +341,11 @@ type Bridge = {
  UITakeUndoOffer(): Promise<void>;
  UIDismissUndoOffer(): Promise<void>;
  UITestProtection(): Promise<string>;
+ UIDenialAction(host: string, reason: string, process: string, action: string): Promise<string>;
+ UIDiagnostics(): Promise<DiagReport>;
+ UIDiagnosticsText(): Promise<string>;
+ UIRunSelfCheck(): Promise<DiagCheck[]>;
+ UIFixCheck(fix: string): Promise<string>;
  UIBulkAlwaysAllow(hosts: string[]): Promise<string>;
  GetThreatLists(): Promise<ThreatListsView>;
  UISetBlockPhishing(on: boolean): Promise<void>;
@@ -426,6 +468,12 @@ export const api = {
  takeUndoOffer: () => bridge().UITakeUndoOffer(),
  dismissUndoOffer: () => bridge().UIDismissUndoOffer(),
  testProtection: () => bridge().UITestProtection(),
+ denialAction: (host: string, reason: string, process: string, action: "allow_once" | "allow_always" | "keep") =>
+  bridge().UIDenialAction(host, reason, process, action),
+ diagnostics: () => bridge().UIDiagnostics(),
+ diagnosticsText: () => bridge().UIDiagnosticsText(),
+ runSelfCheck: () => bridge().UIRunSelfCheck(),
+ fixCheck: (fix: string) => bridge().UIFixCheck(fix),
  bulkAlwaysAllow: (hosts: string[]) => bridge().UIBulkAlwaysAllow(hosts) as Promise<string>,
  threatLists: () => bridge().GetThreatLists(),
  setBlockPhishing: (on: boolean) => bridge().UISetBlockPhishing(on),

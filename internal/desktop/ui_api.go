@@ -14,6 +14,12 @@ type DenialView struct {
 	Detectors     []string `json:"detectors,omitempty"`
 	PolicyProfile string   `json:"policy_profile,omitempty"`
 	Remembered    bool     `json:"remembered"`
+	// Explainable block (table: internal/explain).
+	Title      string `json:"title,omitempty"`       // short heading
+	Explain    string `json:"explain,omitempty"`     // what happened and why
+	Rule       string `json:"rule,omitempty"`        // which rule fired
+	Fix        string `json:"fix,omitempty"`         // safe next step
+	AllowHelps bool   `json:"allow_helps,omitempty"` // allowing the site releases this block
 }
 
 // DenialQuery filters ListDenials.

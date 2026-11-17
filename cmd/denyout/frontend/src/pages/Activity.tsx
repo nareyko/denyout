@@ -72,6 +72,7 @@ export function Activity({
  const [busy, setBusy] = useState(false);
  const [allowRow, setAllowRow] = useState<DenialView | null>(null);
  const [allowBusy, setAllowBusy] = useState(false);
+ const [decisionBusy, setDecisionBusy] = useState(false);
  const [week, setWeek] = useState<LocalAnalytics | null>(null);
 
  const dismissed = snap?.dismissed_tips;
@@ -164,6 +165,22 @@ export function Activity({
  await load({ preserveErr: true });
  } finally {
  setAllowBusy(false);
+ }
+ }
+
+ async function decide(row: DenialView, action: "allow_once" | "keep") {
+ setDecisionBusy(true);
+ setErr("");
+ try {
+ const msg = await api.denialAction(row.host, denialReason(row), row.process || "", action);
+ setInfo(msg || "Done.");
+ await load();
+ } catch (e) {
+ setInfo("");
+ setErr(String(e));
+ await load({ preserveErr: true });
+ } finally {
+ setDecisionBusy(false);
  }
  }
 
@@ -427,11 +444,13 @@ export function Activity({
  {r.remembered ? <div className="muted">Silenced</div> : null}
  {groupByHost ? <div className="muted">Latest for host</div> : null}
  </td>
- <td>{r.why}</td>
+ <td title={r.why}>{r.title || r.why}</td>
  <td onClick={(e) => e.stopPropagation()}>
  <div className="row-actions">
  {looksLikeIP(r.host) ? (
  <span className="muted">IP — no allow</span>
+ ) : r.allow_helps === false ? (
+ <span className="muted">Open for options</span>
  ) : (
  <button className="btn subtle" onClick={() => requestAlwaysAllow(r)}>
  Allow this site
@@ -448,20 +467,50 @@ export function Activity({
  {selected ? (
  <>
  <h3>{selected.host || "Blocked"}</h3>
- <p>{selected.why || "Blocked for your safety."}</p>
+ <p>
+ <strong>{selected.title || "Blocked"}</strong>
+ </p>
+ <p>{selected.explain || selected.why || "Blocked for your safety."}</p>
+ {selected.rule ? (
+ <p className="muted">
+ Rule that fired: <strong>{selected.rule}</strong>
+ </p>
+ ) : null}
+ {selected.fix ? <p className="muted">{selected.fix}</p> : null}
  <p className="url muted">{selected.url || " - "}</p>
  <div className="row-actions">
+ <button
+ className="btn primary"
+ disabled={decisionBusy}
+ onClick={() => void decide(selected, "keep")}
+ >
+ Keep blocked
+ </button>
  {looksLikeIP(selected.host) ? (
  <p className="muted" style={{ margin: 0 }}>
- Raw IPs cannot be always-allowed here. Under Protect computer, many public IPs are
+ Raw IPs cannot be allowed here. Under Protect computer, many public IPs are
  allowed; some blocks still depend on the reason.
  </p>
+ ) : selected.allow_helps === false ? (
+ <p className="muted" style={{ margin: 0 }}>
+ Allowing the site would not release this block.
+ </p>
  ) : (
- <button className="btn primary" onClick={() => requestAlwaysAllow(selected)}>
- Allow this site
+ <>
+ <button
+ className="btn"
+ disabled={decisionBusy}
+ title="Allows this site for 15 minutes, then blocks again"
+ onClick={() => void decide(selected, "allow_once")}
+ >
+ Allow once (15 min)
  </button>
+ <button className="btn" disabled={decisionBusy} onClick={() => requestAlwaysAllow(selected)}>
+ Always for this site
+ </button>
+ </>
  )}
- <button className="btn" onClick={() => copy(selected.url || selected.host)}>
+ <button className="btn subtle" onClick={() => copy(selected.url || selected.host)}>
  Copy URL
  </button>
  </div>

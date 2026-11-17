@@ -21,6 +21,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/nareyko/denyout/internal/desktop"
+	"github.com/nareyko/denyout/internal/diag"
 	"github.com/nareyko/denyout/internal/notify"
 )
 
@@ -273,6 +274,15 @@ func (b *Bridge) UIUndoLastAlwaysAllow() (string, error) {
 func (b *Bridge) UITakeUndoOffer() error    { return b.app.UITakeUndoOffer() }
 func (b *Bridge) UIDismissUndoOffer() error { return b.app.UIDismissUndoOffer() }
 func (b *Bridge) UITestProtection() string  { return b.app.UITestProtection() }
+func (b *Bridge) UIDenialAction(host, reason, process, action string) (string, error) {
+	return b.app.UIDenialAction(host, reason, process, action)
+}
+func (b *Bridge) UIDiagnostics() diag.Report { return b.app.UIDiagnostics() }
+func (b *Bridge) UIDiagnosticsText() string  { return b.app.UIDiagnosticsText() }
+func (b *Bridge) UIRunSelfCheck() []diag.Check {
+	return b.app.UIRunSelfCheck()
+}
+func (b *Bridge) UIFixCheck(fix string) (string, error) { return b.app.UIFixCheck(fix) }
 func (b *Bridge) UIBulkAlwaysAllow(hosts []string) (string, error) {
 	return b.app.UIBulkAlwaysAllow(hosts)
 }
