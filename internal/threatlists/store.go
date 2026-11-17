@@ -85,7 +85,31 @@ func (s *Store) loadStatus() error {
 		return fmt.Errorf("threatlists status: %w", err)
 	}
 	s.status = st
+	s.normalizeFeedCategoriesLocked()
 	return nil
+}
+
+// normalizeFeedCategoriesLocked rewrites legacy category aliases (e.g. telemetry → ads_trackers)
+// and aligns category/format with the product catalog when known.
+func (s *Store) normalizeFeedCategoriesLocked() {
+	changed := false
+	for id, st := range s.status.Feeds {
+		norm := NormalizeCategory(st.Category)
+		if sub, ok := CatalogByID(id); ok {
+			norm = sub.Category
+			if st.Format == "" {
+				st.Format = sub.Format
+			}
+		}
+		if st.Category != norm {
+			st.Category = norm
+			changed = true
+		}
+		s.status.Feeds[id] = st
+	}
+	if changed {
+		_ = s.saveStatusLocked()
+	}
 }
 
 func (s *Store) saveStatusLocked() error {
@@ -171,7 +195,12 @@ func (s *Store) EnsureCatalogDefaults() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, sub := range append(CoreCatalog(), AdvancedCatalog()...) {
-		if _, ok := s.status.Feeds[sub.ID]; ok {
+		if st, ok := s.status.Feeds[sub.ID]; ok {
+			st.Category = sub.Category
+			if st.Format == "" {
+				st.Format = sub.Format
+			}
+			s.status.Feeds[sub.ID] = st
 			continue
 		}
 		s.status.Feeds[sub.ID] = FeedStatus{
@@ -203,7 +232,7 @@ func (s *Store) Contains(host string, category Category) (feedID string, ok bool
 		if !st.Enabled || !st.Active {
 			continue
 		}
-		if category != "" && st.Category != category {
+		if category != "" && NormalizeCategory(st.Category) != NormalizeCategory(category) {
 			continue
 		}
 		if _, hit := set[host]; hit {

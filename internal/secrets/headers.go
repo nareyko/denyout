@@ -56,6 +56,12 @@ func ScanHeaders(headers map[string][]string, canaries []string, hostAllowed boo
 				if h.Reason == "secret_in_body" {
 					h.Reason = "secret_in_header"
 				}
+				// Surface which header fired (Cookie vs Authorization) without values.
+				if h.Detector == "" {
+					h.Detector = "header:" + key
+				} else if !strings.HasPrefix(h.Detector, "header:") {
+					h.Detector = "header:" + key + ":" + h.Detector
+				}
 				out = append(out, h)
 			}
 		}

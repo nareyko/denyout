@@ -412,8 +412,18 @@ func (a *App) enableComputerFromTray() error {
 	}
 	a.clearProtectPause()
 	profile := normalizePolicyProfile(a.state.PolicyProfile)
-	AppendDesktopLog("INFO computer mode on profile=%s", profile)
-	LogEvent("protect_on", map[string]any{"source": "enable", "profile": profile})
+	allows := liveAllowHostsLocked(a.state)
+	AppendDesktopLog("INFO computer mode on profile=%s always_allow=%d", profile, len(allows))
+	fields := map[string]any{"source": "enable", "profile": profile, "always_allow_n": len(allows)}
+	if len(allows) > 0 {
+		// Cap list in events so dogfood logs stay readable.
+		shown := allows
+		if len(shown) > 20 {
+			shown = shown[:20]
+		}
+		fields["always_allow"] = shown
+	}
+	LogEvent("protect_on", fields)
 	if !certutilAvailable() {
 		AppendDesktopLog("INFO hint: install libnss3-tools (certutil) for Chrome/Chromium trust")
 	}

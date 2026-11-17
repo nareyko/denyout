@@ -56,13 +56,16 @@ func (a *App) logPolicyDeny(source, host string, reasons []string, url, process 
 	}
 	LogBlock("deny", fields)
 	for _, r := range reasons {
-		if r == "threat_list" {
+		switch r {
+		case "threat_list", "threat_phishing", "threat_malware", "threat_ads":
 			LogBlock("threat_deny", map[string]any{
 				"host": host, "reasons": reasons, "url": strings.TrimSpace(url),
 				"profile": profile, "source": source,
 			})
-			break
+		default:
+			continue
 		}
+		break
 	}
 }
 

@@ -21,6 +21,17 @@ func TestHumanReasonsStable(t *testing.T) {
 	if !strings.Contains(tl, "phishing") && !strings.Contains(tl, "malware") {
 		t.Fatalf("threat_list copy: %q", tl)
 	}
+	ads := notify.HumanReasons([]string{"threat_ads"})
+	if !strings.Contains(ads, "ads") && !strings.Contains(ads, "tracker") {
+		t.Fatalf("threat_ads copy: %q", ads)
+	}
+	if strings.Contains(ads, "phishing") {
+		t.Fatalf("threat_ads must not say phishing: %q", ads)
+	}
+	ph := notify.HumanReasons([]string{"threat_phishing"})
+	if !strings.Contains(ph, "phishing") {
+		t.Fatalf("threat_phishing copy: %q", ph)
+	}
 	if notify.HumanReasons(nil) == "" {
 		t.Fatal("empty reasons should still explain")
 	}

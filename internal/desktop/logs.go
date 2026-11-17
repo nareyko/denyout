@@ -75,6 +75,8 @@ func LastErrorSummary() string {
 }
 
 // AppendDesktopLog writes a timestamped line to desktop.log.
+// When the process was detached with stderr redirected to desktop.log
+// (ReexecDetachedIfTTY), skip the stderr mirror — otherwise every line is doubled.
 func AppendDesktopLog(format string, args ...any) {
 	_ = os.MkdirAll(LogDir(), 0o755)
 	line := time.Now().UTC().Format(time.RFC3339) + " " + fmt.Sprintf(format, args...) + "\n"
@@ -85,6 +87,9 @@ func AppendDesktopLog(format string, args ...any) {
 	}
 	defer f.Close()
 	_, _ = f.WriteString(line)
+	if os.Getenv(envDetached) == "1" {
+		return
+	}
 	fmt.Fprint(os.Stderr, line)
 }
 

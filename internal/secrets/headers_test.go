@@ -47,4 +47,7 @@ func TestScanHeadersCookieAlways(t *testing.T) {
 	if len(hits) == 0 {
 		t.Fatal("secret in Cookie must deny on allowlisted host")
 	}
+	if len(hits[0].Detector) < 7 || hits[0].Detector[:7] != "header:" {
+		t.Fatalf("want header:… detector, got %q", hits[0].Detector)
+	}
 }

@@ -32,12 +32,12 @@ func TestThreatListDeniesInBlocklist(t *testing.T) {
 	}
 	found := false
 	for _, r := range d.Reasons {
-		if r == policy.ReasonThreatList {
+		if r == policy.ReasonThreatPhishing {
 			found = true
 		}
 	}
 	if !found {
-		t.Fatalf("want threat_list: %+v", d)
+		t.Fatalf("want threat_phishing: %+v", d)
 	}
 }
 
@@ -79,12 +79,39 @@ func TestPackAllowDoesNotBeatThreatList(t *testing.T) {
 	}
 	ok := false
 	for _, r := range d.Reasons {
-		if r == policy.ReasonThreatList {
+		if r == policy.ReasonThreatMalware {
 			ok = true
 		}
 	}
 	if !ok {
 		t.Fatalf("%+v", d)
+	}
+}
+
+func TestThreatAdsReason(t *testing.T) {
+	cfg, err := policy.DefaultWholeDeviceBrowse()
+	if err != nil {
+		t.Fatal(err)
+	}
+	eng := policy.NewEngine(cfg)
+	eng.Threats = mapThreats{"tracker.example": "stevenblack-unified"}
+	d := eng.Evaluate(policy.RequestView{
+		DestHost: "tracker.example",
+		DestPort: 443,
+		DestIPs:  []net.IP{net.ParseIP("1.1.1.1")},
+		RawURL:   "https://tracker.example/",
+	})
+	if d.Verdict != "deny" {
+		t.Fatalf("%+v", d)
+	}
+	ok := false
+	for _, r := range d.Reasons {
+		if r == policy.ReasonThreatAds {
+			ok = true
+		}
+	}
+	if !ok {
+		t.Fatalf("want threat_ads: %+v", d)
 	}
 }
 

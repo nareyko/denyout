@@ -585,6 +585,12 @@ func HumanReasons(reasons []string) string {
 			parts = append(parts, "Blocked a raw IP address (not allowed in this mode).")
 		case "host_denied":
 			parts = append(parts, "This site is on your deny list.")
+		case "threat_phishing":
+			parts = append(parts, "This site is on a known phishing list.")
+		case "threat_malware":
+			parts = append(parts, "This site is on a known malware list.")
+		case "threat_ads":
+			parts = append(parts, "This site is on an ads or trackers list.")
 		case "threat_list":
 			parts = append(parts, "This site is on a known phishing or malware list.")
 		case "secret_in_url", "secret_in_header", "secret_in_body":

@@ -133,7 +133,7 @@ Normative evaluation order after existing normalize/DNS (extend [`04-policy-engi
 2. **Secret / canary scanners** (unchanged. Still cannot be overridden by wide host allow). 
 3. **Book B - user Allow forever / timed allow** -> allow (skip threat lists). 
 4. **Book D - product unbreak** -> allow for threat-list purposes only (scanners still apply). 
-5. **Book C - enabled threat subscriptions** (Phishing / Malware / Stronger / later Telemetry) -> deny with reason `threat_list` / map to clear post-block HITL. 
+5. **Book C - enabled threat subscriptions** (Phishing / Malware / Stronger / opt-in Ads & trackers) -> deny with category reason `threat_phishing` / `threat_malware` / `threat_ads` (legacy `threat_list`) / map to clear post-block HITL. 
 6. **Book B - Remembered Keep / timed deny** -> quiet/throttled path as today. 
 7. **Mode branch:** 
  - Browse/Safe: allow if not denied above. 
@@ -153,9 +153,9 @@ Normative evaluation order after existing normalize/DNS (extend [`04-policy-engi
 | URLhaus | **ON after first successful fetch** | Protect OK if feed down |
 | HaGeZi TIF medium | **OFF** | Nested under Malware + first-enable warning |
 | HaGeZi TIF full | **Not offered** | - |
-| OISD small / OISD big / StevenBlack | **OFF** in Advanced | Day-1 optional catalog |
+| OISD small / OISD big / StevenBlack | **OFF** under Ads & trackers | Optional catalog; master **Block ads & trackers** OFF |
 | Custom list URL | **Not this wave** | Q10 |
-| Telemetry category | **Hidden** | Later |
+| Ads & trackers category | **OFF** (Basic toggle) | Gates Advanced OISD / StevenBlack; honest `threat_ads` copy |
 | Agent packs | Ask on create + Undo pack | - |
 | Unbreak | ~15-30 seed + Product exceptions (N) | - |
 | Agents + threat lists | Enforce. Always on host wins | Q4 |
@@ -177,10 +177,10 @@ Normative evaluation order after existing normalize/DNS (extend [`04-policy-engi
 | Block known phishing | `phishing-army` | ON |
 | Block known malware | `urlhaus-hosts` (active after first OK fetch) | ON |
 | └ Stronger... | `hagezi-tif-medium` | OFF + warning |
-| Telemetry | - | **Hidden** this wave |
+| Block ads & trackers | master gate for Advanced ads feeds | **OFF** |
 
-**Advanced (off):** OISD small, OISD big, StevenBlack unified - with copy that these are broader / ad-heavy, not DenyOut's core job. 
-**Not this wave:** Custom list URL.
+**Advanced (ads & trackers, off):** OISD small, OISD big, StevenBlack unified - broader / ad-heavy, not DenyOut's core job. Master ON with no feeds enables OISD small by default. Deny reasons: `threat_phishing` / `threat_malware` / `threat_ads` (legacy `threat_list` still accepted). 
+**Not this wave:** Custom list URL; NSFW / gambling / DoH-bypass feeds.
 
 Also: poll interval hours. Product exceptions (N) read-only. Refresh now.
 

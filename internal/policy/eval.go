@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/nareyko/denyout/internal/secrets"
+	"github.com/nareyko/denyout/internal/threatlists"
 )
 
 // Decision is the policy verdict.
@@ -248,6 +249,17 @@ func applySecretScanners(cfg *Config, rv RequestView, reasons []string) ([]strin
 	// treating that as "unknown host" falsely denied Cursor/API Bearer tokens.
 	hostAllowed := HostAllowed(cfg, rv.DestHost) || cfg.InsecureAllowAll || blocklistHostOK(cfg, rv.DestHost)
 	hits = append(hits, secrets.ScanHeaders(rv.Headers, cfg.Scanners.Canaries, hostAllowed)...)
+	// Book B "Allow this site" / Always allow = allow-all for that host: keep canaries only.
+	// Pack/preset allows still scan Cookie/body/URL secrets (agent egress seatbelt).
+	if UserAllowAll(cfg, rv.DestHost) || cfg.InsecureAllowAll {
+		kept := hits[:0]
+		for _, h := range hits {
+			if h.Reason == ReasonCanaryDetected {
+				kept = append(kept, h)
+			}
+		}
+		hits = kept
+	}
 	var detectors []string
 	for _, h := range hits {
 		reasons = append(reasons, h.Reason)
@@ -283,9 +295,11 @@ func denyListedHost(cfg *Config, host string, reasons, detectors []string) *Deci
 	return nil
 }
 
-// UserAllowSkipsThreat is true for Book B Always / Once / timed (user_once) on this host.
-// Pack / preset / profile allows do NOT skip Book C.
-func UserAllowSkipsThreat(cfg *Config, host string) bool {
+// UserAllowAll is true for Book B Always / Once (user_always / user_once) on this host.
+// That is the desktop "Allow this site" / Always-allow trust: skip Book C threat lists and
+// non-canary secret scanners (Cookie/Bearer/session FP on sites like claude.ai).
+// Pack / preset / profile allows do NOT qualify.
+func UserAllowAll(cfg *Config, host string) bool {
 	if cfg == nil {
 		return false
 	}
@@ -302,11 +316,17 @@ func UserAllowSkipsThreat(cfg *Config, host string) bool {
 	return false
 }
 
+// UserAllowSkipsThreat is true for Book B Always / Once on this host.
+// Pack / preset / profile allows do NOT skip Book C.
+func UserAllowSkipsThreat(cfg *Config, host string) bool {
+	return UserAllowAll(cfg, host)
+}
+
 func (e *Engine) denyThreatList(cfg *Config, host string, reasons, detectors []string) *Decision {
 	if e == nil || e.Threats == nil {
 		return nil
 	}
-	if UserAllowSkipsThreat(cfg, host) {
+	if UserAllowAll(cfg, host) {
 		return nil
 	}
 	// Book D — product unbreak: skip threat lists only (scanners already ran).
@@ -323,9 +343,24 @@ func (e *Engine) denyThreatList(cfg *Config, host string, reasons, detectors []s
 	}
 	return &Decision{
 		Verdict:   "deny",
-		Reasons:   uniq(append(reasons, ReasonThreatList)),
+		Reasons:   uniq(append(reasons, ThreatReasonForFeed(feedID))),
 		Detectors: uniq(dets),
 	}
+}
+
+// ThreatReasonForFeed maps a Book C feed id to a category-specific deny reason.
+func ThreatReasonForFeed(feedID string) string {
+	if sub, ok := threatlists.CatalogByID(feedID); ok {
+		switch threatlists.NormalizeCategory(sub.Category) {
+		case threatlists.CategoryPhishing:
+			return ReasonThreatPhishing
+		case threatlists.CategoryMalware:
+			return ReasonThreatMalware
+		case threatlists.CategoryAdsTrackers:
+			return ReasonThreatAds
+		}
+	}
+	return ReasonThreatList
 }
 
 // blocklistHostOK is true in Safe desktop (blocklist) when the host is not on deny[].

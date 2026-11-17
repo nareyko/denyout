@@ -280,6 +280,9 @@ func (b *Bridge) GetThreatLists() desktop.ThreatListsView { return b.app.GetThre
 func (b *Bridge) UISetBlockPhishing(on bool) error        { return b.app.UISetBlockPhishing(on) }
 func (b *Bridge) UISetBlockMalware(on bool) error         { return b.app.UISetBlockMalware(on) }
 func (b *Bridge) UISetBlockStronger(on bool) error        { return b.app.UISetBlockStronger(on) }
+func (b *Bridge) UISetBlockAdsTrackers(on bool) error {
+	return b.app.UISetBlockAdsTrackers(on)
+}
 func (b *Bridge) UISetAdvancedThreatFeed(id string, on bool) error {
 	return b.app.UISetAdvancedThreatFeed(id, on)
 }
@@ -334,6 +337,12 @@ func (b *Bridge) UIQuit(choice string) error {
 }
 
 func main() {
+	// Before detach/Wails: version/help and CLI verbs must not spawn another tray.
+	// (`denyout version` used to fall through → ReexecDetachedIfTTY → second GUI.)
+	if code, ok := handleGUIQuickArgs(os.Args[1:], version, os.Stdout, os.Stderr); ok {
+		os.Exit(code)
+	}
+
 	noTray := flag.Bool("no-tray", false, "disable system tray (debug)")
 	openUI := flag.Bool("open", false, "show window on start (install / first run)")
 	foreground := flag.Bool("foreground", false, "keep attached to this terminal (do not detach)")
@@ -342,6 +351,10 @@ func main() {
 	if *showVersion {
 		fmt.Printf("denyout %s\n", version)
 		os.Exit(0)
+	}
+	// Flags then a bare/CLI word: `denyout --foreground check …`
+	if code, ok := handleGUIQuickArgs(flag.Args(), version, os.Stdout, os.Stderr); ok {
+		os.Exit(code)
 	}
 	if os.Getenv("DENYOUT_OPEN_UI") == "1" {
 		*openUI = true

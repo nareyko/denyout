@@ -74,7 +74,7 @@ Write a starter `denyout.yaml` in CWD with comments.
 
 ### 3.6 `denyout version` / `denyout help`
 
-Standard.
+Desktop binary (`denyout`) and CLI (`denyout-cli`) both accept `version` / `--version` / `-V` and `help` / `--help` / `-h` and exit without starting the tray. Other CLI verbs on the desktop binary print a `denyout-cli …` redirect and exit 2 (they must not spawn a second GUI).
 
 ### 3.7 `denyout desktop` (recommended GUI)
 

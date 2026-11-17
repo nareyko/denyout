@@ -16,4 +16,4 @@ Short honest list. Full discussion: [GitHub Issues](https://github.com/nareyko/d
 
 ## Reporting
 
-Prefer GitHub Issues with OS, DenyOut version (`denyout version`), and whether Protect or wrap was on. Do not paste real secrets or full audit URLs.
+Prefer GitHub Issues with OS, DenyOut version (`denyout version` or `denyout-cli version`), and whether Protect or wrap was on. Do not paste real secrets or full audit URLs.

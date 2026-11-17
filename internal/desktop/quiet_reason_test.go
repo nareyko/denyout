@@ -54,14 +54,22 @@ func TestQuietReasonAwayAndSnooze(t *testing.T) {
 	if err := a.UISetNotifySnooze("1h"); err != nil {
 		t.Fatal(err)
 	}
+	// GetUISnapshot re-probes real desktop fullscreen; keep Respect off so CI/dev
+	// machines with a fullscreen window do not change the Quiet phrase mid-test.
+	if err := a.UISetRespectFullscreen(false); err != nil {
+		t.Fatal(err)
+	}
 	notify.SetFullscreen(false)
 	phrase := a.quietReason()
 	if phrase == "" || !containsAllSub(phrase, "Quiet · away") || !containsAllSub(phrase, "snoozed until") {
 		t.Fatalf("phrase=%q", phrase)
 	}
+	if containsAllSub(phrase, "fullscreen") {
+		t.Fatalf("respect fullscreen off must omit fullscreen: %q", phrase)
+	}
 	snap := a.GetUISnapshot()
 	if snap.QuietReason != phrase || !snap.Quieting {
-		t.Fatalf("snap reason=%q quieting=%v", snap.QuietReason, snap.Quieting)
+		t.Fatalf("snap reason=%q quieting=%v want %q", snap.QuietReason, snap.Quieting, phrase)
 	}
 }
 

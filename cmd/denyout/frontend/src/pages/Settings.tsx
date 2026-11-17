@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { PauseModal } from "../components/PauseModal";
 import { Tip, tipGone } from "../components/Tip";
+import { humanReasonLabel as humanKeepReason } from "../reasonLabels";
 import { api, ThreatListsView, UISnapshot } from "../wails";
 
 type Tab = "basic" | "advanced";
@@ -1062,6 +1063,9 @@ export function Settings({
  "refresh",
  "stronger",
  "hagezi",
+ "ads",
+ "tracker",
+ "trackers",
  "poll",
  "hours",
  "exception",
@@ -1074,7 +1078,7 @@ export function Settings({
  <h2>Threat lists</h2>
           <p className="muted">
             {threats?.about_note ||
-              "Block domains on known phishing and malware lists. Downloads stay on this computer."}{" "}
+              "Block domains on known phishing and malware lists by default. Ads and trackers are optional (off). Downloads stay on this computer."}{" "}
             DenyOut refreshes threat lists about every {(threats?.poll_hours || 24)} hours while it
             is running, and when Protect or Agents only starts.
             {computerLive && !snap.problems_alert ? (
@@ -1214,6 +1218,46 @@ export function Settings({
  {!threats.block_malware
  ? " Turn on Block known malware first to enable this."
  : ""}
+ </p>
+ <label style={{ display: "block", marginTop: "0.65rem" }}>
+ <input
+ type="checkbox"
+ checked={!!threats.block_ads_trackers}
+ disabled={threatBusy}
+ onChange={(e) => {
+ const on = e.target.checked;
+ const apply = async () => {
+ setThreatBusy(true);
+ try {
+ await api.setBlockAdsTrackers(on);
+ await reload();
+ } catch (err) {
+ fail(err);
+ await reload();
+ } finally {
+ setThreatBusy(false);
+ }
+ };
+ if (on) {
+ setExtraConfirm({
+ title: "Block ads & trackers?",
+ body:
+ (threats.ads_trackers_warning ||
+ "Block ads and trackers uses optional lists (OISD / StevenBlack). This is not DenyOut's core phishing/malware job and may break some sites. Continue?") +
+ " Turning this on enables OISD small by default; pick other lists under Optional lists.",
+ danger: true,
+ confirmLabel: "Enable",
+ run: apply,
+ });
+ return;
+ }
+ void apply();
+ }}
+ />{" "}
+ Block ads & trackers
+ </label>
+ <p className="muted" style={{ marginTop: "0.15rem" }}>
+ Off by default. When on, choose lists under Optional lists (Advanced).
  </p>
               <label style={{ display: "block", marginTop: "0.65rem" }}>
                 Update every (hours){" "}
@@ -2016,10 +2060,13 @@ export function Settings({
  "advanced-lists",
  ) && (
  <section className="card" id="settings-advanced-lists">
- <h2>Optional lists (not core)</h2>
+ <h2>Optional lists (ads & trackers)</h2>
  <p className="muted">
  {threats?.advanced_warning ||
  "Broader ad/tracker lists - not DenyOut's main job. Default off."}
+ {!threats?.block_ads_trackers
+ ? " Turn on Block ads & trackers above first."
+ : ""}
  {computerLive
   ? ` Changing these while ${computerLiveNoun} is on restarts protection (may ask for a password).`
   : ""}
@@ -2036,10 +2083,21 @@ export function Settings({
  <input
  type="checkbox"
  checked={!!f.enabled}
- disabled={threatBusy || !threatsReady}
+ disabled={
+ threatBusy ||
+ !threatsReady ||
+ (!threats.block_ads_trackers && !f.enabled)
+ }
+ title={
+ !threats.block_ads_trackers && !f.enabled
+ ? "Turn on Block ads & trackers first"
+ : undefined
+ }
  onChange={(e) => {
  const on = e.target.checked;
  const feedID = f.id;
+ const aggressive =
+ feedID === "oisd-big" || feedID === "stevenblack-unified";
  const apply = async () => {
  setThreatBusy(true);
  try {
@@ -2056,7 +2114,10 @@ export function Settings({
  setExtraConfirm({
  title: `Enable ${f.label}?`,
  body:
- (threats?.advanced_warning ||
+ (aggressive
+ ? threats?.aggressive_ads_warning ||
+ "This list is broader and more aggressive than OISD small. It may break logins, CDNs, or analytics that sites need. Prefer OISD small first. Continue?"
+ : threats?.advanced_warning ||
  "Broader list may break sites. Continue?") +
  (computerLive
   ? ` While ${computerLiveNoun} is on this restarts protection (may ask for a password).`
@@ -2497,31 +2558,6 @@ function splitKeepKey(k: string): [string, string] {
   const i = (k || "").indexOf("|");
   if (i < 0) return [k || "", ""];
   return [k.slice(0, i), k.slice(i + 1)];
-}
-
-function humanKeepReason(code: string): string {
-  switch (code) {
-    case "secret_in_url":
-      return "secret in link";
-    case "secret_in_header":
-      return "secret in header";
-    case "secret_in_body":
-      return "secret in body";
-    case "canary_detected":
-      return "canary";
-    case "threat_list":
-      return "threat list";
-    case "host_denied":
-      return "host denied";
-    case "unsafe_ip":
-      return "unsafe IP";
-    case "ip_literal":
-      return "raw IP";
-    case "host_not_allowed":
-      return "not on allowlist";
-    default:
-      return code || "blocked";
-  }
 }
 
 /** Honest continuity line for snooze / away copy (not always “Protect computer”). */

@@ -31,22 +31,31 @@ type ThreatListsView struct {
 	BlockPhishing         bool             `json:"block_phishing"`
 	BlockMalware          bool             `json:"block_malware"`
 	BlockStronger         bool             `json:"block_stronger"` // HaGeZi TIF medium
+	BlockAdsTrackers      bool             `json:"block_ads_trackers"`
 	NeedsAttention        bool             `json:"needs_attention"`
 	Feeds                 []ThreatFeedView `json:"feeds"`
 	AdvancedFeeds         []ThreatFeedView `json:"advanced_feeds"`
 	AboutNote             string           `json:"about_note"`
 	StrongerWarning       string           `json:"stronger_warning"`
-	AdvancedWarning       string           `json:"advanced_warning"`
-	ProductExceptions     int              `json:"product_exceptions"`
-	ProductExceptionHosts []string         `json:"product_exception_hosts"`
-	ProductExceptionsNote string           `json:"product_exceptions_note"`
+	AdvancedWarning         string           `json:"advanced_warning"`
+	AggressiveAdsWarning    string           `json:"aggressive_ads_warning"`
+	AdsTrackersWarning      string           `json:"ads_trackers_warning"`
+	ProductExceptions       int              `json:"product_exceptions"`
+	ProductExceptionHosts   []string         `json:"product_exception_hosts"`
+	ProductExceptionsNote   string           `json:"product_exceptions_note"`
 }
 
 // StrongerFirstEnableWarning is shown once in UI before enabling HaGeZi medium.
 const StrongerFirstEnableWarning = "Stronger adds a large extra malware/threat list (HaGeZi TIF medium). It may block more sites and use more disk/memory. If something breaks, use Allow this site. Continue?"
 
-// AdvancedFeedEnableWarning is shown before enabling OISD / StevenBlack.
-const AdvancedFeedEnableWarning = "These lists are broader and ad/tracker-heavy - not DenyOut's core job (use Pi-hole or similar for network-wide ads). They may break sites. Continue?"
+// AdvancedFeedEnableWarning is shown before enabling a gentle ads feed (OISD small).
+const AdvancedFeedEnableWarning = "Ads and tracker lists are optional privacy filters - not DenyOut's core job (use Pi-hole or similar for network-wide ads). They may break sites. Continue?"
+
+// AggressiveAdsFeedWarning is shown before enabling OISD big or StevenBlack.
+const AggressiveAdsFeedWarning = "This list is broader and more aggressive than OISD small. It may break logins, CDNs, or analytics that sites need. Prefer OISD small first. Continue?"
+
+// AdsTrackersMasterWarning is shown when turning on Block ads & trackers.
+const AdsTrackersMasterWarning = "Block ads and trackers uses optional lists (OISD / StevenBlack). This is not DenyOut's core phishing/malware job and may break some sites. Continue?"
 
 // GetThreatLists returns Book C status for Settings (opens store if needed; no force refresh).
 func (a *App) GetThreatLists() ThreatListsView {
@@ -54,9 +63,11 @@ func (a *App) GetThreatLists() ThreatListsView {
 	unbreak := policy.DefaultUnbreakHosts()
 	out := ThreatListsView{
 		PollHours:             threatlists.DefaultPollHours,
-		AboutNote:             "DenyOut downloads known phishing and malware domain lists. Lists stay on this computer. Failed downloads keep the last good copy - Protect still works.",
+		AboutNote:             "DenyOut downloads known phishing and malware domain lists by default. Ads and trackers lists are optional (off). Lists stay on this computer. Failed downloads keep the last good copy - Protect still works.",
 		StrongerWarning:       StrongerFirstEnableWarning,
 		AdvancedWarning:       AdvancedFeedEnableWarning,
+		AggressiveAdsWarning:  AggressiveAdsFeedWarning,
+		AdsTrackersWarning:    AdsTrackersMasterWarning,
 		Feeds:                 []ThreatFeedView{},
 		AdvancedFeeds:         []ThreatFeedView{},
 		ProductExceptions:     len(unbreak),
@@ -85,7 +96,11 @@ func (a *App) GetThreatLists() ThreatListsView {
 		}
 	}
 	for _, sub := range threatlists.AdvancedCatalog() {
-		out.AdvancedFeeds = append(out.AdvancedFeeds, feedViewFrom(sub, status, true))
+		row := feedViewFrom(sub, status, true)
+		out.AdvancedFeeds = append(out.AdvancedFeeds, row)
+		if row.Enabled {
+			out.BlockAdsTrackers = true
+		}
 	}
 	return out
 }
@@ -181,8 +196,46 @@ func (a *App) UISetThreatPollHours(hours int) error {
 	return st.SetPollHours(hours)
 }
 
+// UISetBlockAdsTrackers is the master gate for Advanced ads/tracker feeds.
+// OFF disables every AdvancedCatalog feed. ON enables OISD small if none are on yet.
+func (a *App) UISetBlockAdsTrackers(on bool) error {
+	st := a.ensureThreatStore(false)
+	if st == nil {
+		return fmt.Errorf("threat lists unavailable")
+	}
+	_ = st.EnsureCatalogDefaults()
+	if !on {
+		var last error
+		for _, sub := range threatlists.AdvancedCatalog() {
+			if err := a.setThreatFeedEnabled(sub.ID, false); err != nil {
+				last = err
+			}
+		}
+		return last
+	}
+	anyOn := false
+	status := st.Status()
+	for _, sub := range threatlists.AdvancedCatalog() {
+		fs := status.Feeds[sub.ID]
+		enabled := sub.Enabled
+		if _, ok := status.Feeds[sub.ID]; ok {
+			enabled = fs.Enabled
+		}
+		if enabled {
+			anyOn = true
+			break
+		}
+	}
+	if anyOn {
+		a.syncThreatChecker(st)
+		return a.rebindThreatsIfProtectOn()
+	}
+	return a.setThreatFeedEnabled(threatlists.IDOISDSmall, true)
+}
+
 // UISetAdvancedThreatFeed enables/disables an Advanced catalog feed (OISD / StevenBlack).
 // Caller should show AdvancedFeedEnableWarning before enabling.
+// Enabling a feed while the master is off turns ads/trackers on for that feed.
 func (a *App) UISetAdvancedThreatFeed(id string, on bool) error {
 	id = strings.TrimSpace(id)
 	ok := false

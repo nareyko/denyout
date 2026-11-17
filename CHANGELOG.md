@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Added
+
+- **Threat lists: Block ads & trackers (default OFF):** Basic toggle gates Advanced OISD / StevenBlack. Category-specific deny reasons (`threat_phishing` / `threat_malware` / `threat_ads`) so tracker hits no longer read as phishing/malware. Legacy `threat_list` still accepted.
+
+### Fixed
+
+- **Allow this site = allow-all for that host:** Book B Always / Once (`user_always` / `user_once`) now skips non-canary secret scanners (Cookie/Bearer/URL/body) as well as threat lists. Fixes Claude.ai and similar sites where session cookies looked like secrets after Allow. Canaries still deny. Pack/preset allows unchanged.
+- **`denyout version` no longer starts a second tray:** GUI handles `version` / `--version` / `-V` / `help` before detach; CLI verbs (`check`, `run`, `hostctl`, …) and unknown bare words print a `denyout-cli …` hint and exit instead of launching Wails.
+- **desktop.log no longer doubles every line** after tray detach (stderr was redirected to the same file as AppendDesktopLog).
+- **Richer Protect/deny diagnostics:** `protect_on` events include Always-allow host list; header secret hits tag detectors as `header:<name>:<detector>` (e.g. `header:cookie:…`) without values.
+
 ## 0.4.12 - Experimental Settings + TUN G6 (2026-11-16)
 
 ### Added

@@ -9,16 +9,17 @@ import (
 
 // ThreatSyncPrefs are Book C toggles exported into the sync blob (not full feed cache).
 type ThreatSyncPrefs struct {
-	BlockPhishing   bool
-	BlockMalware    bool
-	BlockStronger   bool
-	ThreatPollHours int
+	BlockPhishing    bool
+	BlockMalware     bool
+	BlockStronger    bool
+	BlockAdsTrackers bool
+	ThreatPollHours  int
 }
 
 // ExportSyncDocument builds a cloudsync.Document from local desktop state (+ threat prefs).
 // Does not include audit events, secrets, account tokens, or update-check tip fields.
 func ExportSyncDocument(st State, threat ThreatSyncPrefs, packIDs []string) cloudsync.Document {
-	phish, mal, strong := threat.BlockPhishing, threat.BlockMalware, threat.BlockStronger
+	phish, mal, strong, ads := threat.BlockPhishing, threat.BlockMalware, threat.BlockStronger, threat.BlockAdsTrackers
 	return cloudsync.Document{
 		SchemaVersion: cloudsync.SchemaVersion,
 		UpdatedAt:     syncUpdatedAt(st),
@@ -32,6 +33,7 @@ func ExportSyncDocument(st State, threat ThreatSyncPrefs, packIDs []string) clou
 			BlockPhishing:          &phish,
 			BlockMalware:           &mal,
 			BlockStronger:          &strong,
+			BlockAdsTrackers:       &ads,
 			ThreatPollHours:        threat.ThreatPollHours,
 			SensitiveSinksEnabled:  cloneBoolPtr(st.SensitiveSinksEnabled),
 			SensitiveWritesEnabled: cloneBoolPtr(st.SensitiveWritesEnabled),
@@ -79,7 +81,7 @@ func ApplySyncSettings(st *State, s cloudsync.Settings) {
 
 // ThreatPrefsFromSettings extracts Book C toggles from sync settings.
 func ThreatPrefsFromSettings(s cloudsync.Settings) (prefs ThreatSyncPrefs, ok bool) {
-	if s.BlockPhishing == nil && s.BlockMalware == nil && s.BlockStronger == nil && s.ThreatPollHours == 0 {
+	if s.BlockPhishing == nil && s.BlockMalware == nil && s.BlockStronger == nil && s.BlockAdsTrackers == nil && s.ThreatPollHours == 0 {
 		return prefs, false
 	}
 	ok = true
@@ -91,6 +93,9 @@ func ThreatPrefsFromSettings(s cloudsync.Settings) (prefs ThreatSyncPrefs, ok bo
 	}
 	if s.BlockStronger != nil {
 		prefs.BlockStronger = *s.BlockStronger
+	}
+	if s.BlockAdsTrackers != nil {
+		prefs.BlockAdsTrackers = *s.BlockAdsTrackers
 	}
 	prefs.ThreatPollHours = s.ThreatPollHours
 	return prefs, ok

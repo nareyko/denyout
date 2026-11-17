@@ -299,7 +299,7 @@ Normative detail: [`ux-iters/notifications-rework-plan.md`](ux-iters/notificatio
 | Agents only (whole PC) | Same decision dialog | Pre-act Ask |
 | Off | - | - |
 
-Threat-list hits use reason `threat_list`. User **Allow this site** / timed allow beats threat lists. Starter **packs** do not. Product unbreak (Book D) skips threat lists only - scanners still apply. Detail: [`ux-iters/threat-lists-plan.md`](ux-iters/threat-lists-plan.md).
+Threat-list hits use category reasons `threat_phishing` / `threat_malware` / `threat_ads` (legacy `threat_list`). Ads & trackers lists are opt-in (Basic toggle default OFF). User **Allow this site** / timed allow is **allow-all** for that host: beats threat lists and non-canary secret scanners (Cookie/Bearer/URL/body). Canaries still deny. Starter **packs** do not get that trust. Product unbreak (Book D) skips threat lists only. Detail: [`ux-iters/threat-lists-plan.md`](ux-iters/threat-lists-plan.md), [`05-secret-detection.md`](05-secret-detection.md).
 
 **OS toasts (whitelist only):** `protect_failed` · soft `open_app` · `tray_hidden`.  
 **Undo is in-app only** (strip after Allow / auto-resume; tray tooltip “Undo available”) — no OS Undo button.  
