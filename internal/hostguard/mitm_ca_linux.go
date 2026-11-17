@@ -47,7 +47,7 @@ func mitmConfigFromCA(caPath string) (tun.MITMConfig, error) {
 			}
 			return &leaf, nil
 		},
-		RootCAs:            pool,
+		RootCAs: pool,
 		// Only for lab dogfood with self-signed origins; never on by default.
 		InsecureSkipVerify: os.Getenv("DENYOUT_TLS_INSECURE_UPSTREAM") == "1",
 	}, nil

@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"syscall"
 )
 
 // maxHelperCABytes caps how much of a client-supplied CA file the root helper reads.
@@ -39,10 +38,8 @@ func validateHelperCAPath(path string, ownerUID int) error {
 	if !fi.Mode().IsRegular() {
 		return fmt.Errorf("ca path must be a regular file")
 	}
-	if st, ok := fi.Sys().(*syscall.Stat_t); ok {
-		if int(st.Uid) != ownerUID && st.Uid != 0 {
-			return fmt.Errorf("ca file must be owned by the helper owner or root")
-		}
+	if !fileOwnedByOrRoot(fi, ownerUID) {
+		return fmt.Errorf("ca file must be owned by the helper owner or root")
 	}
 	f, err := os.Open(path)
 	if err != nil {

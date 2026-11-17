@@ -9,7 +9,7 @@ import (
 func TestApplySyncSettingsRejectsHostileInput(t *testing.T) {
 	st := &State{BodyPureA: true, AntiChunkEnabled: true}
 	ApplySyncSettings(st, cloudsync.Settings{
-		AlwaysAllowHosts: []string{"ok.example.com", "*.evil.com", "http://x.com", "1.2.3.4", "com", "a b.com", "EVIL.org"},
+		AlwaysAllowHosts:   []string{"ok.example.com", "*.evil.com", "http://x.com", "1.2.3.4", "com", "a b.com", "EVIL.org"},
 		DecisionTimeoutSec: 999999,
 	})
 	want := map[string]bool{"ok.example.com": true, "evil.org": true}
