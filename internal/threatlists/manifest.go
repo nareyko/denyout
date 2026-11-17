@@ -4,9 +4,9 @@ package threatlists
 type Category string
 
 const (
-	CategoryPhishing     Category = "phishing"
-	CategoryMalware      Category = "malware"
-	CategoryAdsTrackers  Category = "ads_trackers"
+	CategoryPhishing    Category = "phishing"
+	CategoryMalware     Category = "malware"
+	CategoryAdsTrackers Category = "ads_trackers"
 	// CategoryTelemetry is the legacy on-disk alias for ads_trackers (status.json).
 	CategoryTelemetry Category = "telemetry"
 )

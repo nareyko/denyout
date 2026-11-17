@@ -37,12 +37,12 @@ type ThreatListsView struct {
 	AdvancedFeeds         []ThreatFeedView `json:"advanced_feeds"`
 	AboutNote             string           `json:"about_note"`
 	StrongerWarning       string           `json:"stronger_warning"`
-	AdvancedWarning         string           `json:"advanced_warning"`
-	AggressiveAdsWarning    string           `json:"aggressive_ads_warning"`
-	AdsTrackersWarning      string           `json:"ads_trackers_warning"`
-	ProductExceptions       int              `json:"product_exceptions"`
-	ProductExceptionHosts   []string         `json:"product_exception_hosts"`
-	ProductExceptionsNote   string           `json:"product_exceptions_note"`
+	AdvancedWarning       string           `json:"advanced_warning"`
+	AggressiveAdsWarning  string           `json:"aggressive_ads_warning"`
+	AdsTrackersWarning    string           `json:"ads_trackers_warning"`
+	ProductExceptions     int              `json:"product_exceptions"`
+	ProductExceptionHosts []string         `json:"product_exception_hosts"`
+	ProductExceptionsNote string           `json:"product_exceptions_note"`
 }
 
 // StrongerFirstEnableWarning is shown once in UI before enabling HaGeZi medium.

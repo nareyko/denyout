@@ -379,6 +379,10 @@ func RedactURL(raw string) string {
 	}
 	q := u.Query()
 	changed := false
+	if u.User != nil { // userinfo (user:password@) is always sensitive
+		u.User = url.UserPassword("***", "***")
+		changed = true
+	}
 	for name, values := range q {
 		key := strings.ToLower(name)
 		if _, ok := namedQueryParams[key]; !ok {
@@ -409,8 +413,9 @@ func RedactURL(raw string) string {
 		}
 	}
 	if !needsHeavy {
-		needsHeavy = reJWT.MatchString(raw) || reOpenAI.MatchString(raw) ||
-			reGitHub.MatchString(raw) || reAWS.MatchString(raw) || reSlack.MatchString(raw)
+		// Any known token shape (Stripe, Telegram, GitLab, Google, SendGrid, ...), not
+		// just a handful: otherwise those tokens survive in audit/stderr output.
+		needsHeavy = reJWT.MatchString(raw) || len(scanTokenShapes(raw, "", false)) > 0
 	}
 	if needsHeavy {
 		if u.User != nil {
@@ -422,7 +427,7 @@ func RedactURL(raw string) string {
 		if u.Opaque != "" {
 			u.Opaque = redactMarkers(u.Opaque, markers)
 		}
-		u.Path = redactMarkers(u.Path, markers)
+		u.Path = RedactPath(redactMarkers(u.Path, markers))
 		if u.RawQuery != "" {
 			u.RawQuery = "redacted=***"
 		} else if strings.Contains(raw, "?") {
@@ -474,4 +479,25 @@ func RedactQuery(rawQuery string) string {
 		return "redacted=***"
 	}
 	return u.RawQuery
+}
+
+// RedactPath replaces path segments that look like tokens (known vendor shapes,
+// JWTs, canaries) with "***" so secrets embedded in URL paths (Telegram bot
+// URLs, Slack hooks, /sk-...) never reach audit logs.
+func RedactPath(path string) string {
+	if path == "" {
+		return path
+	}
+	segs := strings.Split(path, "/")
+	for i, seg := range segs {
+		if seg == "" {
+			continue
+		}
+		if reJWT.MatchString(seg) || len(scanTokenShapes(seg, "", false)) > 0 ||
+			strings.Contains(seg, "DENYOUT_CANARY_") || strings.Contains(seg, "ARVISER_CANARY_") ||
+			strings.Contains(seg, "SECRET_MARKER_") {
+			segs[i] = "***"
+		}
+	}
+	return strings.Join(segs, "/")
 }

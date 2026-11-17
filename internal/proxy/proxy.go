@@ -533,7 +533,7 @@ func (s *Server) logDecision(rv policy.RequestView, d policy.Decision, start tim
 		},
 		HTTP: &audit.HTTPInfo{
 			Method:        rv.Method,
-			Path:          rv.Path,
+			Path:          secrets.RedactPath(rv.Path),
 			QueryRedacted: secrets.RedactQuery(rv.RawQuery),
 		},
 		Detectors:      d.Detectors,
