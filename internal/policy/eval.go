@@ -2,6 +2,7 @@ package policy
 
 import (
 	"fmt"
+	"github.com/nareyko/denyout/internal/inspect"
 	"net"
 	"net/url"
 	"regexp"
@@ -10,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nareyko/denyout/internal/secrets"
 	"github.com/nareyko/denyout/internal/threatlists"
 )
 
@@ -249,16 +249,19 @@ func applySecretScanners(cfg *Config, rv RequestView, reasons []string) ([]strin
 	if scanURL == "" {
 		scanURL = rebuildURL(rv)
 	}
-	hits := secrets.ScanURL(scanURL, cfg.Scanners.Canaries, cfg.MinValueLenOrDefault(), cfg.NamedQueryEnabled())
-	if len(rv.BodyPrefix) > 0 {
-		hits = append(hits, secrets.ScanBytes(rv.BodyPrefix, cfg.Scanners.Canaries)...)
-	}
-	hits = append(hits, scanCustomRegex(cfg, scanURL, rv)...)
 	// Auth headers are OK toward destinations the mode would allow.
 	// In blocklist (Safe desktop), HostAllowed is often false (empty allow[]) —
 	// treating that as "unknown host" falsely denied Cursor/API Bearer tokens.
 	hostAllowed := HostAllowed(cfg, rv.DestHost) || cfg.InsecureAllowAll || blocklistHostOK(cfg, rv.DestHost)
-	hits = append(hits, secrets.ScanHeaders(rv.Headers, cfg.Scanners.Canaries, hostAllowed)...)
+	hits := inspect.Request{
+		URL: scanURL, Path: rv.Path, RawQuery: rv.RawQuery, Headers: rv.Headers, Body: rv.BodyPrefix,
+	}.Scan(inspect.Options{
+		Canaries:          cfg.Scanners.Canaries,
+		MinValueLen:       cfg.MinValueLenOrDefault(),
+		NamedQueryEnabled: cfg.NamedQueryEnabled(),
+		HostAllowed:       hostAllowed,
+		Custom:            compiledCustom(cfg),
+	})
 	// Book B "Allow this site" / Always allow = allow-all for that host: keep canaries only.
 	// Pack/preset allows still scan Cookie/body/URL secrets (agent egress seatbelt).
 	if UserAllowAll(cfg, rv.DestHost) || cfg.InsecureAllowAll {
@@ -562,11 +565,13 @@ func uniq(in []string) []string {
 
 var customRegexCache sync.Map // pattern -> *regexp.Regexp
 
-// scanCustomRegex applies the user's scanners.custom_regex patterns (validated at
-// load) to the URL, body prefix and header values. Previously they were only
-// validated and never used, so users believed they were protected.
-func scanCustomRegex(cfg *Config, scanURL string, rv RequestView) []secrets.Hit {
-	var hits []secrets.Hit
+// compiledCustom returns the user's scanners.custom_regex patterns (validated at load),
+// compiled once per pattern.
+func compiledCustom(cfg *Config) []inspect.Custom {
+	if len(cfg.Scanners.CustomRegex) == 0 {
+		return nil
+	}
+	out := make([]inspect.Custom, 0, len(cfg.Scanners.CustomRegex))
 	for _, cr := range cfg.Scanners.CustomRegex {
 		var re *regexp.Regexp
 		if v, ok := customRegexCache.Load(cr.Pattern); ok {
@@ -579,20 +584,7 @@ func scanCustomRegex(cfg *Config, scanURL string, rv RequestView) []secrets.Hit 
 			customRegexCache.Store(cr.Pattern, c)
 			re = c
 		}
-		det := "custom_regex:" + cr.ID
-		if re.MatchString(scanURL) {
-			hits = append(hits, secrets.Hit{Detector: det, Reason: "secret_in_url", Evidence: "***"})
-		}
-		if len(rv.BodyPrefix) > 0 && re.Match(rv.BodyPrefix) {
-			hits = append(hits, secrets.Hit{Detector: det, Reason: "secret_in_body", Evidence: "***"})
-		}
-		for _, vals := range rv.Headers {
-			for _, v := range vals {
-				if re.MatchString(v) {
-					hits = append(hits, secrets.Hit{Detector: det, Reason: "secret_in_header", Evidence: "***"})
-				}
-			}
-		}
+		out = append(out, inspect.Custom{ID: cr.ID, RE: re})
 	}
-	return hits
+	return out
 }
