@@ -43,3 +43,21 @@ func TestWatchdogFailClosedNeverDegrades(t *testing.T) {
 		}
 	}
 }
+
+func TestWatchdogForceDegradedRetriesRecovery(t *testing.T) {
+	w := &watchdog{}
+	for i := 0; i < watchdogThreshold; i++ {
+		w.observe(false)
+	}
+	if e := w.observe(true); e != "recover" {
+		t.Fatal("want recover")
+	}
+	w.forceDegraded() // re-apply failed
+	if e := w.observe(true); e != "recover" {
+		t.Fatalf("recovery must be retried after a failed re-apply, got %q", e)
+	}
+	w.reset()
+	if w.isDegraded() || w.observe(true) != "" {
+		t.Fatal("reset must clear degraded state")
+	}
+}

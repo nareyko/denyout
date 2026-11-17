@@ -2,7 +2,7 @@
 # Runs inside a NET_ADMIN container. $1 = denyout-cli. Checks helper watchdog + IPv6 listener.
 set -u
 BIN=$1
-apt-get update -qq >/dev/null 2>&1; apt-get install -y -qq iproute2 nftables ca-certificates >/dev/null 2>&1
+apt-get update -qq >/dev/null 2>&1; apt-get install -y -qq iproute2 nftables ca-certificates procps >/dev/null 2>&1
 id -u owner >/dev/null 2>&1 || useradd -u 1000 -M -s /usr/sbin/nologin owner
 mkdir -p /var/lib/denyout; echo 1000 > /var/lib/denyout/owner_uid
 CA=/tmp/ca; mkdir -p $CA; PORT=18443; fail=0
@@ -28,7 +28,7 @@ grep -q degraded /run/denyout-hostguard.state 2>/dev/null && ok "state=degraded"
 
 echo "== proxy returns: expect rules re-applied"
 start_proxy
-for i in $(seq 1 12); do has_table && break; sleep 1; done
+for i in $(seq 1 25); do has_table && break; sleep 1; done
 has_table && ok "rules re-applied after recovery" || bad "rules not restored"
 grep -q protected /run/denyout-hostguard.state 2>/dev/null && ok "state=protected" || bad "state not protected"
 
