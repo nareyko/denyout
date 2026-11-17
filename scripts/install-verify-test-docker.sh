@@ -18,6 +18,11 @@ echo "== require, no signature: must fail"
 if run DENYOUT_VERIFY_SIG=require | grep -q "signature required"; then echo "PASS require fails"; else echo "FAIL require"; exit 1; fi
 echo "== bad mode rejected"
 run DENYOUT_VERIFY_SIG=bogus | grep -q "must be auto|require|skip" && echo "PASS bad mode"
+echo "== GUI archive: auto without cosign installs with a note (require already fails at the CLI stage)"
+printf "#!/bin/sh\necho gui\n" > denyout; chmod +x denyout; tar -czf /rel/denyout_v0.0.1_linux_$a.tar.gz denyout
+rm -f /h/bin/denyout
+out=$(run DENYOUT_VERIFY_SIG=auto)
+echo "$out" | grep -q "denyout_v0.0.1_linux_$a.tar.gz signature not verified" && [ -e /h/bin/denyout ] && echo "PASS GUI auto note"
 echo "== tampered archive: checksum mismatch"
 echo evil >> /rel/denyout-cli_0.0.1_linux_$a.tar.gz
 run DENYOUT_VERIFY_SIG=skip | grep -q "SHA256 mismatch" && echo "PASS tamper detected"

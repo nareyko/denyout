@@ -280,7 +280,36 @@ GUI_DEST="${INSTALL_DIR}/denyout"
 if [ "$os" = "windows" ]; then
   GUI_DEST="${INSTALL_DIR}/denyout.exe"
 fi
-if curl_fetch "${TMP}/${GUI_ARCHIVE}" "${ASSET_BASE}/${GUI_ARCHIVE}"; then
+# verify_gui_archive: cosign signature (release-desktop.yml identity) over the archive.
+# Returns 0 = ok/allowed, 1 = must not install.
+verify_gui_archive() {
+  mode="${DENYOUT_VERIFY_SIG:-auto}"
+  [ "$mode" = skip ] && return 0
+  if command -v cosign >/dev/null 2>&1 \
+     && curl_fetch "${TMP}/${GUI_ARCHIVE}.sig" "${ASSET_BASE}/${GUI_ARCHIVE}.sig" \
+     && curl_fetch "${TMP}/${GUI_ARCHIVE}.pem" "${ASSET_BASE}/${GUI_ARCHIVE}.pem"; then
+    if cosign verify-blob \
+        --certificate "${TMP}/${GUI_ARCHIVE}.pem" --signature "${TMP}/${GUI_ARCHIVE}.sig" \
+        --certificate-identity-regexp "^https://github.com/${REPO}/\.github/workflows/release-desktop\.yml@refs/tags/v" \
+        --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+        "${TMP}/${GUI_ARCHIVE}" >/dev/null 2>&1; then
+      echo "denyout install: GUI signature ok (cosign, GitHub Actions identity)"
+      return 0
+    fi
+    echo "denyout install: SIGNATURE VERIFICATION FAILED for ${GUI_ARCHIVE} - GUI not installed" >&2
+    return 1
+  fi
+  if [ "$mode" = require ]; then
+    echo "denyout install: signature required but cosign/signature unavailable for ${GUI_ARCHIVE} - GUI not installed" >&2
+    return 1
+  fi
+  echo "denyout install: note: ${GUI_ARCHIVE} signature not verified (cosign or .sig missing)" >&2
+  return 0
+}
+
+if curl_fetch "${TMP}/${GUI_ARCHIVE}" "${ASSET_BASE}/${GUI_ARCHIVE}" && ! verify_gui_archive; then
+  echo "denyout install: note - skipping GUI (CLI tray still available)" >&2
+elif [ -f "${TMP}/${GUI_ARCHIVE}" ]; then
   tar -xzf "${TMP}/${GUI_ARCHIVE}" -C "$TMP"
   DBIN=$(find "$TMP" -type f \( -name 'denyout' -o -name 'denyout.exe' \) ! -name 'denyout-cli*' | head -n1 || true)
   if [ -z "$DBIN" ]; then
