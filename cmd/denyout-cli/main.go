@@ -79,6 +79,8 @@ func runMain(args []string) int {
 		return cmdServe(args[1:])
 	case "audit":
 		return cmdAudit(args[1:])
+	case "doctor":
+		return cmdDoctor(args[1:], os.Stdout, os.Stderr)
 	default:
 		fmt.Fprintf(os.Stderr, "denyout-cli: unknown command %q\n\n", args[0])
 		printHelp(os.Stderr)
@@ -107,6 +109,7 @@ Commands:
   gui                  Advanced localhost UI (technical)
   serve -c <file>      Long-running sidecar proxy (pair with NetworkPolicy)
   audit tail           Show recent audit.jsonl events (desktop path by default)
+  doctor               Redacted status report to paste into a bug report
 
 Install and security boundaries: https://denyout.com · docs in this repo.
 `)

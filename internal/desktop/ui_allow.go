@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/nareyko/denyout/internal/audit"
+	"github.com/nareyko/denyout/internal/explain"
 	"github.com/nareyko/denyout/internal/notify"
 )
 
@@ -181,6 +182,7 @@ func (a *App) ListDenials(q DenialQuery) ([]DenialView, error) {
 		if id == "" {
 			id = fmt.Sprintf("%s|%s|%d", e.TS, host, i)
 		}
+		ex := explain.Describe(code)
 		out = append(out, DenialView{
 			ID:            id,
 			TS:            e.TS,
@@ -194,6 +196,11 @@ func (a *App) ListDenials(q DenialQuery) ([]DenialView, error) {
 			Detectors:     append([]string(nil), e.Detectors...),
 			PolicyProfile: e.PolicyProfile,
 			Remembered:    remembered,
+			Title:         ex.Title,
+			Explain:       ex.Detail,
+			Rule:          explain.RuleLabel(code, e.Detectors),
+			Fix:           ex.Fix,
+			AllowHelps:    ex.AllowHelps,
 		})
 		if len(out) >= limit {
 			break

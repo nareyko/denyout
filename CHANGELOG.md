@@ -25,6 +25,9 @@ Full code review (stability + security); details and residual risks in [`docs/se
 
 ### Added
 
+- **Explainable blocks:** every denial in History now shows a plain-language title, what happened, which rule fired (with scanner ids for secret blocks) and the safe next step, from one table in `internal/explain` (a test fails when a reason code emitted by `internal/policy`, the scanners or the proxy has no entry). One-click **Keep blocked / Allow once (15 min) / Always for this site** on the block without opening logs (`UIDenialAction`). Blocks about content or destination (secrets, canary, private/raw IPs) no longer offer a site allow, because it would not release them.
+- **Verify step in first-run:** "Your setup" now runs an in-process self-check (CA present and valid, can mint certificates, loopback TLS handshake accepted by a client that trusts only the DenyOut CA, system trust) and shows each problem with a **Fix** button that reuses the existing consent-gated actions. No host networking or trust store changes happen during the check.
+- **Diagnostics:** `denyout-cli doctor [--json] [-n N] [--proxy-port P] [--strict]` and a Diagnostics panel on Problems print a redacted report (version, OS, helper, proxy, CA self-check, threat list freshness, last N denials, last error) for bug reports. URLs go through the inspect redaction; free text is token-scanned; tests assert no secret from the scanner token set appears in text or JSON.
 - **Threat lists: Block ads & trackers (default OFF):** Basic toggle gates Advanced OISD / StevenBlack. Category-specific deny reasons (`threat_phishing` / `threat_malware` / `threat_ads`) so tracker hits no longer read as phishing/malware. Legacy `threat_list` still accepted.
 
 ### Fixed
