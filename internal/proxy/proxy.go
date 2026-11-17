@@ -76,6 +76,7 @@ func Start(ctx context.Context, cfg Config) (*Server, error) {
 	s.httpSrv = &http.Server{
 		Handler:           s,
 		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       2 * time.Minute,
 	}
 	if cfg.Transparent {
 		go s.serveTransparent()
@@ -201,11 +202,13 @@ func (s *Server) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 		Certificates: []tls.Certificate{leaf},
 		MinVersion:   tls.VersionTLS12,
 	})
+	_ = clientConn.SetDeadline(time.Now().Add(15 * time.Second)) // slowloris: bound the handshake
 	if err := tlsClient.Handshake(); err != nil {
 		s.logMitmError(rv, "mitm_handshake_failed", start)
 		_ = tlsClient.Close()
 		return
 	}
+	_ = clientConn.SetDeadline(time.Time{})
 	defer tlsClient.Close()
 
 	br := bufio.NewReader(tlsClient)
@@ -214,8 +217,19 @@ func (s *Server) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for {
+		// Idle/slow-header protection per request; cleared once the request line+headers arrived.
+		_ = clientConn.SetReadDeadline(time.Now().Add(5 * time.Minute))
 		req, err := http.ReadRequest(br)
 		if err != nil {
+			return
+		}
+		_ = clientConn.SetReadDeadline(time.Time{})
+		if !hostHeaderMatches(req.Host, host) {
+			// Domain fronting: policy was evaluated for the CONNECT/SNI host, so a
+			// different Host header would reach a host that was never checked.
+			resp := &http.Response{StatusCode: http.StatusMisdirectedRequest, ProtoMajor: 1, ProtoMinor: 1,
+				Header: make(http.Header), Body: io.NopCloser(strings.NewReader("host header does not match tunnel host\n"))}
+			_ = resp.Write(tlsClient)
 			return
 		}
 		s.roundTripIntercept(tlsClient, req, host, portN, ips, start)
@@ -304,10 +318,12 @@ func (s *Server) roundTripIntercept(client io.ReadWriteCloser, req *http.Request
 		MinVersion:         tls.VersionTLS12,
 		InsecureSkipVerify: s.cfg.InsecureSkipVerify,
 	})
+	_ = raw.SetDeadline(time.Now().Add(15 * time.Second))
 	if err := up.Handshake(); err != nil {
 		_ = raw.Close()
 		return
 	}
+	_ = raw.SetDeadline(time.Time{})
 	defer up.Close()
 
 	outReq := req.Clone(context.Background())
@@ -615,4 +631,18 @@ func safeDialIP(host string, ips []net.IP, allowPrivate bool) (net.IP, error) {
 		}
 	}
 	return ips[0], nil
+}
+
+// hostHeaderMatches reports whether an HTTP Host header (optionally with a port)
+// names the tunnel host. An empty header (HTTP/1.0) is accepted.
+func hostHeaderMatches(hdr, tunnelHost string) bool {
+	if hdr == "" {
+		return true
+	}
+	h := hdr
+	if hh, _, err := net.SplitHostPort(hdr); err == nil {
+		h = hh
+	}
+	h = strings.Trim(strings.ToLower(h), "[]")
+	return strings.TrimSuffix(h, ".") == strings.TrimSuffix(strings.Trim(strings.ToLower(tunnelHost), "[]"), ".")
 }
