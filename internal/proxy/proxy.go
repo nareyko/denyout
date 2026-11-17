@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -132,8 +133,11 @@ func (s *Server) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 		host = r.Host
 		port = "443"
 	}
-	portN := 443
-	fmt.Sscanf(port, "%d", &portN)
+	portN, perr := strconv.Atoi(port)
+	if perr != nil || portN < 1 || portN > 65535 { // no uint16 wraparound (65616 -> 80)
+		http.Error(w, "bad port", http.StatusBadRequest)
+		return
+	}
 
 	start := time.Now()
 	ips, resolveErr := lookupIPs(host)

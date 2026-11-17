@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -61,8 +62,10 @@ func (e *Engine) EvaluateURL(rawURL string) (Decision, error) {
 	}
 	port := uint16(0)
 	if p := u.Port(); p != "" {
-		var n int
-		fmt.Sscanf(p, "%d", &n)
+		n, perr := strconv.Atoi(p)
+		if perr != nil || n < 1 || n > 65535 {
+			return Decision{Verdict: "deny", Reasons: []string{ReasonInvalidURL}}, nil
+		}
 		port = uint16(n)
 	}
 	if port == 0 {

@@ -47,3 +47,14 @@ func TestCustomRegexIsApplied(t *testing.T) {
 		t.Fatalf("custom regex not enforced: %+v", d)
 	}
 }
+
+func TestEvaluateURLRejectsWrappedPort(t *testing.T) {
+	cfg, err := DefaultEnforceModels()
+	if err != nil {
+		t.Skip(err)
+	}
+	d, _ := NewEngine(cfg).EvaluateURL("https://example.com:65616/")
+	if d.Verdict != "deny" {
+		t.Fatalf("port 65616 must not wrap to 80: %+v", d)
+	}
+}
