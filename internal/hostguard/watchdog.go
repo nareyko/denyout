@@ -46,3 +46,18 @@ func (w *watchdog) isDegraded() bool {
 	defer w.mu.Unlock()
 	return w.degraded
 }
+
+// reset clears all memory (Protect Off or a new Apply).
+func (w *watchdog) reset() {
+	w.mu.Lock()
+	w.fails, w.degraded = 0, false
+	w.mu.Unlock()
+}
+
+// forceDegraded keeps the "down" state after a failed re-apply so the next healthy
+// probe retries the recovery.
+func (w *watchdog) forceDegraded() {
+	w.mu.Lock()
+	w.degraded = true
+	w.mu.Unlock()
+}
