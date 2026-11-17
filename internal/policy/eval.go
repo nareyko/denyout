@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -249,6 +250,7 @@ func applySecretScanners(cfg *Config, rv RequestView, reasons []string) ([]strin
 	if len(rv.BodyPrefix) > 0 {
 		hits = append(hits, secrets.ScanBytes(rv.BodyPrefix, cfg.Scanners.Canaries)...)
 	}
+	hits = append(hits, scanCustomRegex(cfg, scanURL, rv)...)
 	// Auth headers are OK toward destinations the mode would allow.
 	// In blocklist (Safe desktop), HostAllowed is often false (empty allow[]) —
 	// treating that as "unknown host" falsely denied Cursor/API Bearer tokens.
@@ -553,4 +555,41 @@ func uniq(in []string) []string {
 		out = append(out, s)
 	}
 	return out
+}
+
+var customRegexCache sync.Map // pattern -> *regexp.Regexp
+
+// scanCustomRegex applies the user's scanners.custom_regex patterns (validated at
+// load) to the URL, body prefix and header values. Previously they were only
+// validated and never used, so users believed they were protected.
+func scanCustomRegex(cfg *Config, scanURL string, rv RequestView) []secrets.Hit {
+	var hits []secrets.Hit
+	for _, cr := range cfg.Scanners.CustomRegex {
+		var re *regexp.Regexp
+		if v, ok := customRegexCache.Load(cr.Pattern); ok {
+			re = v.(*regexp.Regexp)
+		} else {
+			c, err := regexp.Compile(cr.Pattern)
+			if err != nil {
+				continue
+			}
+			customRegexCache.Store(cr.Pattern, c)
+			re = c
+		}
+		det := "custom_regex:" + cr.ID
+		if re.MatchString(scanURL) {
+			hits = append(hits, secrets.Hit{Detector: det, Reason: "secret_in_url", Evidence: "***"})
+		}
+		if len(rv.BodyPrefix) > 0 && re.Match(rv.BodyPrefix) {
+			hits = append(hits, secrets.Hit{Detector: det, Reason: "secret_in_body", Evidence: "***"})
+		}
+		for _, vals := range rv.Headers {
+			for _, v := range vals {
+				if re.MatchString(v) {
+					hits = append(hits, secrets.Hit{Detector: det, Reason: "secret_in_header", Evidence: "***"})
+				}
+			}
+		}
+	}
+	return hits
 }

@@ -68,3 +68,18 @@ func TestRedactPathAndUserinfo(t *testing.T) {
 		t.Errorf("stripe token leaked in query: %q", got)
 	}
 }
+
+func TestScanHeadersCustomHeaderAndUserinfoToken(t *testing.T) {
+	tok := "ghp_" + strings.Repeat("a", 36)
+	hits := secrets.ScanHeaders(map[string][]string{"X-Whatever": {tok}}, nil, false)
+	if len(hits) == 0 {
+		t.Error("token in custom header not detected")
+	}
+	hits = secrets.ScanHeaders(map[string][]string{"User-Agent": {"curl/8"}, "Accept": {"*/*"}}, nil, false)
+	if len(hits) != 0 {
+		t.Errorf("benign headers flagged: %v", hits)
+	}
+	if len(secrets.ScanURL("http://"+tok+"@evil.example/", nil, 20, true)) == 0 {
+		t.Error("token as userinfo username not detected")
+	}
+}

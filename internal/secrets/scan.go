@@ -127,6 +127,9 @@ func Scan(rawURL string, body []byte, opt Options) []Hit {
 			if u.User != nil {
 				if _, hasPass := u.User.Password(); hasPass {
 					hits = append(hits, Hit{Detector: "userinfo", Reason: "secret_in_url", Evidence: "***"})
+				} else if len(scanTokenShapes(u.User.Username(), "secret_in_url", false)) > 0 {
+					// https://ghp_TOKEN@host/ — token used as the user name
+					hits = append(hits, Hit{Detector: "userinfo", Reason: "secret_in_url", Evidence: "***"})
 				}
 			}
 

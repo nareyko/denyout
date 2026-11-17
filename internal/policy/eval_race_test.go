@@ -33,3 +33,17 @@ func TestEvaluateAllowHostRace(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+func TestCustomRegexIsApplied(t *testing.T) {
+	cfg, err := DefaultEnforceModels()
+	if err != nil {
+		t.Skip(err)
+	}
+	cfg.Scanners.CustomRegex = []CustomRegex{{ID: "corp", Pattern: `CORP-[0-9]{6}`}}
+	e := NewEngine(cfg)
+	d := e.Evaluate(RequestView{DestHost: "example.com", DestPort: 443, Protocol: "https",
+		RawURL: "https://example.com/?x=CORP-123456", Method: "GET"})
+	if d.Verdict != "deny" {
+		t.Fatalf("custom regex not enforced: %+v", d)
+	}
+}
