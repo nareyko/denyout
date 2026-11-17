@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -104,6 +105,7 @@ type Sink struct {
 	stdout   bool
 	version  string
 	file     *os.File
+	closed   bool
 	maxBytes int64 // 0 → DefaultMaxBytes; <0 disables rotation
 }
 
@@ -137,6 +139,7 @@ func (s *Sink) SetMaxBytes(n int64) {
 func (s *Sink) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.closed = true
 	if s.file != nil {
 		return s.file.Close()
 	}
@@ -165,6 +168,17 @@ func (s *Sink) Log(ev Event) error {
 	line := append(b, '\n')
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	// A failed reopen after rotation must not silently drop the audit trail forever.
+	if s.file == nil && s.path != "" && !s.closed {
+		f, err := os.OpenFile(s.path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+		if err != nil {
+			if s.stdout {
+				_, _ = os.Stdout.Write(line)
+			}
+			return fmt.Errorf("audit: reopen %s: %w", s.path, err)
+		}
+		s.file = f
+	}
 	if s.file != nil {
 		if _, err := s.file.Write(line); err != nil {
 			return err
@@ -294,28 +308,56 @@ func TailEvents(path string, limit int, denialsOnly bool) ([]Event, error) {
 	}
 	defer f.Close()
 
-	var all []Event
-	sc := bufio.NewScanner(f)
-	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-	for sc.Scan() {
-		line := sc.Bytes()
-		if len(line) == 0 {
-			continue
+	// Ring buffer: memory is O(limit), not O(file). Over-long lines are skipped, not fatal.
+	ring := make([]Event, 0, limit)
+	next := 0
+	rd := bufio.NewReaderSize(f, 64*1024)
+	const maxLine = 1024 * 1024
+	for {
+		line, tooLong, rerr := readJSONLLine(rd, maxLine)
+		if len(line) > 0 && !tooLong {
+			var ev Event
+			if json.Unmarshal(line, &ev) == nil && (!denialsOnly || ev.Verdict == "deny" || ev.WouldDeny) {
+				if len(ring) < limit {
+					ring = append(ring, ev)
+				} else {
+					ring[next] = ev
+					next = (next + 1) % limit
+				}
+			}
 		}
-		var ev Event
-		if err := json.Unmarshal(line, &ev); err != nil {
-			continue
+		if rerr != nil {
+			if rerr != io.EOF {
+				return nil, rerr
+			}
+			break
 		}
-		if denialsOnly && !(ev.Verdict == "deny" || ev.WouldDeny) {
-			continue
+	}
+	if len(ring) < limit {
+		return ring, nil
+	}
+	out := make([]Event, 0, limit)
+	out = append(out, ring[next:]...)
+	out = append(out, ring[:next]...)
+	return out, nil
+}
+
+// readJSONLLine reads one line (without the newline). Lines over max are drained and reported tooLong.
+func readJSONLLine(rd *bufio.Reader, max int) (line []byte, tooLong bool, err error) {
+	for {
+		chunk, isPrefix, e := rd.ReadLine()
+		if e != nil {
+			return line, tooLong, e
 		}
-		all = append(all, ev)
+		if !tooLong {
+			if len(line)+len(chunk) > max {
+				tooLong, line = true, nil
+			} else {
+				line = append(line, chunk...)
+			}
+		}
+		if !isPrefix {
+			return line, tooLong, nil
+		}
 	}
-	if err := sc.Err(); err != nil {
-		return nil, err
-	}
-	if len(all) > limit {
-		all = all[len(all)-limit:]
-	}
-	return all, nil
 }

@@ -3,6 +3,7 @@ package policy
 import (
 	"fmt"
 	"github.com/nareyko/denyout/internal/inspect"
+	"golang.org/x/net/idna"
 	"net"
 	"net/url"
 	"regexp"
@@ -323,6 +324,10 @@ func UserAllowAll(cfg *Config, host string) bool {
 		}
 		switch r.Reason {
 		case "user_always", "user_once":
+			// A trust grant must name a site, not a whole TLD (e.g. "*.com").
+			if strings.HasPrefix(normalizeHost(r.Host), "*.") && !strings.Contains(normalizeHost(r.Host)[2:], ".") {
+				continue
+			}
 			return true
 		}
 	}
@@ -464,8 +469,20 @@ func rebuildURL(rv RequestView) string {
 	return u.String()
 }
 
+// normalizeHost lower-cases, strips trailing dots ("example.com.." too) and converts
+// Unicode (IDN) names to their ASCII/punycode form so allow/deny rules and the dialed
+// name compare equal. Names idna rejects are returned lower-cased as-is.
 func normalizeHost(host string) string {
-	return strings.ToLower(strings.TrimSuffix(strings.TrimSpace(host), "."))
+	h := strings.ToLower(strings.TrimRight(strings.TrimSpace(host), "."))
+	for _, r := range h {
+		if r > 127 {
+			if a, err := idna.Lookup.ToASCII(h); err == nil {
+				return a
+			}
+			break
+		}
+	}
+	return h
 }
 
 // HostAllowed reports allow-list match.

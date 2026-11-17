@@ -367,8 +367,12 @@ func (s *Server) stripDeniedRedirect(resp *http.Response, start time.Time) {
 	if loc == "" {
 		return
 	}
-	u, err := url.Parse(loc)
-	if err != nil || !u.IsAbs() || u.Hostname() == "" {
+	scheme := "https"
+	if resp.Request != nil && resp.Request.URL != nil && resp.Request.URL.Scheme != "" {
+		scheme = resp.Request.URL.Scheme
+	}
+	u, ok := redirectTarget(loc, scheme)
+	if !ok {
 		return
 	}
 	d, err := s.cfg.Engine.EvaluateURL(u.String())
@@ -396,6 +400,33 @@ func (s *Server) stripDeniedRedirect(resp *http.Response, start time.Time) {
 		resp.Header.Del("Location")
 		resp.Header.Set("X-DenyOut-Redirect", "stripped")
 	}
+}
+
+// redirectTarget returns the absolute URL a client would follow for a Location value, or
+// ok=false when it stays on the same origin (relative path). Protocol-relative ("//host/x")
+// and browser-normalised forms ("/\\host", tabs/newlines inside the value) are cross-host.
+func redirectTarget(loc, baseScheme string) (*url.URL, bool) {
+	clean := strings.Map(func(r rune) rune {
+		if r == '\t' || r == '\r' || r == '\n' {
+			return -1
+		}
+		return r
+	}, strings.TrimSpace(loc))
+	// Browsers treat backslashes like slashes in the authority position.
+	if strings.HasPrefix(clean, "/\\") || strings.HasPrefix(clean, "\\") {
+		clean = "//" + strings.TrimLeft(clean, "/\\")
+	}
+	u, err := url.Parse(clean)
+	if err != nil || u.Hostname() == "" {
+		return nil, false
+	}
+	if !u.IsAbs() {
+		if !strings.HasPrefix(clean, "//") {
+			return nil, false
+		}
+		u.Scheme = baseScheme
+	}
+	return u, true
 }
 
 func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
