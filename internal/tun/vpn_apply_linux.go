@@ -13,13 +13,18 @@ func ApplyVPNEgress(iface string) error {
 	if err := ValidateVPNEgressIface(iface); err != nil {
 		return err
 	}
-	script := strings.Join([]string{
-		fmt.Sprintf("ip route replace default dev %s table %d", iface, VPNTableID),
-		fmt.Sprintf("ip rule del fwmark 0x%x lookup %d priority %d 2>/dev/null || true", DenyOutMark, VPNTableID, VPNRulePriority),
-		fmt.Sprintf("ip rule add fwmark 0x%x lookup %d priority %d", DenyOutMark, VPNTableID, VPNRulePriority),
-	}, "\n")
-	out, err := exec.Command("sh", "-c", script).CombinedOutput()
-	if err != nil {
+	if !WantVPNEgressApply() {
+		return fmt.Errorf("tun: vpn egress apply disabled (set %s=1)", EnvVPNEgressE2E)
+	}
+	tbl := fmt.Sprintf("%d", VPNTableID)
+	mark := fmt.Sprintf("0x%x", DenyOutMark)
+	prio := fmt.Sprintf("%d", VPNRulePriority)
+	// No shell: argv only, so the interface name can never be interpreted.
+	if out, err := exec.Command("ip", "route", "replace", "default", "dev", iface, "table", tbl).CombinedOutput(); err != nil {
+		return fmt.Errorf("tun: vpn egress apply: %w (%s)", err, strings.TrimSpace(string(out)))
+	}
+	_ = exec.Command("ip", "rule", "del", "fwmark", mark, "lookup", tbl, "priority", prio).Run()
+	if out, err := exec.Command("ip", "rule", "add", "fwmark", mark, "lookup", tbl, "priority", prio).CombinedOutput(); err != nil {
 		return fmt.Errorf("tun: vpn egress apply: %w (%s)", err, strings.TrimSpace(string(out)))
 	}
 	return nil

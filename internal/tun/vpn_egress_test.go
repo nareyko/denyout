@@ -62,3 +62,17 @@ func TestFormatVPNEgressRollback(t *testing.T) {
 		t.Fatal(s)
 	}
 }
+
+func TestValidateVPNEgressIfaceRejectsInjection(t *testing.T) {
+	for _, bad := range []string{
+		"wg0;touch${IFS}/x", "wg0$(id)", "wg0`id`", "wg0|id", "wg0&id", "wg 0",
+		"wg0\nid", "wg0/../x", "wg0'", "wg0\"", "wg01234567890123456", " wg0", "wg0 ",
+	} {
+		if err := tun.ValidateVPNEgressIface(bad); err == nil {
+			t.Errorf("expected %q to be rejected", bad)
+		}
+	}
+	if err := tun.ValidateVPNEgressIface("wg0"); err != nil {
+		t.Errorf("wg0 should be valid: %v", err)
+	}
+}
