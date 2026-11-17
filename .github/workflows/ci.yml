@@ -71,6 +71,46 @@ jobs:
       - name: Race tests
         run: go test -race -count=1 ./internal/...
 
+  portable-tests:
+    # Unit tests on the other desktop OSes. Only packages that are platform-neutral
+    # (no root, no nft/pf/WinDivert, no listeners on fixed ports) run here; nothing
+    # in this job mutates the runner's network or trust store. Privileged/network
+    # paths stay Docker-only (docker-security job) or behind DENYOUT_TEST_NO_ELEVATE.
+    # Packages with Unix-only tests (desktop, hostguard, privexec, tun, proxy, ...)
+    # still get compile + vet coverage for all three GOOS in the quality job.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      DENYOUT_TEST_NO_ELEVATE: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.4"
+      - name: Build CLI
+        run: go build ./cmd/denyout-cli
+      - name: Unit tests (platform-neutral packages)
+        run: >-
+          go test -count=1
+          ./internal/platform/...
+          ./internal/policy/...
+          ./internal/secrets/...
+          ./internal/inspect/...
+          ./internal/threatlists/...
+          ./internal/audit/...
+          ./internal/check/...
+          ./internal/cloudsync/...
+          ./internal/lab/...
+      - name: Compile remaining test binaries (no run)
+        shell: bash
+        run: |
+          for p in $(go list ./internal/... ./cmd/denyout-cli); do
+            go test -c -o /dev/null "$p" 2>&1 | grep -v 'no test files' || true
+          done
+
   docker-security:
     # Root helper + installer checks run in containers only (never on the runner's own network).
     runs-on: ubuntu-latest

@@ -25,6 +25,7 @@ Full code review (stability + security); details and residual risks in [`docs/se
 
 ### Added
 
+- **Platform seams:** new `internal/platform` interfaces (`Redirector`, `TrustStore`, `Autostart`) with `platformtest` contract suites and fakes; `hostguard.Apply/Remove/Teardown` and desktop autostart go through them (no behaviour change, signatures unchanged). CI now runs platform-neutral unit tests on `macos-15` and `windows-latest` and compiles all test binaries there. Docs: [`docs/platform-packaging.md`](docs/platform-packaging.md) (incl. missing Apple notarization / Windows Authenticode plan).
 - **Threat lists: Block ads & trackers (default OFF):** Basic toggle gates Advanced OISD / StevenBlack. Category-specific deny reasons (`threat_phishing` / `threat_malware` / `threat_ads`) so tracker hits no longer read as phishing/malware. Legacy `threat_list` still accepted.
 
 ### Fixed

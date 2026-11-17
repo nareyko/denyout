@@ -96,10 +96,10 @@ func Apply(spec Spec) error {
 		_, err := Render(spec)
 		return err
 	}
-	if err := installCA(spec.CACert); err != nil {
+	if err := trustStore.Install(spec.CACert); err != nil {
 		return err
 	}
-	return applyRedirect(spec)
+	return redirector.Apply(spec)
 }
 
 // Remove tears down redirect rules. CA is left in the trust store.
@@ -111,7 +111,7 @@ func Remove(spec Spec) error {
 			spec.UID = uid
 		}
 	}
-	return removeRedirect(spec)
+	return redirector.Remove(spec)
 }
 
 // Teardown removes redirect rules and the system CA installed by Apply.
@@ -119,10 +119,10 @@ func Remove(spec Spec) error {
 func Teardown(spec Spec) error {
 	if err := Remove(spec); err != nil {
 		// Still attempt CA uninstall even if rules were already gone.
-		_ = uninstallCA()
+		_ = trustStore.Remove()
 		return err
 	}
-	return uninstallCA()
+	return trustStore.Remove()
 }
 
 // Render returns the platform rule text for tests / dry-run (no privileges).
