@@ -167,10 +167,6 @@ func (a *App) handleControlDenyEvent(w http.ResponseWriter, r *http.Request) {
 	_, _ = fmt.Fprint(w, `{"ok":true}`)
 }
 
-func (a *App) persistAlwaysHost(host string) error {
-	return a.persistAlwaysHostFrom(host, "")
-}
-
 func (a *App) persistAlwaysHostFrom(host, source string) error {
 	host = strings.TrimSpace(host)
 	if host == "" {

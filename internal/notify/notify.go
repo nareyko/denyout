@@ -352,11 +352,6 @@ func emitAllowedLocked(kind Kind) (ok bool, reason string) {
 	return true, ""
 }
 
-func emitAllowed(kind Kind) bool {
-	ok, _ := emitAllowedLocked(kind)
-	return ok
-}
-
 // Emit shows an OS notification only for a whitelisted kind (and when level allows).
 func Emit(kind Kind, title, body string) {
 	mu.Lock()
