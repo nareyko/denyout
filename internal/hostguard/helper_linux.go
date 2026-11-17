@@ -454,124 +454,85 @@ func handleHelperConn(c net.Conn, ownerUID int) {
 	if err != nil {
 		return
 	}
-	parts := strings.Fields(strings.TrimSpace(line))
-	if len(parts) < 3 {
-		_, _ = c.Write([]byte("ERR bad request\n"))
+	req, perr := ParseRequest(line, ownerUID)
+	if perr != nil {
+		_, _ = c.Write([]byte(encodeReply(Request{JSON: strings.HasPrefix(strings.TrimSpace(line), "{")}, "", perr)))
 		return
 	}
-	verb := strings.ToLower(parts[0])
-	port, _ := strconv.Atoi(parts[1])
-	// Redirect rules always target the configured owner; never trust a client uid
-	// (a zero or foreign uid would let the owner redirect root's or others' traffic).
-	uid := ownerUID
-	ca := ""
-	if len(parts) >= 4 {
-		ca = parts[3]
-	}
-	if verb == "apply" {
-		if err := validateHelperCAPath(ca, ownerUID); err != nil {
-			_, _ = c.Write([]byte("ERR " + err.Error() + "\n"))
-			return
-		}
-	}
-	allowQUIC := false
-	if len(parts) >= 5 && (parts[4] == "1" || strings.EqualFold(parts[4], "true") || parts[4] == "allow_quic") {
-		allowQUIC = true
-	}
-	spec := Spec{ProxyPort: port, UID: uid, CACert: ca, AllowQUIC: allowQUIC}
 	helperOpMu.Lock()
-	defer helperOpMu.Unlock()
-	var opErr error
-	switch verb {
+	reply, xerr := executeHelperRequest(req)
+	helperOpMu.Unlock()
+	_, _ = c.Write([]byte(encodeReply(req, reply, xerr)))
+	// After uninstall teardown, drop the systemd helper so uninstall does not
+	// leave helper-serve running with a deleted binary path.
+	if req.Verb == "teardown" && xerr == nil {
+		_ = UninstallHelper()
+	}
+}
+
+// executeHelperRequest runs one validated request. The caller holds helperOpMu.
+func executeHelperRequest(req Request) (string, error) {
+	spec := Spec{ProxyPort: req.Port, UID: req.UID, CACert: req.CA, AllowQUIC: req.AllowQUIC}
+	switch req.Verb {
 	case "caps", "version":
 		exe := ""
 		if p, e := SelfExe(); e == nil {
 			exe = filepath.Base(p)
 		}
-		_, _ = c.Write([]byte(FormatCapsReply(exe, CapQUIC, CapTUN, CapVPN) + "\n"))
-		return
+		return FormatCapsReply(exe, CapQUIC, CapTUN, CapVPN), nil
 	case "apply":
 		_ = tun.GlobalRuntime().StopReal()
-		opErr = Apply(spec)
-		if opErr == nil {
-			lastApplyMu.Lock()
-			lastApplySpec = spec
-			lastApplyOK = true
-			lastApplyMu.Unlock()
-			persistHelperState(spec)
+		if err := Apply(spec); err != nil {
+			return "", err
 		}
+		lastApplyMu.Lock()
+		lastApplySpec = spec
+		lastApplyOK = true
+		lastApplyMu.Unlock()
+		persistHelperState(spec)
 	case "remove":
 		clearApplied() // Protect Off: the watchdog must not re-apply rules later
 		_ = tun.GlobalRuntime().StopReal()
 		_ = tun.RemoveVPNEgress()
-		opErr = Remove(spec)
+		if err := Remove(spec); err != nil {
+			return "", err
+		}
 	case "teardown":
 		clearApplied()
 		_ = tun.GlobalRuntime().StopReal()
 		_ = tun.RemoveVPNEgress()
-		opErr = Teardown(spec)
+		if err := Teardown(spec); err != nil {
+			return "", err
+		}
 	case "uninstall-helper":
 		clearApplied()
 		_ = tun.GlobalRuntime().StopReal()
 		_ = tun.RemoveVPNEgress()
-		opErr = UninstallHelper()
+		if err := UninstallHelper(); err != nil {
+			return "", err
+		}
 	case "quic-stats":
-		st, rerr := ReadQUICDropStats()
-		if rerr != nil {
-			_, _ = c.Write([]byte("ERR " + rerr.Error() + "\n"))
-			return
+		st, err := ReadQUICDropStats()
+		if err != nil {
+			return "", err
 		}
 		st.Source = "nft"
-		_, _ = c.Write([]byte("OK quic1 " + FormatQUICDropStatsLine(st) + "\n"))
-		return
+		return "OK quic1 " + FormatQUICDropStatsLine(st), nil
 	case "tun-start", "tun-stop", "tun-stats":
-		real, mitm := false, false
-		for _, p := range parts[3:] {
-			switch strings.ToLower(p) {
-			case "real", "real=1":
-				real = true
-			case "mitm", "mitm=1":
-				mitm = true
-			}
-		}
-		reply, rerr := helperTunVerb(verb, uid, real, mitm)
-		if rerr != nil {
-			_, _ = c.Write([]byte("ERR " + rerr.Error() + "\n"))
-			return
-		}
-		_, _ = c.Write([]byte(reply + "\n"))
-		return
+		return helperTunVerb(req.Verb, req.UID, req.Real, req.Mitm)
 	case "vpn-egress-apply":
-		iface := ca // 4th field
-		if iface == "" || iface == "-" {
-			_, _ = c.Write([]byte("ERR vpn iface required\n"))
-			return
+		if err := tun.ApplyVPNEgress(req.Iface); err != nil {
+			return "", err
 		}
-		if err := tun.ApplyVPNEgress(iface); err != nil {
-			_, _ = c.Write([]byte("ERR " + err.Error() + "\n"))
-			return
-		}
-		_, _ = c.Write([]byte("OK " + CapVPN + " applied iface=" + iface + "\n"))
-		return
+		return "OK " + CapVPN + " applied iface=" + req.Iface, nil
 	case "vpn-egress-remove":
 		_ = tun.RemoveVPNEgress()
-		_, _ = c.Write([]byte("OK " + CapVPN + " removed\n"))
-		return
+		return "OK " + CapVPN + " removed", nil
 	default:
-		_, _ = c.Write([]byte("ERR unknown verb\n"))
-		return
-	}
-	if opErr != nil {
-		_, _ = c.Write([]byte("ERR " + opErr.Error() + "\n"))
-		return
+		return "", fmt.Errorf("unknown verb")
 	}
 	// Cap tag lets clients detect a pre-QUIC helper (plain "OK") and re-elevate once.
-	_, _ = c.Write([]byte("OK quic1\n"))
-	// After uninstall teardown, drop the systemd helper so uninstall does not
-	// leave helper-serve running with a deleted binary path.
-	if verb == "teardown" {
-		_ = UninstallHelper()
-	}
+	return "OK quic1", nil
 }
 
 func peerUID(c net.Conn) int {
