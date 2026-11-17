@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
+	"syscall"
 
 	"github.com/nareyko/denyout/internal/notify"
 	"github.com/nareyko/denyout/internal/proxy"
@@ -80,7 +82,18 @@ func Exec(opts Options) (int, error) {
 	if err := cmd.Start(); err != nil {
 		return 2, err
 	}
+	// The child runs in its own process group, so Ctrl-C/SIGTERM only reaches us:
+	// forward them, otherwise the child is orphaned without its proxy and CA.
+	sigc := make(chan os.Signal, 2)
+	signal.Notify(sigc, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		for sig := range sigc {
+			_ = cmd.Process.Signal(sig)
+		}
+	}()
 	waitErr := cmd.Wait()
+	signal.Stop(sigc)
+	close(sigc)
 	killProcGroup(cmd)
 
 	code := 0

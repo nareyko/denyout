@@ -109,8 +109,17 @@ curl_fetch() {
   return 1
 }
 
+# Release tags are interpolated into download URLs: accept only plain versions.
+check_tag() {
+  case "$1" in
+    ''|*[!A-Za-z0-9._-]*|*..*|-*)
+      echo "denyout install: invalid version/tag: $1" >&2; exit 1 ;;
+  esac
+}
+
 resolve_version() {
   if [ -n "${DENYOUT_VERSION:-}" ]; then
+    check_tag "$DENYOUT_VERSION"
     echo "$DENYOUT_VERSION"
     return
   fi
@@ -144,7 +153,10 @@ esac
 ARCHIVE="denyout-cli_${VER_NUM}_${os}_${arch}.tar.gz"
 SUMS="SHA256SUMS"
 if [ -n "$BASE_URL" ]; then
-  ASSET_BASE="$BASE_URL"
+  case "$BASE_URL" in
+    https://*|file://*) ASSET_BASE="$BASE_URL" ;;
+    *) echo "denyout install: BASE_URL must be https:// (or file:// for local tests)" >&2; exit 1 ;;
+  esac
 else
   ASSET_BASE="https://github.com/${REPO}/releases/download/${TAG}"
 fi
@@ -183,10 +195,7 @@ fetch "${TMP}/${SUMS}" "${ASSET_BASE}/${SUMS}"
 
 # Verify checksum for this archive line in SHA256SUMS
 expected=$(awk -v f="$ARCHIVE" '$2 == f || $2 == "./"f {print $1; exit}' "${TMP}/${SUMS}")
-if [ -z "$expected" ]; then
-  # Some generators put only the basename; try matching end of field
-  expected=$(awk -v f="$ARCHIVE" 'index($2, f) {print $1; exit}' "${TMP}/${SUMS}")
-fi
+# Exact file-name match only (no substring match against other archives).
 if [ -z "$expected" ]; then
   echo "denyout install: ${ARCHIVE} not listed in ${SUMS}" >&2
   exit 1
