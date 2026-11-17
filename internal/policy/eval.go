@@ -94,7 +94,12 @@ func (e *Engine) EvaluateURL(rawURL string) (Decision, error) {
 
 // Evaluate applies D04 order.
 func (e *Engine) Evaluate(rv RequestView) Decision {
-	cfg := e.Cfg
+	// Snapshot under the lock: AllowHost/RevokeHost mutate Cfg.Allow concurrently
+	// and the scanners below iterate it without holding e.mu.
+	e.mu.Lock()
+	snap := *e.Cfg
+	e.mu.Unlock()
+	cfg := &snap
 	host := normalizeHost(rv.DestHost)
 	if host == "" {
 		return Decision{Verdict: "deny", Reasons: []string{ReasonInvalidURL}}
@@ -163,7 +168,7 @@ func (e *Engine) RevokeHost(host string) {
 	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	out := e.Cfg.Allow[:0]
+	out := make([]Rule, 0, len(e.Cfg.Allow)) // new slice: readers hold the old one
 	for _, r := range e.Cfg.Allow {
 		if strings.EqualFold(r.Host, host) {
 			continue
