@@ -3,6 +3,7 @@ package desktop
 import (
 	"embed"
 	"fmt"
+	"github.com/nareyko/denyout/internal/profiles"
 	"sort"
 	"strings"
 
@@ -22,11 +23,7 @@ type AllowPack struct {
 }
 
 // AppliedPack tracks which pack hosts were added to a profile (for Undo pack).
-type AppliedPack struct {
-	ID      string   `yaml:"id" json:"id"`
-	Version int      `yaml:"version" json:"version"`
-	Hosts   []string `yaml:"hosts" json:"hosts"` // hosts this pack introduced
-}
+type AppliedPack = profiles.AppliedPack
 
 // ListAllowPacks returns embedded starter packs (sorted by id).
 func ListAllowPacks() ([]AllowPack, error) {

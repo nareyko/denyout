@@ -2,6 +2,7 @@ package desktop
 
 import (
 	"encoding/json"
+	"github.com/nareyko/denyout/internal/appdata"
 	"os"
 	"path/filepath"
 	"strings"
@@ -127,27 +128,13 @@ func DefaultState() State {
 }
 
 // StatePath returns the desktop state file path.
-func StatePath() string {
-	cfg := os.Getenv("XDG_CONFIG_HOME")
-	if cfg == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "denyout.json"
-		}
-		cfg = filepath.Join(home, ".config")
-	}
-	return filepath.Join(cfg, "denyout", "desktop.json")
-}
+func StatePath() string { return appdata.StatePath() }
 
 // ProfilesDir is ~/.config/denyout/profiles.
-func ProfilesDir() string {
-	return filepath.Join(filepath.Dir(StatePath()), "profiles")
-}
+func ProfilesDir() string { return appdata.ProfilesDir() }
 
 // CADir is the persistent desktop CA directory.
-func CADir() string {
-	return filepath.Join(filepath.Dir(StatePath()), "ca")
-}
+func CADir() string { return appdata.CADir() }
 
 // LoadState reads desktop state (defaults if missing).
 func LoadState() State {
