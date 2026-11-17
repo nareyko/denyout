@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/nareyko/denyout/internal/secrets"
 )
 
 const jsonlRotateBytes = 8 << 20 // 8 MiB
@@ -46,7 +48,7 @@ func (a *App) logPolicyDeny(source, host string, reasons []string, url, process 
 	fields := map[string]any{
 		"host":     host,
 		"reasons":  reasons,
-		"url":      strings.TrimSpace(url),
+		"url":      secrets.RedactURL(strings.TrimSpace(url)),
 		"profile":  profile,
 		"ask_mode": ask,
 		"source":   source,
@@ -56,13 +58,16 @@ func (a *App) logPolicyDeny(source, host string, reasons []string, url, process 
 	}
 	LogBlock("deny", fields)
 	for _, r := range reasons {
-		if r == "threat_list" {
+		switch r {
+		case "threat_list", "threat_phishing", "threat_malware", "threat_ads":
 			LogBlock("threat_deny", map[string]any{
-				"host": host, "reasons": reasons, "url": strings.TrimSpace(url),
+				"host": host, "reasons": reasons, "url": secrets.RedactURL(strings.TrimSpace(url)),
 				"profile": profile, "source": source,
 			})
-			break
+		default:
+			continue
 		}
+		break
 	}
 }
 

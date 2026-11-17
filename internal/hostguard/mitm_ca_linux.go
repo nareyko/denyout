@@ -27,7 +27,11 @@ func mitmConfigFromCA(caPath string) (tun.MITMConfig, error) {
 	if err != nil {
 		return zero, err
 	}
-	pool := x509.NewCertPool()
+	// Verify real origins against the system trust store (plus the DenyOut CA).
+	pool, perr := x509.SystemCertPool()
+	if perr != nil || pool == nil {
+		pool = x509.NewCertPool()
+	}
 	if pem, err := os.ReadFile(ca.CertFile()); err == nil {
 		pool.AppendCertsFromPEM(pem)
 	}
@@ -43,7 +47,8 @@ func mitmConfigFromCA(caPath string) (tun.MITMConfig, error) {
 			}
 			return &leaf, nil
 		},
-		RootCAs:            pool,
-		InsecureSkipVerify: true, // lab origins in dogfood may be self-signed
+		RootCAs: pool,
+		// Only for lab dogfood with self-signed origins; never on by default.
+		InsecureSkipVerify: os.Getenv("DENYOUT_TLS_INSECURE_UPSTREAM") == "1",
 	}, nil
 }

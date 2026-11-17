@@ -119,6 +119,9 @@ func (a *App) applyRemoteDocument(doc cloudsync.Document) error {
 		if err := a.UISetBlockStronger(prefs.BlockStronger); err != nil {
 			threatErr = err
 		}
+		if err := a.UISetBlockAdsTrackers(prefs.BlockAdsTrackers); err != nil {
+			threatErr = err
+		}
 		if prefs.ThreatPollHours > 0 {
 			if err := a.UISetThreatPollHours(prefs.ThreatPollHours); err != nil {
 				threatErr = err
@@ -145,10 +148,11 @@ func (a *App) applyRemoteDocument(doc cloudsync.Document) error {
 func (a *App) threatSyncPrefs() ThreatSyncPrefs {
 	v := a.GetThreatLists()
 	return ThreatSyncPrefs{
-		BlockPhishing:   v.BlockPhishing,
-		BlockMalware:    v.BlockMalware,
-		BlockStronger:   v.BlockStronger,
-		ThreatPollHours: v.PollHours,
+		BlockPhishing:    v.BlockPhishing,
+		BlockMalware:     v.BlockMalware,
+		BlockStronger:    v.BlockStronger,
+		BlockAdsTrackers: v.BlockAdsTrackers,
+		ThreatPollHours:  v.PollHours,
 	}
 }
 

@@ -24,6 +24,7 @@ type SessionCA struct {
 	dir     string
 	mu      sync.Mutex
 	leaves  map[string]tls.Certificate
+	leafAt  map[string]time.Time
 }
 
 // NewSessionCA creates a CA and writes PEM files under dir (0600).
@@ -144,8 +145,12 @@ func (c *SessionCA) Fingerprint() string {
 func (c *SessionCA) Leaf(host string) (tls.Certificate, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if leaf, ok := c.leaves[host]; ok {
-		return leaf, nil
+	if leaf, ok := c.leaves[host]; ok && time.Since(c.leafAt[host]) < 12*time.Hour {
+		return leaf, nil // leaves live 24h; refresh well before expiry on long-running desktops
+	}
+	if len(c.leaves) >= 2048 { // bound memory: SNI names are attacker-chosen
+		c.leaves = map[string]tls.Certificate{}
+		c.leafAt = map[string]time.Time{}
 	}
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -182,7 +187,11 @@ func (c *SessionCA) Leaf(host string) (tls.Certificate, error) {
 	if err != nil {
 		return tls.Certificate{}, err
 	}
+	if c.leafAt == nil {
+		c.leafAt = map[string]time.Time{}
+	}
 	c.leaves[host] = leaf
+	c.leafAt[host] = time.Now()
 	return leaf, nil
 }
 

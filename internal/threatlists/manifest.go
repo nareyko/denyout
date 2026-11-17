@@ -4,10 +4,27 @@ package threatlists
 type Category string
 
 const (
-	CategoryPhishing  Category = "phishing"
-	CategoryMalware   Category = "malware"
+	CategoryPhishing    Category = "phishing"
+	CategoryMalware     Category = "malware"
+	CategoryAdsTrackers Category = "ads_trackers"
+	// CategoryTelemetry is the legacy on-disk alias for ads_trackers (status.json).
 	CategoryTelemetry Category = "telemetry"
 )
+
+// NormalizeCategory maps legacy aliases to the current catalog category.
+func NormalizeCategory(c Category) Category {
+	switch c {
+	case CategoryTelemetry, "ads", "trackers":
+		return CategoryAdsTrackers
+	default:
+		return c
+	}
+}
+
+// IsAdsTrackers reports whether c is the ads/trackers bucket (incl. legacy telemetry).
+func IsAdsTrackers(c Category) bool {
+	return NormalizeCategory(c) == CategoryAdsTrackers
+}
 
 // Format is the on-wire list format.
 type Format string
@@ -92,7 +109,7 @@ func AdvancedCatalog() []Subscription {
 		{
 			ID:         IDOISDSmall,
 			URL:        "https://small.oisd.nl/domainswild",
-			Category:   CategoryTelemetry, // closest bucket; UI labels as ads/trackers job
+			Category:   CategoryAdsTrackers,
 			Format:     FormatDomains,
 			Enabled:    false,
 			LicenseURL: "https://oisd.nl/",
@@ -101,7 +118,7 @@ func AdvancedCatalog() []Subscription {
 		{
 			ID:         IDOISDBig,
 			URL:        "https://big.oisd.nl/domainswild",
-			Category:   CategoryTelemetry,
+			Category:   CategoryAdsTrackers,
 			Format:     FormatDomains,
 			Enabled:    false,
 			LicenseURL: "https://oisd.nl/",
@@ -110,7 +127,7 @@ func AdvancedCatalog() []Subscription {
 		{
 			ID:         IDStevenBlack,
 			URL:        "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
-			Category:   CategoryTelemetry,
+			Category:   CategoryAdsTrackers,
 			Format:     FormatHosts,
 			Enabled:    false,
 			LicenseURL: "https://github.com/StevenBlack/hosts",

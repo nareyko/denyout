@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { Tip, tipGone } from "../components/Tip";
+import { humanReasonLabel } from "../reasonLabels";
 import { api, DenialView, LocalAnalytics, UISnapshot } from "../wails";
 
 function timelineLabel(t: string): string {
@@ -31,7 +32,10 @@ const REASONS: { value: string; label: string }[] = [
  { value: "host_denied", label: "Host denied" },
  { value: "unsafe_ip", label: "Unsafe IP" },
  { value: "ip_literal", label: "Raw IP (agents)" },
- { value: "threat_list", label: "Threat list" },
+ { value: "threat_phishing", label: "Phishing list" },
+ { value: "threat_malware", label: "Malware list" },
+ { value: "threat_ads", label: "Ads / trackers list" },
+ { value: "threat_list", label: "Threat list (legacy)" },
  { value: "host_not_allowed", label: "Host not allowed" },
 ];
 
@@ -469,10 +473,19 @@ export function Activity({
  <dl>
  <dt>Reason codes</dt>
  <dd className="mono" title={selected.reasons?.join(", ")}>
- {selected.reasons?.join(", ") || " - "}
+ {(selected.reasons || []).map(humanReasonLabel).join(", ") || " - "}
  </dd>
  <dt>Primary</dt>
- <dd className="mono">{selected.primary_reason || " - "}</dd>
+ <dd title={selected.primary_reason || undefined}>
+ {selected.primary_reason
+ ? humanReasonLabel(selected.primary_reason)
+ : " - "}
+ {selected.primary_reason ? (
+ <span className="mono muted" style={{ marginLeft: 6 }}>
+ ({selected.primary_reason})
+ </span>
+ ) : null}
+ </dd>
  <dt>Method</dt>
  <dd>{selected.method || " - "}</dd>
  <dt>Process</dt>

@@ -4,20 +4,27 @@ package hostguard
 
 import (
 	"bufio"
+	"context"
+	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/nareyko/denyout/internal/tun"
 )
 
 var (
+	helperOpMu    sync.Mutex // serializes state-changing helper verbs
+	tunSuppressed bool       // guarded by lastApplyMu: TUN currently owns IPv4 TCP
 	lastApplyMu   sync.Mutex
 	lastApplySpec Spec
 	lastApplyOK   bool
@@ -193,16 +200,29 @@ func helperTunVerb(verb string, uid int, real, mitm bool) (string, error) {
 	}
 }
 
+func clearApplied() {
+	lastApplyMu.Lock()
+	lastApplyOK = false
+	tunSuppressed = false
+	lastApplyMu.Unlock()
+	_ = os.Remove(helperStateFile)
+}
+
 func suppressT0ForTUN(suppress bool) {
 	lastApplyMu.Lock()
 	defer lastApplyMu.Unlock()
 	if !lastApplyOK || lastApplySpec.ProxyPort <= 0 {
 		return
 	}
+	tunSuppressed = suppress
 	s := lastApplySpec
 	if suppress {
-		s.AllowQUIC = true // omit denyout-block-quic; TUN steers/drops instead
-		s.TunTCP = true    // omit TCP redirect; gVisor owns TCP
+		wantBlockQUIC := !s.AllowQUIC
+		s.AllowQUIC = true // omit IPv4 denyout-block-quic; TUN steers/drops instead
+		s.TunTCP = true    // omit IPv4 TCP redirect; gVisor owns TCP
+		// TUN only carries IPv4: keep IPv6 redirect + QUIC drop (no IPv6 bypass).
+		s.TunV6Guard = true
+		s.TunV6DropQUIC = wantBlockQUIC
 	}
 	_ = Apply(s)
 }
@@ -265,7 +285,15 @@ func InstallHelper(ownerUID int) error {
 			ownerUID = u
 		}
 	}
+	if ownerUID <= 0 {
+		return fmt.Errorf("hostguard helper needs a non-root owner uid (run via the desktop app or pass --uid)")
+	}
 	exe, err := SelfExe()
+	if err != nil {
+		return err
+	}
+	// Never point a root service at a binary an unprivileged user can replace.
+	exe, err = trustedHelperExe(exe)
 	if err != nil {
 		return err
 	}
@@ -378,10 +406,39 @@ func ServeHelper() error {
 		return err
 	}
 	defer ln.Close()
-	_ = os.Chmod(helperSockPath, 0o666) // peercred still gates; world-connectable then auth by uid
+	// Stale TUN/VPN state from a previous crashed helper must not linger.
+	_ = tun.GlobalRuntime().StopReal()
+	_ = tun.RemoveVPNEgress()
+	// On SIGTERM/SIGINT (systemctl stop) remove our rules so a stopped helper
+	// never leaves a REDIRECT to a dead proxy (orphan blackhole).
+	sigc := make(chan os.Signal, 1)
+	signal.Notify(sigc, syscall.SIGTERM, syscall.SIGINT)
+	go func() {
+		<-sigc
+		helperOpMu.Lock()
+		_ = tun.GlobalRuntime().StopReal()
+		_ = tun.RemoveVPNEgress()
+		_ = removeRedirect(Spec{})
+		_ = os.Remove(helperSockPath)
+		helperOpMu.Unlock()
+		_ = ln.Close()
+	}()
+	wctx, wcancel := context.WithCancel(context.Background())
+	defer wcancel()
+	go runWatchdog(wctx)
+	// Owner-only socket (plus root); SO_PEERCRED is checked again per connection.
+	if owner > 0 {
+		_ = os.Chown(helperSockPath, owner, 0)
+		_ = os.Chmod(helperSockPath, 0o600)
+	} else {
+		_ = os.Chmod(helperSockPath, 0o600) // root only until an owner is configured
+	}
 	for {
 		c, err := ln.Accept()
 		if err != nil {
+			if errors.Is(err, net.ErrClosed) {
+				return nil // clean shutdown
+			}
 			return err
 		}
 		go handleHelperConn(c, owner)
@@ -390,12 +447,12 @@ func ServeHelper() error {
 
 func handleHelperConn(c net.Conn, ownerUID int) {
 	defer c.Close()
-	ucred := peerUID(c)
-	if ownerUID > 0 && ucred > 0 && ucred != ownerUID && ucred != 0 {
+	if !helperPeerAuthorized(ownerUID, peerUID(c)) {
 		_, _ = c.Write([]byte("ERR unauthorized\n"))
 		return
 	}
-	line, err := bufio.NewReader(c).ReadString('\n')
+	_ = c.SetDeadline(time.Now().Add(30 * time.Second))
+	line, err := bufio.NewReader(io.LimitReader(c, 4096)).ReadString('\n')
 	if err != nil {
 		return
 	}
@@ -406,16 +463,26 @@ func handleHelperConn(c net.Conn, ownerUID int) {
 	}
 	verb := strings.ToLower(parts[0])
 	port, _ := strconv.Atoi(parts[1])
-	uid, _ := strconv.Atoi(parts[2])
+	// Redirect rules always target the configured owner; never trust a client uid
+	// (a zero or foreign uid would let the owner redirect root's or others' traffic).
+	uid := ownerUID
 	ca := ""
 	if len(parts) >= 4 {
 		ca = parts[3]
+	}
+	if verb == "apply" {
+		if err := validateHelperCAPath(ca, ownerUID); err != nil {
+			_, _ = c.Write([]byte("ERR " + err.Error() + "\n"))
+			return
+		}
 	}
 	allowQUIC := false
 	if len(parts) >= 5 && (parts[4] == "1" || strings.EqualFold(parts[4], "true") || parts[4] == "allow_quic") {
 		allowQUIC = true
 	}
 	spec := Spec{ProxyPort: port, UID: uid, CACert: ca, AllowQUIC: allowQUIC}
+	helperOpMu.Lock()
+	defer helperOpMu.Unlock()
 	var opErr error
 	switch verb {
 	case "caps", "version":
@@ -435,14 +502,17 @@ func handleHelperConn(c net.Conn, ownerUID int) {
 			lastApplyMu.Unlock()
 		}
 	case "remove":
+		clearApplied() // Protect Off: the watchdog must not re-apply rules later
 		_ = tun.GlobalRuntime().StopReal()
 		_ = tun.RemoveVPNEgress()
 		opErr = Remove(spec)
 	case "teardown":
+		clearApplied()
 		_ = tun.GlobalRuntime().StopReal()
 		_ = tun.RemoveVPNEgress()
 		opErr = Teardown(spec)
 	case "uninstall-helper":
+		clearApplied()
 		_ = tun.GlobalRuntime().StopReal()
 		_ = tun.RemoveVPNEgress()
 		opErr = UninstallHelper()

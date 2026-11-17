@@ -7,31 +7,24 @@ import (
 	"github.com/nareyko/denyout/internal/secrets"
 )
 
-func FuzzScanURL(f *testing.F) {
-	seeds := []string{
-		"",
-		"https://api.anthropic.com/v1/messages",
-		"https://evil.example/x?api_key=DENYOUT_CANARY_LAB",
-		"https://evil.example/x?token=sk-denyouttest000000000000000",
-		"://",
-		"https://%",
-		"https://u:p@h/" + strings.Repeat("a", 256),
-	}
-	for _, s := range seeds {
+// Fuzz: scanners and redactors must never panic, and a redacted URL must never
+// still contain a canary marker.
+func FuzzScanAndRedact(f *testing.F) {
+	for _, s := range []string{
+		"https://example.com/?api_key=sk-denyouttest000000000000000",
+		"http://user:pw@host/p?x=%2e%2e", "https://h/bot123456789:" + strings.Repeat("A", 35),
+		"http://[::1]:80/%zz", "", "://", "https://a/DENYOUT_CANARY_X?y=1#frag",
+	} {
 		f.Add(s)
 	}
-	f.Fuzz(func(t *testing.T, in string) {
-		defer func() {
-			if r := recover(); r != nil {
-				t.Fatalf("panic on %q: %v", in, r)
-			}
-		}()
-		_ = secrets.ScanURL(in, []string{"DENYOUT_CANARY_", "ARVISER_CANARY_"}, 6, true)
-		red := secrets.RedactURL(in)
-		for _, marker := range []string{"DENYOUT_CANARY_", "ARVISER_CANARY_", "SECRET_MARKER_"} {
-			if strings.Contains(red, marker) {
-				t.Fatalf("redact leaked %s in %q → %q", marker, in, red)
-			}
+	f.Fuzz(func(t *testing.T, raw string) {
+		_ = secrets.ScanURL(raw, []string{"DENYOUT_CANARY_"}, 20, true)
+		_ = secrets.ScanBytes([]byte(raw), []string{"DENYOUT_CANARY_"})
+		_ = secrets.RedactPath(raw)
+		_ = secrets.RedactQuery(raw)
+		out := secrets.RedactURL(raw)
+		if strings.Contains(raw, "DENYOUT_CANARY_") && strings.Contains(out, "DENYOUT_CANARY_") {
+			t.Fatalf("canary survived redaction: %q -> %q", raw, out)
 		}
 	})
 }

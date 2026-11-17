@@ -20,6 +20,9 @@ func TestGetThreatListsDefaults(t *testing.T) {
 	if v.BlockStronger {
 		t.Fatal("Stronger must default off")
 	}
+	if v.BlockAdsTrackers {
+		t.Fatal("ads/trackers must default off")
+	}
 	if v.StrongerWarning == "" {
 		t.Fatal("stronger warning copy required")
 	}
@@ -36,9 +39,48 @@ func TestGetThreatListsDefaults(t *testing.T) {
 		if f.Enabled {
 			t.Fatalf("advanced must default off: %+v", f)
 		}
+		if f.Category != string(threatlists.CategoryAdsTrackers) {
+			t.Fatalf("advanced category: %+v", f)
+		}
 	}
 	if v.AdvancedWarning == "" {
 		t.Fatal("advanced warning required")
+	}
+	if v.AdsTrackersWarning == "" {
+		t.Fatal("ads trackers master warning required")
+	}
+	if v.AggressiveAdsWarning == "" {
+		t.Fatal("aggressive ads warning required")
+	}
+}
+
+func TestBlockAdsTrackersMaster(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	a := &App{opts: Options{Version: "test"}, state: DefaultState()}
+	_ = a.GetThreatLists()
+	st := a.ensureThreatStore(false)
+	if st == nil {
+		t.Fatal("store")
+	}
+	// Enable stevenblack without network by flipping store; master should read as on.
+	if err := st.SetEnabled(threatlists.IDStevenBlack, true); err != nil {
+		t.Fatal(err)
+	}
+	v := a.GetThreatLists()
+	if !v.BlockAdsTrackers {
+		t.Fatal("master should be on when any advanced feed enabled")
+	}
+	if err := a.UISetBlockAdsTrackers(false); err != nil {
+		t.Fatal(err)
+	}
+	v = a.GetThreatLists()
+	if v.BlockAdsTrackers {
+		t.Fatal("master off")
+	}
+	for _, f := range v.AdvancedFeeds {
+		if f.Enabled {
+			t.Fatalf("all advanced must be off: %+v", f)
+		}
 	}
 }
 

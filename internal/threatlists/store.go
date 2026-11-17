@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sync"
 	"time"
 )
@@ -55,7 +56,10 @@ func Open(dir string) (*Store, error) {
 		},
 	}
 	if err := s.loadStatus(); err != nil && !os.IsNotExist(err) {
-		return nil, err
+		// Self-heal: quarantine an unreadable/corrupt status file instead of failing
+		// Open (which silently disabled all threat protection).
+		_ = os.Rename(s.statusPath(), s.statusPath()+".corrupt")
+		s.status = StatusFile{PollHours: DefaultPollHours, Feeds: make(map[string]FeedStatus)}
 	}
 	if s.status.Feeds == nil {
 		s.status.Feeds = make(map[string]FeedStatus)
@@ -66,6 +70,8 @@ func Open(dir string) (*Store, error) {
 	}
 	return s, nil
 }
+
+var feedIDRE = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,64}$`)
 
 func (s *Store) statusPath() string {
 	return filepath.Join(s.Dir, "status.json")
@@ -85,7 +91,31 @@ func (s *Store) loadStatus() error {
 		return fmt.Errorf("threatlists status: %w", err)
 	}
 	s.status = st
+	s.normalizeFeedCategoriesLocked()
 	return nil
+}
+
+// normalizeFeedCategoriesLocked rewrites legacy category aliases (e.g. telemetry → ads_trackers)
+// and aligns category/format with the product catalog when known.
+func (s *Store) normalizeFeedCategoriesLocked() {
+	changed := false
+	for id, st := range s.status.Feeds {
+		norm := NormalizeCategory(st.Category)
+		if sub, ok := CatalogByID(id); ok {
+			norm = sub.Category
+			if st.Format == "" {
+				st.Format = sub.Format
+			}
+		}
+		if st.Category != norm {
+			st.Category = norm
+			changed = true
+		}
+		s.status.Feeds[id] = st
+	}
+	if changed {
+		_ = s.saveStatusLocked()
+	}
 }
 
 func (s *Store) saveStatusLocked() error {
@@ -102,12 +132,12 @@ func (s *Store) saveStatusLocked() error {
 
 func (s *Store) loadCachedFeeds() error {
 	for id, st := range s.status.Feeds {
+		if !feedIDRE.MatchString(id) { // ids come from status.json: never build paths from junk
+			continue
+		}
 		raw, err := os.ReadFile(s.feedPath(id))
 		if err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
-			return err
+			continue // one unreadable feed must not disable the others
 		}
 		format := st.Format
 		if format == "" {
@@ -171,7 +201,12 @@ func (s *Store) EnsureCatalogDefaults() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, sub := range append(CoreCatalog(), AdvancedCatalog()...) {
-		if _, ok := s.status.Feeds[sub.ID]; ok {
+		if st, ok := s.status.Feeds[sub.ID]; ok {
+			st.Category = sub.Category
+			if st.Format == "" {
+				st.Format = sub.Format
+			}
+			s.status.Feeds[sub.ID] = st
 			continue
 		}
 		s.status.Feeds[sub.ID] = FeedStatus{
@@ -203,7 +238,7 @@ func (s *Store) Contains(host string, category Category) (feedID string, ok bool
 		if !st.Enabled || !st.Active {
 			continue
 		}
-		if category != "" && st.Category != category {
+		if category != "" && NormalizeCategory(st.Category) != NormalizeCategory(category) {
 			continue
 		}
 		if _, hit := set[host]; hit {

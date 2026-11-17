@@ -107,3 +107,14 @@ func TestClientDeleteAccount(t *testing.T) {
 		t.Fatal("delete not called")
 	}
 }
+
+func TestSafeAPIBase(t *testing.T) {
+	for base, want := range map[string]bool{
+		"https://api.denyout.com": true, "http://127.0.0.1:8080": true, "http://localhost:1": true,
+		"http://api.denyout.com": false, "http://evil.example": false, "ftp://x": false, "": false, "https://": false,
+	} {
+		if got := SafeAPIBase(base); got != want {
+			t.Errorf("SafeAPIBase(%q)=%v want %v", base, got, want)
+		}
+	}
+}

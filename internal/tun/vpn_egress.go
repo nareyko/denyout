@@ -3,8 +3,13 @@ package tun
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 )
+
+// ifaceNameRE matches a safe Linux interface name (IFNAMSIZ-1 = 15 chars; no
+// whitespace, shell metacharacters or slashes).
+var ifaceNameRE = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,15}$`)
 
 // VPN egress routing (Linux): marked DenyOut upstream dials → VPN iface.
 // Closed-loop: render/validate only unless DENYOUT_VPN_EGRESS_E2E=1 (VM).
@@ -38,9 +43,11 @@ type VPNEgressPlan struct {
 // ValidateVPNEgressIface rejects loopback, our TUN, and coexistence denylist names
 // that must not be used as VPN egress.
 func ValidateVPNEgressIface(iface string) error {
-	iface = strings.TrimSpace(iface)
 	if iface == "" {
 		return fmt.Errorf("tun: vpn egress iface required")
+	}
+	if !ifaceNameRE.MatchString(iface) {
+		return fmt.Errorf("tun: invalid vpn egress iface name %q", iface)
 	}
 	if iface == DeviceName {
 		return fmt.Errorf("tun: %s is DenyOut ingress, not VPN egress", DeviceName)

@@ -28,6 +28,7 @@ type Settings struct {
 	BlockPhishing          *bool    `json:"block_phishing,omitempty"`
 	BlockMalware           *bool    `json:"block_malware,omitempty"`
 	BlockStronger          *bool    `json:"block_stronger,omitempty"`
+	BlockAdsTrackers       *bool    `json:"block_ads_trackers,omitempty"`
 	ThreatPollHours        int      `json:"threat_poll_hours,omitempty"`
 	SensitiveSinksEnabled  *bool    `json:"sensitive_sinks_enabled,omitempty"`
 	SensitiveWritesEnabled *bool    `json:"sensitive_writes_enabled,omitempty"`

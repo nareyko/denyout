@@ -18,7 +18,10 @@ var clearPostBlockReasons = map[string]bool{
 	"secret_in_body":   true,
 	"canary_detected":  true,
 	"host_denied":      true,
-	"threat_list":      true,
+	"threat_list":      true, // legacy umbrella
+	"threat_phishing":  true,
+	"threat_malware":   true,
+	"threat_ads":       true,
 	"unsafe_ip":        true,
 	"ip_literal":       true,
 }

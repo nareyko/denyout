@@ -14,8 +14,8 @@ This is **not** a general DLP product. It is a high-precision seatbelt for agent
 | URL path (CONNECT target path N/A) | ✗ | ✓ |
 | Query string | ✗ | ✓ |
 | Userinfo (`user:pass@host`) | if present in URL | ✓ |
-| Headers (`Authorization`, `Cookie`, `X-Api-Key`, ...) | ✗ | ✓ hard deny (`secret_in_header`). Auth-like headers to **allowlisted** hosts allowed (API calls). Canaries always deny |
-| Body prefix | ✗ | ✓ hard deny (`secret_in_body`), first `body_scan_max_bytes` of json/form/text |
+| Headers (`Authorization`, `Cookie`, `X-Api-Key`, ...) | ✗ | ✓ hard deny (`secret_in_header`). Auth-like headers to **allowlisted** hosts allowed (API calls). **Book B** Always / Once (`user_always` / `user_once` — desktop **Allow this site**) is allow-all for that host: non-canary header/URL/body secrets are not denied (session Cookie FP fix). Pack/preset allows do **not** get that trust. Canaries always deny |
+| Body prefix | ✗ | ✓ hard deny (`secret_in_body`), first `body_scan_max_bytes` of json/form/text. Same Book B allow-all exception as headers |
 
 Fragment (`#...`) is not sent to servers. **MAY** still appear in some client logs - out of scope unless visible to proxy.
 

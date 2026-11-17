@@ -185,7 +185,15 @@ func (u *Updater) download(ctx context.Context, url string) ([]byte, error) {
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("HTTP %s", resp.Status)
 	}
-	return io.ReadAll(io.LimitReader(resp.Body, 64<<20)) // 64 MiB cap
+	const maxFeed = 64 << 20
+	b, err := io.ReadAll(io.LimitReader(resp.Body, maxFeed+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(b) > maxFeed { // never accept a silently truncated list as complete
+		return nil, fmt.Errorf("feed exceeds %d MiB cap", maxFeed>>20)
+	}
+	return b, nil
 }
 
 // NeedsAttention is true when every enabled feed is stale > 7 days.

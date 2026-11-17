@@ -84,6 +84,7 @@ func askNotifySend(title, body string) (AskAction, bool) {
 		"--action=once=Allow once",
 		"--action=always=Always",
 		"--action=deny=Deny",
+		"--",
 		title,
 		body,
 	)

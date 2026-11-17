@@ -164,9 +164,9 @@ func decisionBody(p DecisionPrompt) string {
 	}
 	b.WriteString("\n\n")
 	if !p.Taught {
-		b.WriteString("This is how DenyOut protects you. Choose Keep blocked, Allow this site, or Decide later.\n")
+		b.WriteString("This is how DenyOut protects you. Choose Keep blocked, Allow this site (trust fully except canaries), or Decide later.\n")
 	} else {
-		b.WriteString("Keep blocked, Allow this site, or Decide later.\n")
+		b.WriteString("Keep blocked, Allow this site (trust fully), or Decide later.\n")
 	}
 	return b.String()
 }

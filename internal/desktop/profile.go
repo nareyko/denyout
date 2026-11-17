@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -84,7 +85,22 @@ func slugID(name string) string {
 	return out
 }
 
+var profileIDRE = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
+
+// ValidProfileID reports whether id is safe to use as a file name component.
+func ValidProfileID(id string) bool { return profileIDRE.MatchString(id) }
+
+// profilePath maps an id to its YAML file. Ids that are not plain slugs are
+// neutralized so ".." or path separators can never escape ProfilesDir.
 func profilePath(id string) string {
+	if !ValidProfileID(id) {
+		id = "invalid-" + strings.Map(func(r rune) rune {
+			if r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '-' || r == '_' {
+				return r
+			}
+			return '_'
+		}, filepath.Base(id))
+	}
 	return filepath.Join(ProfilesDir(), id+".yaml")
 }
 
@@ -134,6 +150,9 @@ func SaveProfile(p AgentProfile) error {
 	if p.ID == "" {
 		p.ID = slugID(p.Name)
 	}
+	if !ValidProfileID(p.ID) {
+		return fmt.Errorf("invalid profile id %q", p.ID)
+	}
 	if p.Learning.Enabled && strings.TrimSpace(p.Learning.StartedAt) == "" {
 		p.Learning.StartedAt = time.Now().UTC().Format(time.RFC3339)
 	}
@@ -149,6 +168,9 @@ func SaveProfile(p AgentProfile) error {
 
 // DeleteProfile removes a profile file.
 func DeleteProfile(id string) error {
+	if !ValidProfileID(id) {
+		return fmt.Errorf("invalid profile id %q", id)
+	}
 	return os.Remove(profilePath(id))
 }
 
@@ -314,8 +336,14 @@ func (p AgentProfile) WriteTempConfig() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	dir := filepath.Join(os.TempDir(), "denyout-profiles")
-	_ = os.MkdirAll(dir, 0o755)
+	if !ValidProfileID(p.ID) {
+		return "", fmt.Errorf("invalid profile id %q", p.ID)
+	}
+	// Per-user private dir (not a predictable world-writable /tmp path).
+	dir := filepath.Join(ProfilesDir(), ".run")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", err
+	}
 	path := filepath.Join(dir, p.ID+".yaml")
 	if err := os.WriteFile(path, b, 0o600); err != nil {
 		return "", err

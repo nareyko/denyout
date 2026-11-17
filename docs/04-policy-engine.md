@@ -57,7 +57,7 @@ List books (see [`ux-iters/threat-lists-plan.md`](ux-iters/threat-lists-plan.md)
 6. **Book B - user Allow forever / timed allow** (host-specific Always / timed) -> `allow` (skips Book C). 
 7. **Book D - product unbreak** -> allow for **threat-list purposes only** (scanners still apply). 
 8. **Explicit deny hosts** (policy `deny:`) -> `deny` reason `host_denied`. 
-9. **Book C - enabled threat subscriptions** (phishing / malware / stronger / later telemetry) -> `deny` reason `threat_list` (map to clear post-block HITL). Applies in **all modes**. 
+9. **Book C - enabled threat subscriptions** (phishing / malware / stronger / opt-in ads & trackers) -> `deny` reason `threat_phishing` / `threat_malware` / `threat_ads` (legacy `threat_list` still accepted; map to clear post-block HITL). Applies in **all modes**. 
 10. **Book B - remembered Keep / timed deny** -> quiet / throttled path as on desktop today. 
 11. **Mode branch:**
  - `enforce`: match Book A allow rules. Else deny `host_not_allowed` (or `path_not_allowed`). 
@@ -164,7 +164,10 @@ Same `(Policy, RequestView, rate-state)` -> same verdict. Timeouts in `ask` are 
 | `allow` | Permitted |
 | `host_not_allowed` | Enforce miss |
 | `host_denied` | Explicit deny |
-| `threat_list` | Book C threat subscription hit |
+| `threat_list` | Legacy Book C hit (umbrella) |
+| `threat_phishing` | Book C phishing feed hit |
+| `threat_malware` | Book C malware feed hit |
+| `threat_ads` | Book C ads/trackers feed hit |
 | `path_not_allowed` | L2 path miss |
 | `method_not_allowed` | L2 method miss |
 | `unsafe_ip` | SSRF/metadata/private |

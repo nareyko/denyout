@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -54,6 +55,7 @@ type Config struct {
 type Server struct {
 	cfg     Config
 	ln      net.Listener
+	ln6     net.Listener // transparent mode: ::1 twin so nft IPv6 redirects land somewhere
 	httpSrv *http.Server
 	mu      sync.Mutex
 	closed  bool
@@ -76,9 +78,18 @@ func Start(ctx context.Context, cfg Config) (*Server, error) {
 	s.httpSrv = &http.Server{
 		Handler:           s,
 		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       2 * time.Minute,
 	}
 	if cfg.Transparent {
-		go s.serveTransparent()
+		go s.serveTransparentOn(ln)
+		// nft redirects IPv6 80/443 to ::1:<port>; without this listener IPv6 web traffic
+		// is refused (or, worse, users disable the v6 rules). Best-effort: v6 may be off.
+		if cfg.ListenHost == "127.0.0.1" {
+			if ln6, err6 := net.Listen("tcp", fmt.Sprintf("[::1]:%d", ln.Addr().(*net.TCPAddr).Port)); err6 == nil {
+				s.ln6 = ln6
+				go s.serveTransparentOn(ln6)
+			}
+		}
 	} else {
 		go func() {
 			_ = s.httpSrv.Serve(ln)
@@ -114,6 +125,9 @@ func (s *Server) Close() error {
 	if s.httpSrv != nil && !s.cfg.Transparent {
 		_ = s.httpSrv.Shutdown(ctx)
 	}
+	if s.ln6 != nil {
+		_ = s.ln6.Close()
+	}
 	return s.ln.Close()
 }
 
@@ -131,8 +145,11 @@ func (s *Server) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 		host = r.Host
 		port = "443"
 	}
-	portN := 443
-	fmt.Sscanf(port, "%d", &portN)
+	portN, perr := strconv.Atoi(port)
+	if perr != nil || portN < 1 || portN > 65535 { // no uint16 wraparound (65616 -> 80)
+		http.Error(w, "bad port", http.StatusBadRequest)
+		return
+	}
 
 	start := time.Now()
 	ips, resolveErr := lookupIPs(host)
@@ -201,11 +218,13 @@ func (s *Server) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 		Certificates: []tls.Certificate{leaf},
 		MinVersion:   tls.VersionTLS12,
 	})
+	_ = clientConn.SetDeadline(time.Now().Add(15 * time.Second)) // slowloris: bound the handshake
 	if err := tlsClient.Handshake(); err != nil {
 		s.logMitmError(rv, "mitm_handshake_failed", start)
 		_ = tlsClient.Close()
 		return
 	}
+	_ = clientConn.SetDeadline(time.Time{})
 	defer tlsClient.Close()
 
 	br := bufio.NewReader(tlsClient)
@@ -214,8 +233,19 @@ func (s *Server) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for {
+		// Idle/slow-header protection per request; cleared once the request line+headers arrived.
+		_ = clientConn.SetReadDeadline(time.Now().Add(5 * time.Minute))
 		req, err := http.ReadRequest(br)
 		if err != nil {
+			return
+		}
+		_ = clientConn.SetReadDeadline(time.Time{})
+		if !hostHeaderMatches(req.Host, host) {
+			// Domain fronting: policy was evaluated for the CONNECT/SNI host, so a
+			// different Host header would reach a host that was never checked.
+			resp := &http.Response{StatusCode: http.StatusMisdirectedRequest, ProtoMajor: 1, ProtoMinor: 1,
+				Header: make(http.Header), Body: io.NopCloser(strings.NewReader("host header does not match tunnel host\n"))}
+			_ = resp.Write(tlsClient)
 			return
 		}
 		s.roundTripIntercept(tlsClient, req, host, portN, ips, start)
@@ -304,10 +334,12 @@ func (s *Server) roundTripIntercept(client io.ReadWriteCloser, req *http.Request
 		MinVersion:         tls.VersionTLS12,
 		InsecureSkipVerify: s.cfg.InsecureSkipVerify,
 	})
+	_ = raw.SetDeadline(time.Now().Add(15 * time.Second))
 	if err := up.Handshake(); err != nil {
 		_ = raw.Close()
 		return
 	}
+	_ = raw.SetDeadline(time.Time{})
 	defer up.Close()
 
 	outReq := req.Clone(context.Background())
@@ -409,7 +441,27 @@ func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, redactDenyMsg(d), http.StatusForbidden)
 		return
 	}
-	transport := http.DefaultTransport
+	// Pin the dial to the IPs that were just validated (no second DNS lookup, no
+	// HTTP(S)_PROXY from the environment): closes DNS-rebinding SSRF.
+	allowPrivate := s.cfg.Engine.Cfg.AllowPrivate
+	transport := &http.Transport{
+		Proxy:             nil,
+		DisableKeepAlives: true,
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			ip, err := safeDialIP(host, ips, allowPrivate)
+			if err != nil {
+				return nil, err
+			}
+			_, p, _ := net.SplitHostPort(addr)
+			return s.dialTCP(net.JoinHostPort(ip.String(), p), 15*time.Second)
+		},
+		ResponseHeaderTimeout: 60 * time.Second,
+	}
+	defer transport.CloseIdleConnections()
+	r.RequestURI = ""
+	// Hop-by-hop proxy headers must not leak upstream.
+	r.Header.Del("Proxy-Authorization")
+	r.Header.Del("Proxy-Connection")
 	resp, err := transport.RoundTrip(r)
 	if err != nil {
 		http.Error(w, "upstream error", http.StatusBadGateway)
@@ -533,7 +585,7 @@ func (s *Server) logDecision(rv policy.RequestView, d policy.Decision, start tim
 		},
 		HTTP: &audit.HTTPInfo{
 			Method:        rv.Method,
-			Path:          rv.Path,
+			Path:          secrets.RedactPath(rv.Path),
 			QueryRedacted: secrets.RedactQuery(rv.RawQuery),
 		},
 		Detectors:      d.Detectors,
@@ -595,4 +647,18 @@ func safeDialIP(host string, ips []net.IP, allowPrivate bool) (net.IP, error) {
 		}
 	}
 	return ips[0], nil
+}
+
+// hostHeaderMatches reports whether an HTTP Host header (optionally with a port)
+// names the tunnel host. An empty header (HTTP/1.0) is accepted.
+func hostHeaderMatches(hdr, tunnelHost string) bool {
+	if hdr == "" {
+		return true
+	}
+	h := hdr
+	if hh, _, err := net.SplitHostPort(hdr); err == nil {
+		h = hh
+	}
+	h = strings.Trim(strings.ToLower(h), "[]")
+	return strings.TrimSuffix(h, ".") == strings.TrimSuffix(strings.Trim(strings.ToLower(tunnelHost), "[]"), ".")
 }

@@ -8,9 +8,11 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -85,7 +87,7 @@ func Run(ctx context.Context, opts Options) error {
 	url := "http://" + addr + "/"
 	fmt.Fprintf(os.Stderr, "denyout gui: mode=%s preset=%s ui=%s (localhost only)\n", cfg.Mode, cfg.Preset, url)
 
-	httpSrv := &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second}
+	httpSrv := &http.Server{Handler: guardLocal(addr, mux), ReadHeaderTimeout: 5 * time.Second}
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- httpSrv.Serve(ln)
@@ -260,4 +262,33 @@ func openBrowser(url string) {
 		cmd = exec.Command("xdg-open", url)
 	}
 	_ = cmd.Start()
+}
+
+// guardLocal blocks DNS-rebinding and cross-site requests against the loopback
+// web UI: the Host header must be the listener address (or localhost), and
+// state-changing requests must be same-origin JSON with no foreign Origin.
+func guardLocal(addr string, next http.Handler) http.Handler {
+	_, port, _ := net.SplitHostPort(addr)
+	okHost := map[string]bool{
+		addr: true, "localhost:" + port: true, "127.0.0.1:" + port: true, "[::1]:" + port: true,
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !okHost[strings.ToLower(r.Host)] {
+			http.Error(w, "forbidden host", http.StatusForbidden)
+			return
+		}
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			if o := r.Header.Get("Origin"); o != "" {
+				if ou, err := url.Parse(o); err != nil || !okHost[strings.ToLower(ou.Host)] {
+					http.Error(w, "forbidden origin", http.StatusForbidden)
+					return
+				}
+			}
+			if ct := r.Header.Get("Content-Type"); !strings.HasPrefix(strings.ToLower(ct), "application/json") {
+				http.Error(w, "content-type must be application/json", http.StatusUnsupportedMediaType)
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
 }

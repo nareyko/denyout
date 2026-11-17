@@ -143,12 +143,15 @@ export type ThreatListsView = {
  block_phishing: boolean;
  block_malware: boolean;
  block_stronger: boolean;
+ block_ads_trackers: boolean;
  needs_attention: boolean;
  feeds: ThreatFeedView[];
  advanced_feeds: ThreatFeedView[];
  about_note: string;
  stronger_warning: string;
  advanced_warning: string;
+ aggressive_ads_warning: string;
+ ads_trackers_warning: string;
  product_exceptions: number;
  product_exception_hosts: string[];
  product_exceptions_note: string;
@@ -306,6 +309,7 @@ type Bridge = {
  UISetBlockPhishing(on: boolean): Promise<void>;
  UISetBlockMalware(on: boolean): Promise<void>;
  UISetBlockStronger(on: boolean): Promise<void>;
+ UISetBlockAdsTrackers(on: boolean): Promise<void>;
  UISetAdvancedThreatFeed(id: string, on: boolean): Promise<void>;
  UISetThreatPollHours(hours: number): Promise<void>;
  UIRefreshThreatLists(): Promise<ThreatListsView>;
@@ -427,6 +431,7 @@ export const api = {
  setBlockPhishing: (on: boolean) => bridge().UISetBlockPhishing(on),
  setBlockMalware: (on: boolean) => bridge().UISetBlockMalware(on),
  setBlockStronger: (on: boolean) => bridge().UISetBlockStronger(on),
+ setBlockAdsTrackers: (on: boolean) => bridge().UISetBlockAdsTrackers(on),
  setAdvancedThreatFeed: (id: string, on: boolean) =>
  bridge().UISetAdvancedThreatFeed(id, on),
  setThreatPollHours: (hours: number) => bridge().UISetThreatPollHours(hours),

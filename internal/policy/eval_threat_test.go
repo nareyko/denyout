@@ -32,12 +32,12 @@ func TestThreatListDeniesInBlocklist(t *testing.T) {
 	}
 	found := false
 	for _, r := range d.Reasons {
-		if r == policy.ReasonThreatList {
+		if r == policy.ReasonThreatPhishing {
 			found = true
 		}
 	}
 	if !found {
-		t.Fatalf("want threat_list: %+v", d)
+		t.Fatalf("want threat_phishing: %+v", d)
 	}
 }
 
@@ -79,12 +79,39 @@ func TestPackAllowDoesNotBeatThreatList(t *testing.T) {
 	}
 	ok := false
 	for _, r := range d.Reasons {
-		if r == policy.ReasonThreatList {
+		if r == policy.ReasonThreatMalware {
 			ok = true
 		}
 	}
 	if !ok {
 		t.Fatalf("%+v", d)
+	}
+}
+
+func TestThreatAdsReason(t *testing.T) {
+	cfg, err := policy.DefaultWholeDeviceBrowse()
+	if err != nil {
+		t.Fatal(err)
+	}
+	eng := policy.NewEngine(cfg)
+	eng.Threats = mapThreats{"tracker.example": "stevenblack-unified"}
+	d := eng.Evaluate(policy.RequestView{
+		DestHost: "tracker.example",
+		DestPort: 443,
+		DestIPs:  []net.IP{net.ParseIP("1.1.1.1")},
+		RawURL:   "https://tracker.example/",
+	})
+	if d.Verdict != "deny" {
+		t.Fatalf("%+v", d)
+	}
+	ok := false
+	for _, r := range d.Reasons {
+		if r == policy.ReasonThreatAds {
+			ok = true
+		}
+	}
+	if !ok {
+		t.Fatalf("want threat_ads: %+v", d)
 	}
 }
 
@@ -104,5 +131,20 @@ func TestUserOnceBeatsThreatList(t *testing.T) {
 	})
 	if d.Verdict != "allow" {
 		t.Fatalf("%+v", d)
+	}
+}
+
+func TestUnsafeIPExtendedRanges(t *testing.T) {
+	for ip, want := range map[string]bool{
+		"127.0.0.1": true, "169.254.169.254": true, "100.100.100.200": true, "100.64.1.1": true,
+		"0.0.0.1": true, "224.0.0.1": true, "255.255.255.255": true, "fd00:ec2::254": true,
+		"64:ff9b::7f00:1": true, "64:ff9b::808:808": false, "8.8.8.8": false, "10.0.0.1": true, "::1": true,
+	} {
+		if got := policy.UnsafeIP(net.ParseIP(ip), false); got != want {
+			t.Errorf("policy.UnsafeIP(%s,false)=%v want %v", ip, got, want)
+		}
+	}
+	if policy.UnsafeIP(net.ParseIP("100.64.1.1"), true) || !policy.UnsafeIP(net.ParseIP("100.100.100.200"), true) || !policy.UnsafeIP(net.ParseIP("fd00:ec2::254"), true) {
+		t.Error("allow_private semantics wrong")
 	}
 }

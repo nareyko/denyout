@@ -2,6 +2,37 @@
 
 ## Unreleased
 
+### Security
+
+Full code review (stability + security); details and residual risks in [`docs/security-review-2026-11.md`](docs/security-review-2026-11.md).
+
+- **Root helper (Linux):** `vpn-egress-apply` no longer shell-executes the interface name (root command injection); helper socket is owner-only with deny-by-default peer auth; redirect rules always target the configured owner uid; `apply` only reads a plain PEM CA certificate owned by the owner/root; the systemd unit runs a root-owned copy of the binary; nft replace is one atomic transaction; SIGTERM removes rules.
+- **Proxy/policy:** body scanning no longer skips multipart/octet-stream/ndjson/gzip; all headers are scanned; token-as-username URLs and `custom_regex` are enforced; dials are pinned to validated IPs (DNS-rebinding SSRF); transparent HTTP scans headers/body; Host header must match the tunnel host (domain fronting); handshake/idle deadlines; port range check; CGNAT/metadata/NAT64/multicast IPs blocked; QUIC-MITM verifies upstream certificates (`DENYOUT_TLS_INSECURE_UPSTREAM=1` only for the lab); data race between `Evaluate` and `AllowHost/RevokeHost` fixed.
+- **Privacy:** tokens are redacted from audit paths, URL userinfo and `blocks.jsonl`.
+- **Sync/updates:** remote sync settings are validated and can no longer switch off BodyPureA/AntiChunk; cloud API and update manifest require https; update links open only trusted https hosts; truncated threat feeds are rejected; corrupt threat cache self-heals; state files are written atomically; profile ids cannot escape the profiles dir.
+- **IPv6 / fail-safe:** the transparent proxy also listens on `[::1]`; under TUN the IPv6 redirect and IPv6 QUIC drop stay in place (IPv6 was a full bypass); a helper **watchdog** removes the redirect when the proxy is down for ~6s (no more orphan-REDIRECT blackhole) and re-applies on recovery, never after Protect Off. `DENYOUT_FAIL_CLOSED=1` keeps rules (strict).
+- **Release integrity:** `SHA256SUMS` is signed with keyless cosign in CI; `install.sh` verifies it (`DENYOUT_VERIFY_SIG=auto|require|skip`), validates the tag and `DENYOUT_BASE_URL`, and matches checksums by exact name.
+- **Local web UI:** Host/Origin/Content-Type guard (DNS rebinding / cross-site POST).
+- **Dependencies:** `x/net`, `x/crypto`, `x/sys`, `x/text` bumped; `govulncheck` clean.
+- **Tests (Docker only):** `scripts/security-helper-regression-docker.sh`, `scripts/watchdog-e2e-docker.sh`, `scripts/install-verify-test-docker.sh`; fuzz tests for scanners and feed parsing.
+
+### Behaviour changes to know about
+
+- Header and body scanning is broader; expect a few more denies on APIs that put tokens in custom headers toward hosts that are not user-allowed.
+- If the proxy dies the helper now *opens* the redirect after ~6s (state `degraded`) instead of blackholing HTTPS; set `DENYOUT_FAIL_CLOSED=1` for the old strict behaviour.
+- The helper needs a non-root owner uid (`/var/lib/denyout/owner_uid`); Docker labs set it.
+
+### Added
+
+- **Threat lists: Block ads & trackers (default OFF):** Basic toggle gates Advanced OISD / StevenBlack. Category-specific deny reasons (`threat_phishing` / `threat_malware` / `threat_ads`) so tracker hits no longer read as phishing/malware. Legacy `threat_list` still accepted.
+
+### Fixed
+
+- **Allow this site = allow-all for that host:** Book B Always / Once (`user_always` / `user_once`) now skips non-canary secret scanners (Cookie/Bearer/URL/body) as well as threat lists. Fixes Claude.ai and similar sites where session cookies looked like secrets after Allow. Canaries still deny. Pack/preset allows unchanged.
+- **`denyout version` no longer starts a second tray:** GUI handles `version` / `--version` / `-V` / `help` before detach; CLI verbs (`check`, `run`, `hostctl`, …) and unknown bare words print a `denyout-cli …` hint and exit instead of launching Wails.
+- **desktop.log no longer doubles every line** after tray detach (stderr was redirected to the same file as AppendDesktopLog).
+- **Richer Protect/deny diagnostics:** `protect_on` events include Always-allow host list; header secret hits tag detectors as `header:<name>:<detector>` (e.g. `header:cookie:…`) without values.
+
 ## 0.4.12 - Experimental Settings + TUN G6 (2026-11-16)
 
 ### Added
