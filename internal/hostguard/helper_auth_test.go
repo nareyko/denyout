@@ -69,7 +69,7 @@ func TestValidateHelperCAPath(t *testing.T) {
 	if err := validateHelperCAPath("relative/ca.pem", owner); err == nil {
 		t.Error("relative path accepted")
 	}
-	if err := validateHelperCAPath(dir + "/../" + filepath.Base(dir) + "/ca.pem", owner); err == nil {
+	if err := validateHelperCAPath(dir+"/../"+filepath.Base(dir)+"/ca.pem", owner); err == nil {
 		t.Error("unclean path accepted")
 	}
 }
