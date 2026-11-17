@@ -17,12 +17,14 @@ func applyRedirect(spec Spec) error {
 	}
 	defer os.RemoveAll(dir)
 	path := filepath.Join(dir, "denyout.nft")
-	if err := os.WriteFile(path, []byte(rules), 0o600); err != nil {
+	// One nft transaction: "add" makes the following "delete" idempotent, and the
+	// whole file applies atomically, so a failed load never leaves the user with
+	// no rules (previously: delete first, then load).
+	script := "add table ip denyout\ndelete table ip denyout\n" +
+		"add table inet denyout\ndelete table inet denyout\n" + rules
+	if err := os.WriteFile(path, []byte(script), 0o600); err != nil {
 		return err
 	}
-	// Replace prior tables if present (legacy ip + current inet).
-	_ = exec.Command("nft", "delete", "table", "ip", "denyout").Run()
-	_ = exec.Command("nft", "delete", "table", "inet", "denyout").Run()
 	cmd := exec.Command("nft", "-f", path)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

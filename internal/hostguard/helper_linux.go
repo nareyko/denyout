@@ -4,11 +4,13 @@ package hostguard
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -389,6 +391,23 @@ func ServeHelper() error {
 		return err
 	}
 	defer ln.Close()
+	// Stale TUN/VPN state from a previous crashed helper must not linger.
+	_ = tun.GlobalRuntime().StopReal()
+	_ = tun.RemoveVPNEgress()
+	// On SIGTERM/SIGINT (systemctl stop) remove our rules so a stopped helper
+	// never leaves a REDIRECT to a dead proxy (orphan blackhole).
+	sigc := make(chan os.Signal, 1)
+	signal.Notify(sigc, syscall.SIGTERM, syscall.SIGINT)
+	go func() {
+		<-sigc
+		helperOpMu.Lock()
+		_ = tun.GlobalRuntime().StopReal()
+		_ = tun.RemoveVPNEgress()
+		_ = removeRedirect(Spec{})
+		_ = os.Remove(helperSockPath)
+		helperOpMu.Unlock()
+		_ = ln.Close()
+	}()
 	// Owner-only socket (plus root); SO_PEERCRED is checked again per connection.
 	if owner > 0 {
 		_ = os.Chown(helperSockPath, owner, 0)
@@ -399,6 +418,9 @@ func ServeHelper() error {
 	for {
 		c, err := ln.Accept()
 		if err != nil {
+			if errors.Is(err, net.ErrClosed) {
+				return nil // clean shutdown
+			}
 			return err
 		}
 		go handleHelperConn(c, owner)
