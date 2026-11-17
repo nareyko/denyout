@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/nareyko/denyout/internal/platform"
 )
 
 // RegisterAutostart installs login launch of `denyout` (or `denyout-cli desktop` for CLI-only).
@@ -19,16 +21,7 @@ func RegisterAutostart() error {
 		self = resolved
 	}
 	self = preferStableDesktopBinary(self)
-	switch runtime.GOOS {
-	case "linux":
-		return registerAutostartLinux(self)
-	case "darwin":
-		return registerAutostartDarwin(self)
-	case "windows":
-		return registerAutostartWindows(self)
-	default:
-		return fmt.Errorf("autostart: unsupported OS %s", runtime.GOOS)
-	}
+	return autostart.Register(self)
 }
 
 // preferStableDesktopBinary avoids writing go-test /tmp/go-build paths into login autostart.
@@ -64,31 +57,13 @@ func preferStableDesktopBinary(self string) string {
 
 // UnregisterAutostart removes login launch entries.
 func UnregisterAutostart() error {
-	switch runtime.GOOS {
-	case "linux":
-		return unregisterAutostartLinux()
-	case "darwin":
-		return unregisterAutostartDarwin()
-	case "windows":
-		return unregisterAutostartWindows()
-	default:
-		return nil
-	}
+	return autostart.Unregister()
 }
 
 // AutostartRegistered reports whether a login-launch entry is present on disk.
 // Used so Settings reflects reality, not only the last saved preference.
 func AutostartRegistered() bool {
-	switch runtime.GOOS {
-	case "linux":
-		return autostartRegisteredLinux()
-	case "darwin":
-		return autostartRegisteredDarwin()
-	case "windows":
-		return autostartRegisteredWindows()
-	default:
-		return false
-	}
+	return autostart.Registered()
 }
 
 // autostartExecLine returns the Exec=/ExecStart= value for login launch.
@@ -182,4 +157,48 @@ func sanitizeDesktopEnv(env []string) []string {
 		out = append(out, e)
 	}
 	return out
+}
+
+// autostart is the per-OS login-launch implementation (internal/platform.Autostart).
+var autostart platform.Autostart = osAutostart{}
+
+type osAutostart struct{}
+
+func (osAutostart) Register(self string) error {
+	switch runtime.GOOS {
+	case "linux":
+		return registerAutostartLinux(self)
+	case "darwin":
+		return registerAutostartDarwin(self)
+	case "windows":
+		return registerAutostartWindows(self)
+	default:
+		return fmt.Errorf("autostart: unsupported OS %s", runtime.GOOS)
+	}
+}
+
+func (osAutostart) Unregister() error {
+	switch runtime.GOOS {
+	case "linux":
+		return unregisterAutostartLinux()
+	case "darwin":
+		return unregisterAutostartDarwin()
+	case "windows":
+		return unregisterAutostartWindows()
+	default:
+		return nil
+	}
+}
+
+func (osAutostart) Registered() bool {
+	switch runtime.GOOS {
+	case "linux":
+		return autostartRegisteredLinux()
+	case "darwin":
+		return autostartRegisteredDarwin()
+	case "windows":
+		return autostartRegisteredWindows()
+	default:
+		return false
+	}
 }

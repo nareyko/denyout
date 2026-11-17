@@ -7,6 +7,11 @@ func TestNormalizeHostIDNAndDots(t *testing.T) {
 		"Example.COM..":     "example.com",
 		"bücher.de":         "xn--bcher-kva.de",
 		"xn--bcher-kva.de.": "xn--bcher-kva.de",
+		// Found by FuzzHostMatch: IDNA maps these to "." and left a trailing dot, so a deny
+		// rule for evil.com missed "evil.com｡".
+		"evil.com｡": "evil.com",
+		"evil.com。": "evil.com",
+		"evil．com｡": "evil.com",
 	} {
 		if got := normalizeHost(in); got != want {
 			t.Fatalf("%q -> %q want %q", in, got, want)

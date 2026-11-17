@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/gen2brain/beeep"
+
+	"github.com/nareyko/denyout/internal/explain"
 )
 
 var (
@@ -566,41 +568,5 @@ func Deny(host string, reasons []string, redactedURL ...string) {
 	_ = redactedURL
 }
 
-// HumanReasons turns stable reason codes into plain-language copy.
-func HumanReasons(reasons []string) string {
-	if len(reasons) == 0 {
-		return "Your agent tried to reach something outside the allowlist."
-	}
-	var parts []string
-	for _, r := range reasons {
-		switch r {
-		case "host_not_allowed":
-			parts = append(parts, "That site is not on your allowed list.")
-		case "ip_literal":
-			parts = append(parts, "Blocked a raw IP address (not allowed in this mode).")
-		case "host_denied":
-			parts = append(parts, "This site is on your deny list.")
-		case "threat_phishing":
-			parts = append(parts, "This site is on a known phishing list.")
-		case "threat_malware":
-			parts = append(parts, "This site is on a known malware list.")
-		case "threat_ads":
-			parts = append(parts, "This site is on an ads or trackers list.")
-		case "threat_list":
-			parts = append(parts, "This site is on a known phishing or malware list.")
-		case "secret_in_url", "secret_in_header", "secret_in_body":
-			parts = append(parts, "Blocked a link that looked like it contained a secret.")
-		case "canary_detected":
-			parts = append(parts, "A canary/test secret was found in the request.")
-		case "unsafe_ip":
-			parts = append(parts, "The destination looked like a private or metadata address.")
-		case "port_not_allowed":
-			parts = append(parts, "That network port is not allowed.")
-		case "rate_limited":
-			parts = append(parts, "Too many requests in a short time.")
-		default:
-			parts = append(parts, r)
-		}
-	}
-	return strings.Join(parts, " ")
-}
+// HumanReasons turns stable reason codes into plain-language copy (table: internal/explain).
+func HumanReasons(reasons []string) string { return explain.Short(reasons) }

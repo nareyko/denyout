@@ -10,3 +10,5 @@ func installCA(certPath string) error {
 func uninstallCA() error {
 	return nil
 }
+
+func caInstalled() bool { return false }

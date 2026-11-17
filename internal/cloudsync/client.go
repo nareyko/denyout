@@ -11,6 +11,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/nareyko/denyout/internal/httpsafe"
 )
 
 // DefaultAPIBase is the production API host.
@@ -27,7 +29,7 @@ func (c *Client) httpClient() *http.Client {
 	if c != nil && c.HTTP != nil {
 		return c.HTTP
 	}
-	return &http.Client{Timeout: 20 * time.Second}
+	return httpsafe.NewClient(20 * time.Second)
 }
 
 func (c *Client) base() string {

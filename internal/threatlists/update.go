@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"github.com/nareyko/denyout/internal/httpsafe"
 )
 
 // UndersizeRatio rejects a new body smaller than this fraction of the previous
@@ -38,7 +40,7 @@ func (u *Updater) client() HTTPDoer {
 	if u.Client != nil {
 		return u.Client
 	}
-	return &http.Client{Timeout: 60 * time.Second}
+	return httpsafe.NewClient(60 * time.Second)
 }
 
 // RefreshResult is one feed attempt outcome.

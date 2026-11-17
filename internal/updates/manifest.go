@@ -14,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/nareyko/denyout/internal/httpsafe"
 )
 
 // DefaultManifestURL is the public HTTPS endpoint (no registration).
@@ -62,7 +64,7 @@ func Fetch(ctx context.Context, client *http.Client, manifestURL string) (Manife
 		return Manifest{}, fmt.Errorf("%w: manifest URL must be https", ErrUnavailable)
 	}
 	if client == nil {
-		client = &http.Client{Timeout: 12 * time.Second}
+		client = httpsafe.NewClient(12 * time.Second)
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, manifestURL, nil)
 	if err != nil {

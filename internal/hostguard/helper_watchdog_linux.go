@@ -8,6 +8,8 @@ import (
 	"net"
 	"os"
 	"time"
+
+	"github.com/nareyko/denyout/internal/protectstate"
 )
 
 const helperStateFile = "/run/denyout-hostguard.state"
@@ -15,7 +17,7 @@ const helperStateFile = "/run/denyout-hostguard.state"
 // runWatchdog probes the proxy port from the last successful Apply and keeps the
 // nft redirect consistent with proxy health (see watchdog).
 func runWatchdog(ctx context.Context) {
-	w := &watchdog{failClosed: os.Getenv("DENYOUT_FAIL_CLOSED") == "1"}
+	w := &watchdog{failClosed: FailPolicy() == protectstate.FailClosed}
 	t := time.NewTicker(2 * time.Second)
 	defer t.Stop()
 	for {
@@ -57,6 +59,7 @@ func runWatchdog(ctx context.Context) {
 			_ = removeRedirect(cur)
 			helperOpMu.Unlock()
 			writeHelperState("degraded proxy_down")
+			fireDegraded()
 		case "recover":
 			// Rules only (CA is already trusted); keep "degraded" if this fails so the
 			// next tick retries instead of believing protection is back.

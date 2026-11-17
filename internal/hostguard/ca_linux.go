@@ -42,3 +42,9 @@ func uninstallCA() error {
 	_ = os.Remove(LinuxSystemCAHashLink)
 	return nil
 }
+
+// caInstalled reports whether the DenyOut CA file is present in the system store.
+func caInstalled() bool {
+	_, err := os.Stat(LinuxSystemCACert)
+	return err == nil
+}

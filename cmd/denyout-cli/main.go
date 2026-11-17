@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/nareyko/denyout/internal/appstate"
 	"github.com/nareyko/denyout/internal/audit"
 	"github.com/nareyko/denyout/internal/check"
 	"github.com/nareyko/denyout/internal/desktop"
@@ -24,9 +25,11 @@ import (
 	"github.com/nareyko/denyout/internal/lab"
 	"github.com/nareyko/denyout/internal/notify"
 	"github.com/nareyko/denyout/internal/policy"
+	"github.com/nareyko/denyout/internal/profiles"
 	"github.com/nareyko/denyout/internal/proxy"
 	"github.com/nareyko/denyout/internal/run"
 	"github.com/nareyko/denyout/internal/serve"
+	"github.com/nareyko/denyout/internal/settings"
 	"github.com/nareyko/denyout/internal/threatlists"
 	"github.com/nareyko/denyout/internal/tun"
 )
@@ -59,6 +62,8 @@ func runMain(args []string) int {
 		return cmdCheck(args[1:])
 	case "policy":
 		return cmdPolicy(args[1:])
+	case "config":
+		return cmdConfig(args[1:])
 	case "init":
 		return cmdInit(args[1:])
 	case "run":
@@ -79,6 +84,8 @@ func runMain(args []string) int {
 		return cmdServe(args[1:])
 	case "audit":
 		return cmdAudit(args[1:])
+	case "doctor":
+		return cmdDoctor(args[1:], os.Stdout, os.Stderr)
 	default:
 		fmt.Fprintf(os.Stderr, "denyout-cli: unknown command %q\n\n", args[0])
 		printHelp(os.Stderr)
@@ -97,7 +104,8 @@ Commands:
   help                 Show this help
   init                 Write starter denyout.yaml
   check <url>          Evaluate a URL against policy (no network dial)
-  policy validate <f>  Validate a denyout/v1 YAML config
+  policy check <f>     Validate a denyout/v1 YAML config (line-accurate errors; alias: validate)
+  config show          Effective settings with the source of each value (secrets redacted)
   test [--db path]     Run lab SQLite fixtures (denyout-cli test)
   run [flags] -- <cmd> Wrap command with local policy proxy
   profile              Manage named agent wrap profiles
@@ -107,6 +115,7 @@ Commands:
   gui                  Advanced localhost UI (technical)
   serve -c <file>      Long-running sidecar proxy (pair with NetworkPolicy)
   audit tail           Show recent audit.jsonl events (desktop path by default)
+  doctor               Redacted status report to paste into a bug report
 
 Install and security boundaries: https://denyout.com · docs in this repo.
 `)
@@ -180,19 +189,75 @@ func cmdCheck(args []string) int {
 }
 
 func cmdPolicy(args []string) int {
-	if len(args) == 0 || args[0] != "validate" {
-		fmt.Fprintln(os.Stderr, "Usage: denyout-cli policy validate <file>")
+	if len(args) == 0 || (args[0] != "validate" && args[0] != "check") {
+		fmt.Fprintln(os.Stderr, "Usage: denyout-cli policy check <file>")
 		return 2
 	}
 	if len(args) < 2 {
-		fmt.Fprintln(os.Stderr, "denyout-cli policy validate: file required")
+		fmt.Fprintf(os.Stderr, "denyout-cli policy %s: file required\n", args[0])
 		return 2
 	}
-	if _, err := policy.LoadFile(args[1]); err != nil {
-		fmt.Fprintf(os.Stderr, "invalid: %v\n", err)
+	raw, err := os.ReadFile(args[1])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "denyout-cli policy %s: %v\n", args[0], err)
+		return 2
+	}
+	if ds := policy.Check(raw); len(ds) > 0 {
+		fmt.Fprintf(os.Stderr, "invalid: %s: %d problem(s)\n%s", args[1], len(ds), policy.FormatDiagnostics(raw, ds))
 		return 2
 	}
 	fmt.Println("ok")
+	return 0
+}
+
+// cmdConfig implements `denyout-cli config show [--json]`.
+func cmdConfig(args []string) int {
+	if len(args) == 0 || args[0] != "show" {
+		fmt.Fprintln(os.Stderr, "Usage: denyout-cli config show [--json]")
+		return 2
+	}
+	jsonOut := false
+	for _, a := range args[1:] {
+		switch a {
+		case "--json":
+			jsonOut = true
+		default:
+			fmt.Fprintf(os.Stderr, "denyout-cli config show: unknown flag %q\n", a)
+			return 2
+		}
+	}
+	st := appstate.LoadState()
+	vals := settings.Resolve(st, os.Getenv, nil)
+	problems := settings.Validate(st)
+	if jsonOut {
+		type row struct {
+			Key    string          `json:"key"`
+			Value  string          `json:"value"`
+			Source settings.Source `json:"source"`
+			Env    string          `json:"env,omitempty"`
+		}
+		out := struct {
+			SchemaVersion int      `json:"schema_version"`
+			Settings      []row    `json:"settings"`
+			Problems      []string `json:"problems,omitempty"`
+		}{SchemaVersion: settings.SchemaVersion}
+		for _, v := range vals {
+			out.Settings = append(out.Settings, row{v.Key, v.Display(), v.Source, v.Env})
+		}
+		for _, e := range problems {
+			out.Problems = append(out.Problems, e.Error())
+		}
+		b, _ := json.MarshalIndent(out, "", "  ")
+		fmt.Println(string(b))
+		return 0
+	}
+	fmt.Printf("# settings schema v%d (precedence: flag > env > state file > default)\n", settings.SchemaVersion)
+	for _, v := range vals {
+		fmt.Printf("%-26s %-8s %s\n", v.Key, "["+string(v.Source)+"]", v.Display())
+	}
+	for _, e := range problems {
+		fmt.Fprintf(os.Stderr, "warning: %v\n", e)
+	}
 	return 0
 }
 
@@ -399,6 +464,8 @@ func cmdProfile(args []string) int {
   list                         List saved agent profiles
   create --name N -- <cmd>…    Create a profile (Agent+Cursor + learning)
   show <id>                    Print profile YAML path / summary
+  export <id> <file>           Write a profile to a file
+  import [--force] <id> <file> Validate and import a profile file as <id>
   delete <id>                  Delete a profile
   run <id>                     Run profile (same as denyout-cli run --profile <id>)
   pin <id>                     Pin all pending Once hosts (learning)
@@ -476,6 +543,38 @@ Profiles live in ~/.config/denyout/profiles/`)
 		}
 		fmt.Printf("id=%s name=%q preset=%s ask=%v sandbox=%q pending=%v allow=%v\npath=%s\n",
 			p.ID, p.Name, p.Preset, p.AskMode, p.Sandbox, p.PendingOnce, p.ExtraAllow, desktop.ProfilePathForCLI(p.ID))
+		return 0
+	case "export":
+		if len(args) != 3 {
+			fmt.Fprintln(os.Stderr, "Usage: denyout-cli profile export <id> <file>")
+			return 2
+		}
+		if err := profiles.ExportProfile(args[1], args[2]); err != nil {
+			fmt.Fprintf(os.Stderr, "denyout-cli profile export: %v\n", err)
+			return 2
+		}
+		fmt.Printf("exported %s to %s\n", args[1], args[2])
+		return 0
+	case "import":
+		force := false
+		var pos []string
+		for _, a := range args[1:] {
+			if a == "--force" {
+				force = true
+			} else {
+				pos = append(pos, a)
+			}
+		}
+		if len(pos) != 2 {
+			fmt.Fprintln(os.Stderr, "Usage: denyout-cli profile import [--force] <id> <file>")
+			return 2
+		}
+		p, err := profiles.ImportProfile(pos[0], pos[1], force)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "denyout-cli profile import: %v\n", err)
+			return 2
+		}
+		fmt.Printf("imported %s (%s)\n", p.ID, desktop.ProfilePathForCLI(p.ID))
 		return 0
 	case "delete":
 		if len(args) < 2 {
@@ -964,13 +1063,8 @@ func cmdHostctlProxyd(args []string) int {
 		return 2
 	}
 	var rules []policy.Rule
-	if raw := os.Getenv("DENYOUT_ALWAYS_ALLOW"); raw != "" {
-		for _, h := range strings.Split(raw, ",") {
-			h = strings.TrimSpace(h)
-			if h != "" {
-				rules = append(rules, policy.Rule{Host: h, Reason: "user_always"})
-			}
-		}
+	for _, h := range settings.EnvList(os.Getenv("DENYOUT_ALWAYS_ALLOW")) {
+		rules = append(rules, policy.Rule{Host: h, Reason: "user_always"})
 	}
 	profile := strings.ToLower(strings.TrimSpace(os.Getenv("DENYOUT_POLICY_PROFILE")))
 	if profile == "" {
@@ -993,7 +1087,7 @@ func cmdHostctlProxyd(args []string) int {
 		fmt.Fprintf(os.Stderr, "denyout-cli hostctl proxyd: %v\n", err)
 		return 2
 	}
-	if v := strings.TrimSpace(os.Getenv("DENYOUT_ALLOW_PRIVATE")); v == "1" || strings.EqualFold(v, "true") {
+	if settings.EnvBool(os.Getenv("DENYOUT_ALLOW_PRIVATE")) {
 		cfg.AllowPrivate = true
 	}
 	var threats policy.ThreatChecker
@@ -1002,9 +1096,10 @@ func cmdHostctlProxyd(args []string) int {
 	} else {
 		threats = att.Store
 	}
+	startDebugStats()
 	var sessRef *run.Session
 	insecureUp := false
-	if v := strings.TrimSpace(os.Getenv("DENYOUT_TLS_INSECURE_UPSTREAM")); v == "1" || strings.EqualFold(v, "true") {
+	if settings.EnvBool(os.Getenv("DENYOUT_TLS_INSECURE_UPSTREAM")) {
 		insecureUp = true
 	}
 	sess, err := run.StartSession(run.SessionOptions{

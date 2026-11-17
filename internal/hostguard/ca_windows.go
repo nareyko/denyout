@@ -37,3 +37,8 @@ func uninstallCA() error {
 	_ = exec.Command("certutil", "-delstore", "Root", DesktopCANickname).Run()
 	return nil
 }
+
+// caInstalled reports whether the DenyOut CA is in the Current User Root store (read-only query).
+func caInstalled() bool {
+	return exec.Command("certutil", "-user", "-store", "Root", DesktopCANickname).Run() == nil
+}

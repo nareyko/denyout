@@ -11,6 +11,7 @@ import (
 
 	"github.com/nareyko/denyout/internal/hostguard"
 	"github.com/nareyko/denyout/internal/notify"
+	"github.com/nareyko/denyout/internal/protectstate"
 )
 
 func (a *App) trayEnableProtectComputer() {
@@ -110,6 +111,11 @@ func (a *App) runTray(ctx context.Context) error {
 		os.Exit(0)
 	})
 
+	// Notify once when protection transitions into degraded (proxy lost, redirect pulled).
+	degradeTracker := &protectstate.Tracker{OnDegraded: func(tr protectstate.Transition) {
+		notify.Emit(notify.KindProtectFailed, "Protection is degraded", tr.Message)
+	}}
+
 	tray.SetMenu(menu)
 	tray.Show()
 
@@ -133,12 +139,14 @@ func (a *App) runTray(ctx context.Context) error {
 				pauseUntil := activeProtectPausedUntil(a.state.ProtectPausedUntil)
 				pauseLast := a.state.ProtectPauseLast
 				leaveOn := a.state.ProtectionOn || a.state.ComputerEnabled
-				needsAttention := problemsUnhealthyLocked(a)
+				pres := protectResultLocked(a)
+				needsAttention := pres.NeedsAttention
 				threatWarn := a.threatNeedsAttentionLocked()
 				unread := a.state.AwayUnreadBlocks
 				snoozeUntil := activeNotifySnoozeUntil(a.state.NotifySnoozeUntil)
 				a.mu.Unlock()
 				a.pollPresenceOnce()
+				degradeTracker.Observe(pres)
 
 				snooze1h.SetDisabled(snoozeUntil != "")
 				snoozeTomorrow.SetDisabled(snoozeUntil != "")

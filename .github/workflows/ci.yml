@@ -5,12 +5,18 @@ on:
     branches: [main, master]
   pull_request:
 
+# Least privilege: CI only reads the repo. No job needs a write token.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: "1.27.4"
       - name: Build
@@ -47,14 +53,14 @@ jobs:
           set -euo pipefail
           chmod +x scripts/closed-loop-tun-preflight.sh
           DENYOUT_BIN=./bin/denyout-cli ./scripts/closed-loop-tun-preflight.sh
-      - name: govulncheck
-        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
   quality:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: "1.27.4"
       - name: gofmt
@@ -67,16 +73,58 @@ jobs:
             echo "== GOOS=$os"; GOOS=$os go vet ./internal/... ./cmd/denyout-cli
           done
       - name: staticcheck
-        run: go run honnef.co/go/tools/cmd/staticcheck@latest ./internal/... ./cmd/denyout-cli
+        run: go run honnef.co/go/tools/cmd/staticcheck@v0.8.2 ./internal/... ./cmd/denyout-cli
       - name: Race tests
         run: go test -race -count=1 ./internal/...
+
+  portable-tests:
+    # Unit tests on the other desktop OSes. Only packages that are platform-neutral
+    # (no root, no nft/pf/WinDivert, no listeners on fixed ports) run here; nothing
+    # in this job mutates the runner's network or trust store. Privileged/network
+    # paths stay Docker-only (docker-security job) or behind DENYOUT_TEST_NO_ELEVATE.
+    # Packages with Unix-only tests (desktop, hostguard, privexec, tun, proxy, ...)
+    # still get compile + vet coverage for all three GOOS in the quality job.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      DENYOUT_TEST_NO_ELEVATE: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.4"
+      - name: Build CLI
+        run: go build ./cmd/denyout-cli
+      - name: Unit tests (platform-neutral packages)
+        run: >-
+          go test -count=1
+          ./internal/platform/...
+          ./internal/policy/...
+          ./internal/secrets/...
+          ./internal/inspect/...
+          ./internal/threatlists/...
+          ./internal/audit/...
+          ./internal/check/...
+          ./internal/cloudsync/...
+          ./internal/lab/...
+      - name: Compile remaining test binaries (no run)
+        shell: bash
+        run: |
+          for p in $(go list ./internal/... ./cmd/denyout-cli); do
+            go test -c -o /dev/null "$p" 2>&1 | grep -v 'no test files' || true
+          done
 
   docker-security:
     # Root helper + installer checks run in containers only (never on the runner's own network).
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: "1.27.4"
       - name: Root-helper exploit regression
@@ -89,8 +137,10 @@ jobs:
   copy-hygiene:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
       - name: prose-hygiene (docs + app UI symbols)
@@ -100,3 +150,36 @@ jobs:
           chmod +x scripts/check-copy.sh
           # CI clone path is set inside the script when CI=1
           bash scripts/check-copy.sh
+
+  supply-chain:
+    # Dependency integrity + known-vulnerability checks (read-only, no secrets).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: "1.27.4"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+      - name: go mod verify (downloaded modules match go.sum)
+        run: go mod verify
+      - name: go.mod / go.sum tidy
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum
+      - name: govulncheck (Go)
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.10.0 ./...
+      - name: Outdated modules (report only)
+        run: |
+          {
+            echo '### Direct modules with available updates'
+            echo '```'
+            go list -m -u -f '{{if and (not .Indirect) .Update}}{{.Path}} {{.Version}} -> {{.Update.Version}}{{end}}' all
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: npm audit (frontend, production deps)
+        working-directory: cmd/denyout/frontend
+        run: npm audit --omit=dev --audit-level=high

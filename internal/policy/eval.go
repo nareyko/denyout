@@ -477,7 +477,9 @@ func normalizeHost(host string) string {
 	for _, r := range h {
 		if r > 127 {
 			if a, err := idna.Lookup.ToASCII(h); err == nil {
-				return a
+				// IDNA maps U+3002/U+FF0E/U+FF61 to "."; strip any dot that created
+				// ("evil.com｡" must equal "evil.com").
+				return strings.TrimRight(a, ".")
 			}
 			break
 		}
