@@ -114,6 +114,9 @@ func (a *App) UIOpenUpdateURL() error {
 	if u == "" {
 		return errors.New("no update link yet - check for updates first")
 	}
+	if !updates.SafeReleaseURL(u) {
+		return errors.New("update link is not a trusted DenyOut https URL")
+	}
 	openBrowser(u)
 	return nil
 }

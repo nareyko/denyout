@@ -8,7 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -55,6 +57,9 @@ func ParseManifest(data []byte) (Manifest, error) {
 func Fetch(ctx context.Context, client *http.Client, manifestURL string) (Manifest, error) {
 	if manifestURL == "" {
 		manifestURL = DefaultManifestURL
+	}
+	if mu, perr := url.Parse(manifestURL); perr != nil || (mu.Scheme != "https" && !isLoopbackHost(mu.Hostname())) {
+		return Manifest{}, fmt.Errorf("%w: manifest URL must be https", ErrUnavailable)
 	}
 	if client == nil {
 		client = &http.Client{Timeout: 12 * time.Second}
@@ -146,4 +151,27 @@ func verParts(s string) []int {
 		out = append(out, n)
 	}
 	return out
+}
+
+func isLoopbackHost(h string) bool {
+	if h == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(h)
+	return ip != nil && ip.IsLoopback()
+}
+
+// SafeReleaseURL reports whether u may be opened in the user's browser: https
+// only, on a DenyOut-controlled host. Stops a tampered manifest from launching
+// file:/custom-scheme handlers or sending users to a lookalike site.
+func SafeReleaseURL(u string) bool {
+	pu, err := url.Parse(strings.TrimSpace(u))
+	if err != nil || pu.Scheme != "https" || pu.User != nil {
+		return false
+	}
+	h := strings.ToLower(pu.Hostname())
+	if h == "denyout.com" || strings.HasSuffix(h, ".denyout.com") {
+		return true
+	}
+	return h == "github.com" && strings.HasPrefix(pu.Path, "/nareyko/denyout")
 }

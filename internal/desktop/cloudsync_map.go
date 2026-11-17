@@ -1,6 +1,8 @@
 package desktop
 
 import (
+	"net"
+	"regexp"
 	"strings"
 	"time"
 
@@ -55,19 +57,21 @@ func ApplySyncSettings(st *State, s cloudsync.Settings) {
 		st.Notify = s.NotifyLevel != "quiet"
 	}
 	if s.DecisionTimeoutSec > 0 {
-		st.DecisionTimeoutSec = s.DecisionTimeoutSec
+		st.DecisionTimeoutSec = clampInt(s.DecisionTimeoutSec, 1, 3600)
 	}
 	if s.ReaskIntervalSec > 0 {
-		st.ReaskIntervalSec = s.ReaskIntervalSec
+		st.ReaskIntervalSec = clampInt(s.ReaskIntervalSec, 1, 86400)
 	}
+	// Remote lists are untrusted input: validate shape and size so a hostile or
+	// buggy sync server cannot inject wildcard / junk allow entries.
 	if s.AlwaysAllowHosts != nil {
-		st.AlwaysAllowHosts = append([]string(nil), s.AlwaysAllowHosts...)
+		st.AlwaysAllowHosts = sanitizeSyncHosts(s.AlwaysAllowHosts)
 	}
 	if s.RememberedKeeps != nil {
-		st.RememberedKeeps = append([]string(nil), s.RememberedKeeps...)
+		st.RememberedKeeps = capStrings(s.RememberedKeeps, 500, 253)
 	}
 	if s.RememberedSignalAllows != nil {
-		st.RememberedSignalAllows = append([]string(nil), s.RememberedSignalAllows...)
+		st.RememberedSignalAllows = capStrings(s.RememberedSignalAllows, 500, 253)
 	}
 	if s.SensitiveSinksEnabled != nil {
 		st.SensitiveSinksEnabled = cloneBoolPtr(s.SensitiveSinksEnabled)
@@ -75,8 +79,54 @@ func ApplySyncSettings(st *State, s cloudsync.Settings) {
 	if s.SensitiveWritesEnabled != nil {
 		st.SensitiveWritesEnabled = cloneBoolPtr(s.SensitiveWritesEnabled)
 	}
-	st.BodyPureA = s.BodyPureA
-	st.AntiChunkEnabled = s.AntiChunkEnabled
+	// Remote sync may only keep or tighten these protections: an absent field
+	// decodes as false and must never silently switch them off.
+	st.BodyPureA = st.BodyPureA || s.BodyPureA
+	st.AntiChunkEnabled = st.AntiChunkEnabled || s.AntiChunkEnabled
+}
+
+func clampInt(v, lo, hi int) int {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
+}
+
+func capStrings(in []string, maxN, maxLen int) []string {
+	out := make([]string, 0, len(in))
+	for _, v := range in {
+		v = strings.TrimSpace(v)
+		if v == "" || len(v) > maxLen {
+			continue
+		}
+		out = append(out, v)
+		if len(out) >= maxN {
+			break
+		}
+	}
+	return out
+}
+
+var syncHostRE = regexp.MustCompile(`^(?i:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+)$`)
+
+// sanitizeSyncHosts keeps plain DNS host names only (no wildcards, schemes,
+// ports, IP literals or bare TLDs), max 500 entries.
+func sanitizeSyncHosts(in []string) []string {
+	out := make([]string, 0, len(in))
+	for _, h := range in {
+		h = strings.ToLower(strings.TrimSpace(h))
+		if len(h) > 253 || !syncHostRE.MatchString(h) || net.ParseIP(h) != nil {
+			continue
+		}
+		out = append(out, h)
+		if len(out) >= 500 {
+			break
+		}
+	}
+	return out
 }
 
 // ThreatPrefsFromSettings extracts Book C toggles from sync settings.

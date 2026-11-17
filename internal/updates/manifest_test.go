@@ -76,3 +76,15 @@ func BenchmarkIsNewer(b *testing.B) {
 		_ = IsNewer("1.2.3", "1.2.2")
 	}
 }
+
+func TestSafeReleaseURL(t *testing.T) {
+	for u, want := range map[string]bool{
+		"https://denyout.com/download": true, "https://github.com/nareyko/denyout/releases/tag/v1": true,
+		"http://denyout.com/x": false, "file:///etc/passwd": false, "https://denyout.com.evil.io/": false,
+		"https://github.com/other/repo": false, "https://u:p@denyout.com/": false, "javascript:alert(1)": false,
+	} {
+		if got := SafeReleaseURL(u); got != want {
+			t.Errorf("SafeReleaseURL(%q)=%v want %v", u, got, want)
+		}
+	}
+}
