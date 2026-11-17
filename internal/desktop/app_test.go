@@ -115,9 +115,20 @@ func TestAllowAPIOnceAndAlways(t *testing.T) {
 	_ = ln.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	done := make(chan struct{})
 	go func() {
+		defer close(done)
 		_ = desktop.Run(ctx, desktop.Options{NoTray: true, NoOpen: true, WebUI: true, Listen: addr})
+	}()
+	// Wait for Run to finish writing before t.TempDir cleanup (was a CI flake:
+	// "TempDir RemoveAll cleanup: directory not empty").
+	defer func() {
+		cancel()
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			t.Error("desktop.Run did not stop")
+		}
 	}()
 
 	base := "http://" + addr
@@ -177,9 +188,20 @@ func TestAskModeSettings(t *testing.T) {
 	_ = ln.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	done := make(chan struct{})
 	go func() {
+		defer close(done)
 		_ = desktop.Run(ctx, desktop.Options{NoTray: true, NoOpen: true, WebUI: true, Listen: addr})
+	}()
+	// Wait for Run to finish writing before t.TempDir cleanup (was a CI flake:
+	// "TempDir RemoveAll cleanup: directory not empty").
+	defer func() {
+		cancel()
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			t.Error("desktop.Run did not stop")
+		}
 	}()
 
 	base := "http://" + addr
