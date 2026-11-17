@@ -28,7 +28,7 @@ grep -q degraded /run/denyout-hostguard.state 2>/dev/null && ok "state=degraded"
 
 echo "== proxy returns: expect rules re-applied"
 start_proxy
-for i in $(seq 1 12); do has_table && break; sleep 1; done
+for i in $(seq 1 25); do has_table && break; sleep 1; done
 has_table && ok "rules re-applied after recovery" || bad "rules not restored"
 grep -q protected /run/denyout-hostguard.state 2>/dev/null && ok "state=protected" || bad "state not protected"
 

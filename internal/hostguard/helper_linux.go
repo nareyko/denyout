@@ -219,12 +219,7 @@ func suppressT0ForTUN(suppress bool) {
 	tunSuppressed = suppress
 	s := lastApplySpec
 	if suppress {
-		wantBlockQUIC := !s.AllowQUIC
-		s.AllowQUIC = true // omit IPv4 denyout-block-quic; TUN steers/drops instead
-		s.TunTCP = true    // omit IPv4 TCP redirect; gVisor owns TCP
-		// TUN only carries IPv4: keep IPv6 redirect + QUIC drop (no IPv6 bypass).
-		s.TunV6Guard = true
-		s.TunV6DropQUIC = wantBlockQUIC
+		s = suppressedSpec(s)
 	}
 	_ = Apply(s)
 }
@@ -596,4 +591,15 @@ func peerUID(c net.Conn) int {
 		}
 	})
 	return uid
+}
+
+// suppressedSpec is the ruleset used while the TUN data plane owns IPv4 TCP/QUIC:
+// the IPv4 redirect/drop is omitted, but IPv6 stays guarded (TUN carries only IPv4).
+func suppressedSpec(s Spec) Spec {
+	wantBlockQUIC := !s.AllowQUIC
+	s.AllowQUIC = true // omit IPv4 denyout-block-quic; TUN steers/drops instead
+	s.TunTCP = true    // omit IPv4 TCP redirect; gVisor owns TCP
+	s.TunV6Guard = true
+	s.TunV6DropQUIC = wantBlockQUIC
+	return s
 }

@@ -1,4 +1,4 @@
-.PHONY: build test check canary lab accept m3 snapshot release-dry
+.PHONY: build test check canary lab accept m3 snapshot release-dry fmt-check vet-all lint race security-docker
 
 build:
 	go build -ldflags "-X main.version=dev" -o bin/denyout-cli ./cmd/denyout-cli
@@ -31,3 +31,21 @@ snapshot:
 # Validate config only
 release-dry:
 	goreleaser check
+
+fmt-check:
+	@out=$$(gofmt -l cmd internal); if [ -n "$$out" ]; then echo "gofmt needed:"; echo "$$out"; exit 1; fi
+
+vet-all:
+	@for os in linux darwin windows; do echo "== GOOS=$$os"; GOOS=$$os go vet ./internal/... ./cmd/denyout-cli || exit 1; done
+
+lint:
+	go run honnef.co/go/tools/cmd/staticcheck@latest ./internal/... ./cmd/denyout-cli
+
+race:
+	go test -race -count=1 ./internal/...
+
+# Docker-only security checks (never touch the host network).
+security-docker:
+	sh scripts/security-helper-regression-docker.sh
+	sh scripts/watchdog-e2e-docker.sh
+	sh scripts/install-verify-test-docker.sh
