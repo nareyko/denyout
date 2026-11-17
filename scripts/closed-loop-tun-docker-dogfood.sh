@@ -39,7 +39,7 @@ docker run --rm --privileged \
     apt-get update -qq
     apt-get install -y -qq iproute2 nftables >/dev/null
     echo "== helper-serve =="
-    denyout-cli hostctl helper-serve &
+    DENYOUT_TLS_INSECURE_UPSTREAM=1 denyout-cli hostctl helper-serve &
     hp=$!
     trap "kill $hp 2>/dev/null || true" EXIT
     for i in 1 2 3 4 5 6 7 8 9 10; do
