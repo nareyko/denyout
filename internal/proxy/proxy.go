@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"github.com/nareyko/denyout/internal/inspect"
 	"io"
 	"net"
 	"net/http"
@@ -18,7 +19,6 @@ import (
 
 	"github.com/nareyko/denyout/internal/audit"
 	"github.com/nareyko/denyout/internal/policy"
-	"github.com/nareyko/denyout/internal/secrets"
 )
 
 // TLSMode is intercept or passthrough.
@@ -279,7 +279,7 @@ func (s *Server) roundTripIntercept(client io.ReadWriteCloser, req *http.Request
 		RawURL:     rawURL,
 		Inspection: "intercept",
 		Headers:    req.Header,
-		BodyPrefix: peekRequestBody(req, bodyMax),
+		BodyPrefix: inspect.BodyView(req, bodyMax),
 	}
 	d := s.cfg.Engine.Evaluate(rv)
 	s.logDecision(rv, d, start)
@@ -433,7 +433,7 @@ func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
 		RawURL:     raw,
 		Inspection: "cleartext",
 		Headers:    r.Header,
-		BodyPrefix: peekRequestBody(r, bodyMax),
+		BodyPrefix: inspect.BodyView(r, bodyMax),
 	}
 	d := s.cfg.Engine.Evaluate(rv)
 	s.logDecision(rv, d, start)
@@ -554,7 +554,8 @@ func (s *Server) logPassthroughError(rv policy.RequestView, err error, start tim
 }
 
 func (s *Server) logDecision(rv policy.RequestView, d policy.Decision, start time.Time) {
-	redURL := secrets.RedactURL(rv.RawURL)
+	red := inspect.Request{URL: rv.RawURL, Path: rv.Path, RawQuery: rv.RawQuery}.Redacted()
+	redURL := red.URL
 	if s.cfg.Audit == nil {
 		if d.Verdict == "deny" {
 			fmt.Fprintf(os.Stderr, "denyout: DENY %s reasons=%s\n", redURL, strings.Join(d.Reasons, ","))
@@ -585,8 +586,8 @@ func (s *Server) logDecision(rv policy.RequestView, d policy.Decision, start tim
 		},
 		HTTP: &audit.HTTPInfo{
 			Method:        rv.Method,
-			Path:          secrets.RedactPath(rv.Path),
-			QueryRedacted: secrets.RedactQuery(rv.RawQuery),
+			Path:          red.Path,
+			QueryRedacted: red.Query,
 		},
 		Detectors:      d.Detectors,
 		LatencyMS:      time.Since(start).Milliseconds(),

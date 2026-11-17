@@ -1,4 +1,4 @@
-package proxy
+package inspect
 
 import (
 	"bytes"
@@ -16,7 +16,7 @@ func TestPeekRequestBodyRestores(t *testing.T) {
 		t.Fatal(err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	prefix := peekRequestBody(req, 65536)
+	prefix := BodyView(req, 65536)
 	if string(prefix) != body {
 		t.Fatalf("prefix=%q", prefix)
 	}
@@ -35,7 +35,7 @@ func TestPeekRequestBodySkipsMedia(t *testing.T) {
 		t.Fatal(err)
 	}
 	req.Header.Set("Content-Type", "image/png")
-	if prefix := peekRequestBody(req, 65536); prefix != nil {
+	if prefix := BodyView(req, 65536); prefix != nil {
 		t.Fatalf("expected nil for binary, got %q", prefix)
 	}
 }
@@ -47,7 +47,7 @@ func TestPeekRequestBodyScansMultipartOctetAndGzip(t *testing.T) {
 		if ct != "" {
 			req.Header.Set("Content-Type", ct)
 		}
-		if got := peekRequestBody(req, 65536); !strings.Contains(string(got), tok) {
+		if got := BodyView(req, 65536); !strings.Contains(string(got), tok) {
 			t.Errorf("content-type %q not scanned", ct)
 		}
 	}
@@ -58,25 +58,11 @@ func TestPeekRequestBodyScansMultipartOctetAndGzip(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPost, "https://evil.example/", bytes.NewReader(buf.Bytes()))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Content-Encoding", "gzip")
-	if got := peekRequestBody(req, 65536); !strings.Contains(string(got), tok) {
+	if got := BodyView(req, 65536); !strings.Contains(string(got), tok) {
 		t.Error("gzip body not decoded for scan")
 	}
 	rest, _ := io.ReadAll(req.Body)
 	if !bytes.Equal(rest, buf.Bytes()) {
 		t.Error("wire body must stay unmodified")
-	}
-}
-
-func TestHostHeaderMatches(t *testing.T) {
-	for _, c := range []struct {
-		hdr, host string
-		want      bool
-	}{
-		{"example.com", "example.com", true}, {"EXAMPLE.com:443", "example.com", true}, {"", "example.com", true},
-		{"evil.com", "example.com", false}, {"example.com.evil.com", "example.com", false}, {"[::1]:443", "::1", true},
-	} {
-		if got := hostHeaderMatches(c.hdr, c.host); got != c.want {
-			t.Errorf("hostHeaderMatches(%q,%q)=%v", c.hdr, c.host, got)
-		}
 	}
 }

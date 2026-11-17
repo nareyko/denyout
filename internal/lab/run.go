@@ -9,8 +9,8 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/nareyko/denyout/internal/inspect"
 	"github.com/nareyko/denyout/internal/policy"
-	"github.com/nareyko/denyout/internal/secrets"
 )
 
 // RunOptions configures a lab run.
@@ -102,7 +102,7 @@ func RunDB(db *sql.DB, opts RunOptions) (*RunReport, error) {
 			var err error
 			cfg, err = configFor(c.mode, c.preset)
 			if err != nil {
-				cr := CaseResult{CaseID: c.id, Suite: c.suite, URL: secrets.RedactURL(c.rawURL), Passed: false, Detail: err.Error(), Expect: c.expectVerdict}
+				cr := CaseResult{CaseID: c.id, Suite: c.suite, URL: inspect.RedactURL(c.rawURL), Passed: false, Detail: err.Error(), Expect: c.expectVerdict}
 				rep.Results = append(rep.Results, cr)
 				rep.Failed++
 				rep.Total++
@@ -114,7 +114,7 @@ func RunDB(db *sql.DB, opts RunOptions) (*RunReport, error) {
 
 		d, err := policy.EvaluateURL(cfg, c.rawURL)
 		if err != nil {
-			cr := CaseResult{CaseID: c.id, Suite: c.suite, URL: secrets.RedactURL(c.rawURL), Passed: false, Detail: err.Error(), Expect: c.expectVerdict}
+			cr := CaseResult{CaseID: c.id, Suite: c.suite, URL: inspect.RedactURL(c.rawURL), Passed: false, Detail: err.Error(), Expect: c.expectVerdict}
 			rep.Results = append(rep.Results, cr)
 			rep.Failed++
 			rep.Total++
@@ -125,7 +125,7 @@ func RunDB(db *sql.DB, opts RunOptions) (*RunReport, error) {
 		cr := CaseResult{
 			CaseID:    c.id,
 			Suite:     c.suite,
-			URL:       secrets.RedactURL(c.rawURL),
+			URL:       inspect.RedactURL(c.rawURL),
 			Verdict:   d.Verdict,
 			Reasons:   d.Reasons,
 			Expect:    c.expectVerdict,
