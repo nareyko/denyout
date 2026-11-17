@@ -199,7 +199,7 @@ func (s *Server) handleCheck(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		URL string `json:"url"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.URL == "" {
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10)).Decode(&body); err != nil || body.URL == "" {
 		writeErr(w, fmt.Errorf("url required"), http.StatusBadRequest)
 		return
 	}

@@ -30,6 +30,14 @@ Scope: all Go packages (`internal/*`, `cmd/denyout-cli`), the Wails desktop shel
 
 `go build/vet`: clean. `go test -race -count=2`: all 17 packages pass. `govulncheck`: 0 called vulns (3 in required modules, fixed by bump). `staticcheck`: 12 style/dead-code items (not security). `gosec`: 173 findings, overwhelmingly G204/G301/G306 noise; the relevant ones (G402 TLS skip-verify, G118) were reviewed. `npm audit --omit=dev`: 0; dev-only vite/esbuild advisories (dev server). Fuzz: `FuzzScanAndRedact` 90s/380k execs and `FuzzParse` 60s/1M execs, no crashes.
 
+## Follow-up: continuous assurance (security-1)
+
+- CI: `supply-chain` job (`go mod verify`, tidy check, `govulncheck`, outdated-module report, `npm audit`), workflow `permissions: contents: read`, all actions pinned to commit SHAs, `staticcheck` pinned, Dependabot (gomod, actions, npm).
+- `fuzz.yml` runs every `Fuzz*` target (auto-discovered by `scripts/fuzz-all.sh`) twice a week and uploads crashers. New targets: `FuzzParseRequest` (helper protocol), `FuzzHostMatch` (policy).
+- Found by fuzzing: IDNA maps U+3002/U+FF0E/U+FF61 to `.`, so `normalizeHost("evil.com\uff61")` kept a trailing dot and missed a rule for `evil.com`. Fixed + regression test.
+- Review of cloudsync/updates/threatlists/gui: redirects were unrestricted (an https endpoint could bounce the bearer token or manifest to plain http); added `internal/httpsafe` (no https->http, max 5 hops) to the default clients. `/api/check` body is now size-capped.
+- Open (needs owner decision): [`docs/design-security-open-decisions.md`](design-security-open-decisions.md) (owner-uid trust, IPv6/DNS in TUN). Also open: a user-supplied `*http.Client` bypasses the redirect policy; `apiErr` echoes remote error text into the UI; `srt` read restrictions.
+
 ## Residual risk / backlog
 
 1. **Owner-uid trust.** A sandboxed agent running as the owner uid can still call helper verbs (now validated). Longer term: split the agent into a different uid or require a per-session token.

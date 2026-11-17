@@ -76,3 +76,18 @@ Last verified against public tree: 2026-11-13.
 - [x] Process wrap vs Protect this computer claims distinguished 
 - [x] Windows WinDivert residual documented 
 - [x] Forbidden browser claim removed for Protect-On (browser is in scope when On)
+
+## 8. Trust boundaries and what covers each
+
+| # | Boundary (untrusted -> trusted) | Attacker controls | Enforced by | Covered by |
+| --- | --- | --- | --- | --- |
+| B1 | Agent process -> network egress | any outbound TCP 80/443, headers, bodies, URLs | transparent redirect / TUN, `internal/proxy`, `internal/policy`, `internal/secrets`, `internal/inspect` | `internal/accept` (AT-01..09), `internal/proxy` tests, `FuzzScanAndRedact`, `FuzzScanRedactInvariant`, `FuzzHostMatch` |
+| B2 | Destination name -> dial | hostnames, DNS answers, redirects, Host vs SNI | pinned dials, `UnsafeIP`, Host/SNI check, absolute and relative `Location` re-evaluation | `internal/policy` and `internal/proxy` tests, `FuzzHostMatch` (normalisation/IDNA) |
+| B3 | Owner-uid process -> root helper socket | one request line (legacy or JSON) | owner-only socket, peer auth, closed verb set, `ParseRequest` validation, CA PEM checks | `FuzzParseRequest`, `scripts/security-helper-regression-docker.sh`, `scripts/docker/helper-exploits.sh` |
+| B4 | Helper -> kernel rules | interface name, port, CA path | no shell, `privexec.Valid*`, atomic nft transaction, watchdog | `scripts/watchdog-e2e-docker.sh`, rules unit tests (Docker only) |
+| B5 | Remote service -> client (cloud sync, update manifest, threat feeds) | JSON bodies, feed bytes, redirects, truncation | https-only bases, size caps, `internal/httpsafe` (no https->http redirects), tighten-only sync validation, link allow-list | unit tests in `internal/cloudsync`, `internal/updates`, `internal/threatlists`, `internal/httpsafe`, `FuzzParse` |
+| B6 | Browser/web page -> local web UI / desktop API | Host/Origin/Content-Type, request size | `guardLocal`, body caps, JSON-only | `internal/gui` tests |
+| B7 | Release artifact -> installed binary | download mirror, archive | SHA256SUMS + keyless cosign, installer verification | `scripts/install-verify-test-docker.sh` |
+| B8 | Dependencies / CI -> repository | upstream modules, actions | `go mod verify`, `govulncheck`, SHA-pinned actions, Dependabot, least-privilege `permissions:` | `.github/workflows/ci.yml` (`supply-chain`), `fuzz.yml` (scheduled) |
+
+Not a boundary DenyOut defends (see §2 and `docs/security-review-2026-11.md`): the owner uid itself, other uids, DNS/DoH, non-80/443 TCP, UDP other than QUIC, a root attacker.
