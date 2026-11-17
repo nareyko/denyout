@@ -94,8 +94,8 @@ echo "== quiesce, then leak check over a steady load window (final proxy process
 wait_state '^(protected|restored_after_restart)' 10 || bad "pre-steady state: $(state)"
 has_table || { apply; sleep 1; }
 G0=$(goroutines); F0=$(fds $PP); T0=$(threads $PP); R0=$(rss_kb $PP)
-start_load; sleep 5; GP=$(goroutines); sleep 5; stop_load; sleep 5
-[ "${GP:-0}" -gt "$G0" ] && ok "load reached the proxy (peak goroutines $GP)" || bad "no evidence load reached the proxy (peak ${GP:-?} vs idle $G0)"
+D0=$(grep -c "^denyout: DENY" /tmp/proxyd.log); start_load; sleep 5; GP=$(goroutines); sleep 5; stop_load; sleep 5; D1=$(grep -c "^denyout: DENY" /tmp/proxyd.log)
+[ $((D1 - D0)) -ge 20 ] && ok "load reached the proxy ($((D1 - D0)) connections handled, mid-load goroutines ${GP:-?})" || bad "load did not reach the proxy ($((D1 - D0)) connections)"
 G1=$(goroutines); F1=$(fds $PP); T1=$(threads $PP); R1=$(rss_kb $PP)
 echo "proxy goroutines $G0 -> $G1, fds $F0 -> $F1, threads $T0 -> $T1, rss_kb $R0 -> $R1"
 [ -n "$G0" ] && [ -n "$G1" ] || bad "could not read goroutine counts"
