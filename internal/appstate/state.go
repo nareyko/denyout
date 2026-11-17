@@ -37,9 +37,12 @@ func NormalizePolicyProfile(p string) string {
 
 // State is persisted desktop preferences.
 type State struct {
-	SetupDone   bool   `json:"setup_done"`
-	Notify      bool   `json:"notify"`
-	NotifyLevel string `json:"notify_level,omitempty"` // quiet | normal | detailed
+	// SchemaVersion is the on-disk schema version (see migrate.go). 0 = file written
+	// before versioning; LoadState migrates it forward and SaveState stamps it.
+	SchemaVersion int    `json:"schema_version,omitempty"`
+	SetupDone     bool   `json:"setup_done"`
+	Notify        bool   `json:"notify"`
+	NotifyLevel   string `json:"notify_level,omitempty"` // quiet | normal | detailed
 	// QuietWhileAwayOff: when true, Ask/Decision still appear while locked/idle.
 	// Default false = stay quiet while away (Presence wave).
 	QuietWhileAwayOff bool `json:"quiet_while_away_off,omitempty"`
@@ -153,20 +156,7 @@ func LoadState() State {
 		return st
 	}
 	_ = json.Unmarshal(b, &st)
-	if st.Scope == "" && st.ComputerEnabled {
-		st.Scope = ScopeComputer
-		st.ProtectionOn = true
-	}
-	if !jsonHasKey(b, "computer_available") {
-		st.ComputerAvailable = true
-	}
-	if !jsonHasKey(b, "autostart") && !st.AutostartAsked {
-		st.Autostart = true
-	}
-	// Legacy empty profile -> was agent; migration dialog handles switch to browse.
-	if strings.TrimSpace(st.PolicyProfile) == "" {
-		st.PolicyProfile = PolicyProfileAgent
-	}
+	migrate(&st, b)
 	return st
 }
 
@@ -183,6 +173,9 @@ func jsonHasKey(b []byte, key string) bool {
 func SaveState(st State) error {
 	stateMu.Lock()
 	defer stateMu.Unlock()
+	if st.SchemaVersion < CurrentSchemaVersion { // never downgrade a newer file's stamp
+		st.SchemaVersion = CurrentSchemaVersion
+	}
 	path := appdata.StatePath()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
