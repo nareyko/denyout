@@ -25,6 +25,18 @@ func TestLastErrorSummaryIgnoresPlaceholder(t *testing.T) {
 	}
 }
 
+func TestProtectReasonExposed(t *testing.T) {
+	a := &App{status: "Off"}
+	a.state = DefaultState()
+	if got := a.ProtectReason(); got != "" {
+		t.Fatalf("off should have no reason, got %q", got)
+	}
+	a.state.ProtectionOn = true
+	if got := a.ProtectReason(); got == "" {
+		t.Fatal("intended on without proxyd must explain why")
+	}
+}
+
 func TestProblemsUnhealthyOffIsHealthy(t *testing.T) {
 	a := &App{status: "Off"}
 	a.state = DefaultState()

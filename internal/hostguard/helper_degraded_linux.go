@@ -4,7 +4,8 @@ package hostguard
 
 import (
 	"os"
-	"strings"
+
+	"github.com/nareyko/denyout/internal/protectstate"
 )
 
 // HelperDegraded reports whether the helper watchdog has removed the redirect
@@ -14,5 +15,5 @@ func HelperDegraded() bool {
 	if err != nil {
 		return false
 	}
-	return strings.HasPrefix(strings.TrimSpace(string(b)), "degraded")
+	return protectstate.HelperStateDegraded(string(b))
 }

@@ -25,6 +25,8 @@ Full code review (stability + security); details and residual risks in [`docs/se
 
 ### Added
 
+- **Stability:** new `internal/protectstate` package is the single source of truth for the protection state (off / protected / agents / session / paused / degraded / needs_attention) with a pure `Compute` and a stable reason (`App.ProtectReason()`); desktop snapshot, Problems, tray and the helper's degraded check all use it (UI output unchanged, proven by an exhaustive equivalence test). Typed fail-soft policy `protectstate.FailPolicy` (open/closed) wired to the helper watchdog: `DENYOUT_FAIL_CLOSED=1` still works, plus `DENYOUT_FAIL_POLICY=open|closed` and `hostguard.SetFailPolicy`. The tray raises a notification when protection transitions into degraded (`protectstate.Tracker`, `hostguard.SetDegradedHook`).
+- **Tests:** `scripts/soak-docker.sh` (`SOAK_SECONDS`, `SOAK_CONC`; `make soak-docker`) soaks the proxy with concurrent clients and repeated proxy/helper SIGKILL restarts, asserting bounded goroutines/fds, state back to protected and no orphan redirect; optional non-blocking `soak.yml` workflow (manual/weekly). `DENYOUT_DEBUG_STATS=1` makes `proxyd` print its goroutine count on SIGUSR1 (soak only).
 - **Threat lists: Block ads & trackers (default OFF):** Basic toggle gates Advanced OISD / StevenBlack. Category-specific deny reasons (`threat_phishing` / `threat_malware` / `threat_ads`) so tracker hits no longer read as phishing/malware. Legacy `threat_list` still accepted.
 
 ### Fixed

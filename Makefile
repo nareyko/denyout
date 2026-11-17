@@ -49,3 +49,7 @@ security-docker:
 	sh scripts/security-helper-regression-docker.sh
 	sh scripts/watchdog-e2e-docker.sh
 	sh scripts/install-verify-test-docker.sh
+
+# Soak/stress (SOAK_SECONDS=60 default), Docker only.
+soak-docker:
+	sh scripts/soak-docker.sh

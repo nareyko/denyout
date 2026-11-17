@@ -11,6 +11,7 @@ import (
 	"github.com/nareyko/denyout/internal/audit"
 	"github.com/nareyko/denyout/internal/hostguard"
 	"github.com/nareyko/denyout/internal/notify"
+	"github.com/nareyko/denyout/internal/protectstate"
 )
 
 func hostguardHelperOK() bool {
@@ -300,60 +301,49 @@ func pendingYourSetupModeLocked(a *App, liveMode string) string {
 	}
 }
 
-func problemsUnhealthyLocked(a *App) bool {
-	// Home / tray "Needs attention" = Protect intended on but broken.
-	// Off (no proxyd / no ComputerEnabled) is healthy — not an alert.
-	// Live in-process session is intentional limited protect — not a failure.
-	// Threat-list freshness is Problems/Settings only, not a Protect failure.
-	wantOn := a.state.ComputerEnabled || a.state.ProtectionOn || a.proxyd != nil || a.session != nil
-	if !wantOn {
-		return false
+// protectInputsLocked gathers the facts protectstate.Compute needs (caller holds a.mu).
+func protectInputsLocked(a *App) protectstate.Inputs {
+	_, caErr := os.Stat(filepath.Join(CADir(), "ca.crt"))
+	pause := activeProtectPausedUntil(a.state.ProtectPausedUntil) != ""
+	return protectstate.Inputs{
+		Intent:         a.state.ComputerEnabled || a.state.ProtectionOn,
+		ProxydLive:     a.proxyd != nil,
+		SessionLive:    a.session != nil,
+		AgentsProfile:  normalizePolicyProfile(a.state.PolicyProfile) == PolicyProfileAgent,
+		Status:         a.status,
+		HelperDegraded: a.proxyd != nil && hostguard.HelperDegraded(),
+		CAPresent:      caErr == nil,
+		Paused:         pause,
 	}
-	st := strings.ToLower(a.status)
-	if strings.Contains(st, "error") || strings.Contains(a.status, "Needs") {
-		return true
-	}
-	if a.proxyd == nil && a.session == nil {
-		return true
-	}
-	// Helper watchdog pulled the redirect (proxy stopped answering): traffic is unfiltered.
-	if a.proxyd != nil && hostguard.HelperDegraded() {
-		return true
-	}
-	// Computer mode needs CA on disk; session uses the same CA store.
-	ca := filepath.Join(CADir(), "ca.crt")
-	if _, err := os.Stat(ca); err != nil {
-		return true
-	}
-	return false
 }
 
+// protectResultLocked is the single protection-state computation (see protectstate).
+func protectResultLocked(a *App) protectstate.Result {
+	return protectstate.Compute(protectInputsLocked(a))
+}
+
+// ProtectReason returns the human reason for the current state ("" when healthy).
+func (a *App) ProtectReason() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return protectResultLocked(a).Message
+}
+
+// problemsUnhealthyLocked: Home / tray "Needs attention" = Protect intended on but
+// broken. Off is healthy; a live session is intentional limited protect; threat-list
+// freshness is not a Protect failure.
+func problemsUnhealthyLocked(a *App) bool {
+	return protectResultLocked(a).NeedsAttention
+}
+
+// uiModeLocked reflects the live protector only. Leave-on / crash intent is
+// ProtectionOn + problems_alert, not a fake "Protected" pill.
 func uiModeLocked(a *App) string {
-	// Mode reflects the live protector only. Leave-on / crash intent is
-	// ProtectionOn + problems_alert, not a fake "Protected" pill.
-	if a.proxyd != nil {
-		if normalizePolicyProfile(a.state.PolicyProfile) == PolicyProfileAgent {
-			return "agents"
-		}
-		return "safe"
-	}
-	if a.session != nil {
-		return "session"
-	}
-	return "off"
+	return protectResultLocked(a).Mode
 }
 
 func uiModeLabel(mode string) string {
-	switch mode {
-	case "safe":
-		return "Protected"
-	case "agents":
-		return "Agents only"
-	case "session":
-		return "Session"
-	default:
-		return "Off"
-	}
+	return protectstate.ModeLabel(mode)
 }
 
 // uiModeLabelPaused matches GetUISnapshot ModeLabel (Off + active pause → Paused).
