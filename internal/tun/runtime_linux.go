@@ -5,9 +5,9 @@ package tun
 import (
 	"context"
 	"fmt"
+	"github.com/nareyko/denyout/internal/privexec"
 	"log"
 	"net"
-	"os/exec"
 	"strings"
 	"time"
 
@@ -62,12 +62,12 @@ func (r *Runtime) StartRealOpts(opts StartOpts) error {
 		_ = dev.Close()
 		return fmt.Errorf("tun: got iface %q want %s", name, DeviceName)
 	}
-	if err := exec.Command("ip", "addr", "replace", AddrCIDR, "dev", DeviceName).Run(); err != nil {
+	if err := privexec.Run("ip", "addr", "replace", AddrCIDR, "dev", DeviceName); err != nil {
 		_ = dev.Close()
 		_ = destroyDeviceBestEffort()
 		return fmt.Errorf("tun: addr: %w", err)
 	}
-	if err := exec.Command("ip", "link", "set", DeviceName, "up").Run(); err != nil {
+	if err := privexec.Run("ip", "link", "set", DeviceName, "up"); err != nil {
 		_ = dev.Close()
 		_ = destroyDeviceBestEffort()
 		return fmt.Errorf("tun: link up: %w", err)
@@ -305,37 +305,41 @@ func applySteer(uid int, enableTCP bool) error {
     meta skuid %d tcp dport { 80, 443 } counter meta mark set 0x%x comment "denyout-tun-tcp"
 `, uid, SteerMark)
 	}
-	script := strings.Join([]string{
-		`nft delete table inet denyout-tun 2>/dev/null || true`,
-		fmt.Sprintf(`nft -f - <<'EOF'
-table inet denyout-tun {
+	if err := privexec.ValidUID(uid); err != nil {
+		return fmt.Errorf("tun: steer: %w", err)
+	}
+	ruleset := fmt.Sprintf(`table inet denyout-tun {
   chain output {
     type route hook output priority -150; policy accept;
     meta mark 0x%x return
     meta skuid %d udp dport 443 counter meta mark set 0x%x comment "denyout-tun-quic"
 %s  }
 }
-EOF`, DenyOutMark, uid, SteerMark, tcpRules),
-		fmt.Sprintf(`ip route replace default dev %s table %d`, DeviceName, SteerTableID),
-		fmt.Sprintf(`ip rule del fwmark 0x%x lookup %d priority %d 2>/dev/null || true`, SteerMark, SteerTableID, SteerRulePriority),
-		fmt.Sprintf(`ip rule add fwmark 0x%x lookup %d priority %d`, SteerMark, SteerTableID, SteerRulePriority),
-	}, "\n")
-	out, err := exec.Command("sh", "-c", script).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("tun: steer: %w (%s)", err, strings.TrimSpace(string(out)))
+`, DenyOutMark, uid, SteerMark, tcpRules)
+	tbl, mark, prio := fmt.Sprintf("%d", SteerTableID), fmt.Sprintf("0x%x", SteerMark), fmt.Sprintf("%d", SteerRulePriority)
+	privexec.Best("nft", "delete", "table", "inet", "denyout-tun")
+	if out, err := privexec.OutputStdin(ruleset, "nft", "-f", "-"); err != nil {
+		return fmt.Errorf("tun: steer: nft: %w (%s)", err, strings.TrimSpace(string(out)))
+	}
+	if err := privexec.Run("ip", "route", "replace", "default", "dev", DeviceName, "table", tbl); err != nil {
+		return fmt.Errorf("tun: steer: %w", err)
+	}
+	privexec.Best("ip", "rule", "del", "fwmark", mark, "lookup", tbl, "priority", prio)
+	if err := privexec.Run("ip", "rule", "add", "fwmark", mark, "lookup", tbl, "priority", prio); err != nil {
+		return fmt.Errorf("tun: steer: %w", err)
 	}
 	return nil
 }
 
 func removeSteerBestEffort(uid int) error {
 	_ = uid
-	_ = exec.Command("nft", "delete", "table", "inet", "denyout-tun").Run()
-	_ = exec.Command("ip", "rule", "del", "fwmark", fmt.Sprintf("0x%x", SteerMark), "lookup", fmt.Sprintf("%d", SteerTableID), "priority", fmt.Sprintf("%d", SteerRulePriority)).Run()
-	_ = exec.Command("ip", "route", "flush", "table", fmt.Sprintf("%d", SteerTableID)).Run()
+	privexec.Best("nft", "delete", "table", "inet", "denyout-tun")
+	privexec.Best("ip", "rule", "del", "fwmark", fmt.Sprintf("0x%x", SteerMark), "lookup", fmt.Sprintf("%d", SteerTableID), "priority", fmt.Sprintf("%d", SteerRulePriority))
+	privexec.Best("ip", "route", "flush", "table", fmt.Sprintf("%d", SteerTableID))
 	return nil
 }
 
 func destroyDeviceBestEffort() error {
-	_ = exec.Command("ip", "link", "delete", DeviceName).Run()
+	privexec.Best("ip", "link", "delete", DeviceName)
 	return nil
 }
