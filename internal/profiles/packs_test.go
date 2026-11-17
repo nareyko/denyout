@@ -1,6 +1,7 @@
-package desktop
+package profiles
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -99,4 +100,13 @@ func TestSuggestPackID(t *testing.T) {
 	if SuggestPackID("Bot", []string{"python"}) != "" {
 		t.Fatal()
 	}
+}
+
+func containsFold(list []string, host string) bool {
+	for _, h := range list {
+		if strings.EqualFold(h, host) {
+			return true
+		}
+	}
+	return false
 }
