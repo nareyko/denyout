@@ -316,6 +316,10 @@ func problemsUnhealthyLocked(a *App) bool {
 	if a.proxyd == nil && a.session == nil {
 		return true
 	}
+	// Helper watchdog pulled the redirect (proxy stopped answering): traffic is unfiltered.
+	if a.proxyd != nil && hostguard.HelperDegraded() {
+		return true
+	}
 	// Computer mode needs CA on disk; session uses the same CA store.
 	ca := filepath.Join(CADir(), "ca.crt")
 	if _, err := os.Stat(ca); err != nil {
