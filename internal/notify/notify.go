@@ -445,7 +445,7 @@ func runNotifySendPlain(kind Kind, title, body string) {
 		args = append(args, fmt.Sprintf("--expire-time=%d", int(expire.Milliseconds())))
 	}
 	args = append(args, notifySendSoundArgs(kind)...)
-	args = append(args, title, body)
+	args = append(args, "--", title, body) // "--": text starting with "-" is never an option
 	cmd := exec.Command("notify-send", args...)
 	if err := cmd.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "denyout: notification: %v\n", err)
