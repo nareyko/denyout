@@ -5,6 +5,7 @@ package hostguard
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"os/exec"
@@ -13,11 +14,13 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/nareyko/denyout/internal/tun"
 )
 
 var (
+	helperOpMu    sync.Mutex // serializes state-changing helper verbs
 	lastApplyMu   sync.Mutex
 	lastApplySpec Spec
 	lastApplyOK   bool
@@ -265,6 +268,9 @@ func InstallHelper(ownerUID int) error {
 			ownerUID = u
 		}
 	}
+	if ownerUID <= 0 {
+		return fmt.Errorf("hostguard helper needs a non-root owner uid (run via the desktop app or pass --uid)")
+	}
 	exe, err := SelfExe()
 	if err != nil {
 		return err
@@ -378,7 +384,13 @@ func ServeHelper() error {
 		return err
 	}
 	defer ln.Close()
-	_ = os.Chmod(helperSockPath, 0o666) // peercred still gates; world-connectable then auth by uid
+	// Owner-only socket (plus root); SO_PEERCRED is checked again per connection.
+	if owner > 0 {
+		_ = os.Chown(helperSockPath, owner, 0)
+		_ = os.Chmod(helperSockPath, 0o600)
+	} else {
+		_ = os.Chmod(helperSockPath, 0o600) // root only until an owner is configured
+	}
 	for {
 		c, err := ln.Accept()
 		if err != nil {
@@ -390,12 +402,12 @@ func ServeHelper() error {
 
 func handleHelperConn(c net.Conn, ownerUID int) {
 	defer c.Close()
-	ucred := peerUID(c)
-	if ownerUID > 0 && ucred > 0 && ucred != ownerUID && ucred != 0 {
+	if !helperPeerAuthorized(ownerUID, peerUID(c)) {
 		_, _ = c.Write([]byte("ERR unauthorized\n"))
 		return
 	}
-	line, err := bufio.NewReader(c).ReadString('\n')
+	_ = c.SetDeadline(time.Now().Add(30 * time.Second))
+	line, err := bufio.NewReader(io.LimitReader(c, 4096)).ReadString('\n')
 	if err != nil {
 		return
 	}
@@ -406,16 +418,26 @@ func handleHelperConn(c net.Conn, ownerUID int) {
 	}
 	verb := strings.ToLower(parts[0])
 	port, _ := strconv.Atoi(parts[1])
-	uid, _ := strconv.Atoi(parts[2])
+	// Redirect rules always target the configured owner; never trust a client uid
+	// (a zero or foreign uid would let the owner redirect root's or others' traffic).
+	uid := ownerUID
 	ca := ""
 	if len(parts) >= 4 {
 		ca = parts[3]
+	}
+	if verb == "apply" {
+		if err := validateHelperCAPath(ca, ownerUID); err != nil {
+			_, _ = c.Write([]byte("ERR " + err.Error() + "\n"))
+			return
+		}
 	}
 	allowQUIC := false
 	if len(parts) >= 5 && (parts[4] == "1" || strings.EqualFold(parts[4], "true") || parts[4] == "allow_quic") {
 		allowQUIC = true
 	}
 	spec := Spec{ProxyPort: port, UID: uid, CACert: ca, AllowQUIC: allowQUIC}
+	helperOpMu.Lock()
+	defer helperOpMu.Unlock()
 	var opErr error
 	switch verb {
 	case "caps", "version":
