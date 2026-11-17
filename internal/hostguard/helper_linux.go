@@ -19,6 +19,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/nareyko/denyout/internal/privexec"
 	"github.com/nareyko/denyout/internal/tun"
 )
 
@@ -322,9 +323,9 @@ WantedBy=multi-user.target
 	if err := os.WriteFile(helperUnitPath, []byte(unit), 0o644); err != nil {
 		return err
 	}
-	_ = exec.Command("systemctl", "daemon-reload").Run()
-	_ = exec.Command("systemctl", "enable", helperUnitName).Run()
-	if err := exec.Command("systemctl", "restart", helperUnitName).Run(); err != nil {
+	privexec.Best("systemctl", "daemon-reload")
+	privexec.Best("systemctl", "enable", helperUnitName)
+	if err := privexec.Run("systemctl", "restart", helperUnitName); err != nil {
 		// Fallback: run serve in background if systemd unavailable (dev containers).
 		cmd := exec.Command(exe, "hostctl", "helper-serve")
 		cmd.Stdout = nil
@@ -382,11 +383,11 @@ func UninstallHelper() error {
 	if os.Geteuid() != 0 {
 		return ErrNeedsAdmin
 	}
-	_ = exec.Command("systemctl", "disable", "--now", helperUnitName).Run()
+	privexec.Best("systemctl", "disable", "--now", helperUnitName)
 	_ = os.Remove(helperUnitPath)
 	_ = os.Remove(helperSockPath)
 	_ = os.Remove(helperOwnerFile)
-	_ = exec.Command("systemctl", "daemon-reload").Run()
+	privexec.Best("systemctl", "daemon-reload")
 	return nil
 }
 
