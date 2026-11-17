@@ -1,0 +1,14 @@
+{
+ "setup_done": true,
+ "notify": false,
+ "notify_level": "quiet",
+ "ask_mode": false,
+ "protection_on": true,
+ "computer_enabled": false,
+ "computer_available": false,
+ "autostart": false,
+ "autostart_asked": true,
+ "policy_profile": "browse",
+ "scope": "computer",
+ "unknown_future_key": 1
+}

@@ -1,0 +1,11 @@
+{
+ "setup_done": true,
+ "notify": true,
+ "ask_mode": true,
+ "protection_on": false,
+ "computer_enabled": true,
+ "always_allow_hosts": ["example.com"],
+ "policy_profile": "",
+ "decision_timeout_sec": 30,
+ "body_pure_a": true
+}

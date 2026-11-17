@@ -28,6 +28,8 @@ Full code review (stability + security); details and residual risks in [`docs/se
 
 ### Added
 
+- **Configuration layer:** new `internal/settings` (typed settings, one `Spec` per setting, precedence flag > env > state file > default, validation) and a single reference, [`docs/configuration.md`](docs/configuration.md), enforced by a test against every `DENYOUT_*` variable in the tree. `desktop.json` is now versioned (`schema_version: 1`); older files migrate on read (fixtures in tests), newer files are never downgraded. `hostctl proxyd` env parsing goes through the shared helpers (same semantics).
+- **CLI:** `denyout-cli policy check <file>` (line-accurate errors, exit 2; `policy validate` stays as an alias), `denyout-cli config show [--json]` (effective settings with the source of each value, secrets redacted), `denyout-cli profile export <id> <file>` / `profile import [--force] <id> <file>` (id cannot escape the profiles dir; imports cannot use TLS passthrough, unknown presets/sandboxes, wildcard-everything allows, or unknown keys).
 - **Threat lists: Block ads & trackers (default OFF):** Basic toggle gates Advanced OISD / StevenBlack. Category-specific deny reasons (`threat_phishing` / `threat_malware` / `threat_ads`) so tracker hits no longer read as phishing/malware. Legacy `threat_list` still accepted.
 
 ### Fixed

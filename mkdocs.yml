@@ -40,6 +40,7 @@ nav:
   - 09-audit-and-ops.md: 09-audit-and-ops.md
   - 10-security-boundaries.md: 10-security-boundaries.md
   - 11-config-reference.md: 11-config-reference.md
+  - configuration.md: configuration.md
   - 12-mvp-and-roadmap.md: 12-mvp-and-roadmap.md
   - 13-competitors.md: 13-competitors.md
   - 14-testing.md: 14-testing.md
