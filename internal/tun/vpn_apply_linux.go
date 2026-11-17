@@ -4,8 +4,7 @@ package tun
 
 import (
 	"fmt"
-	"os/exec"
-	"strings"
+	"github.com/nareyko/denyout/internal/privexec"
 )
 
 // ApplyVPNEgress installs mark→table→iface routes (root). Caller must gate with WantVPNEgressApply.
@@ -16,23 +15,20 @@ func ApplyVPNEgress(iface string) error {
 	if !WantVPNEgressApply() {
 		return fmt.Errorf("tun: vpn egress apply disabled (set %s=1)", EnvVPNEgressE2E)
 	}
-	tbl := fmt.Sprintf("%d", VPNTableID)
-	mark := fmt.Sprintf("0x%x", DenyOutMark)
-	prio := fmt.Sprintf("%d", VPNRulePriority)
-	// No shell: argv only, so the interface name can never be interpreted.
-	if out, err := exec.Command("ip", "route", "replace", "default", "dev", iface, "table", tbl).CombinedOutput(); err != nil {
-		return fmt.Errorf("tun: vpn egress apply: %w (%s)", err, strings.TrimSpace(string(out)))
+	tbl, mark, prio := fmt.Sprintf("%d", VPNTableID), fmt.Sprintf("0x%x", DenyOutMark), fmt.Sprintf("%d", VPNRulePriority)
+	if err := privexec.Run("ip", "route", "replace", "default", "dev", iface, "table", tbl); err != nil {
+		return fmt.Errorf("tun: vpn egress apply: %w", err)
 	}
-	_ = exec.Command("ip", "rule", "del", "fwmark", mark, "lookup", tbl, "priority", prio).Run()
-	if out, err := exec.Command("ip", "rule", "add", "fwmark", mark, "lookup", tbl, "priority", prio).CombinedOutput(); err != nil {
-		return fmt.Errorf("tun: vpn egress apply: %w (%s)", err, strings.TrimSpace(string(out)))
+	privexec.Best("ip", "rule", "del", "fwmark", mark, "lookup", tbl, "priority", prio)
+	if err := privexec.Run("ip", "rule", "add", "fwmark", mark, "lookup", tbl, "priority", prio); err != nil {
+		return fmt.Errorf("tun: vpn egress apply: %w", err)
 	}
 	return nil
 }
 
 // RemoveVPNEgress deletes DenyOut VPN policy routing (best-effort).
 func RemoveVPNEgress() error {
-	_ = exec.Command("ip", "rule", "del", "fwmark", fmt.Sprintf("0x%x", DenyOutMark), "lookup", fmt.Sprintf("%d", VPNTableID), "priority", fmt.Sprintf("%d", VPNRulePriority)).Run()
-	_ = exec.Command("ip", "route", "flush", "table", fmt.Sprintf("%d", VPNTableID)).Run()
+	privexec.Best("ip", "rule", "del", "fwmark", fmt.Sprintf("0x%x", DenyOutMark), "lookup", fmt.Sprintf("%d", VPNTableID), "priority", fmt.Sprintf("%d", VPNRulePriority))
+	privexec.Best("ip", "route", "flush", "table", fmt.Sprintf("%d", VPNTableID))
 	return nil
 }

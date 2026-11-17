@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 const pfAnchor = "com.denyout"
@@ -22,9 +23,7 @@ func applyRedirect(spec Spec) error {
 		return fmt.Errorf("write pf anchor: %w", err)
 	}
 	// Ensure anchor is referenced (best-effort append once).
-	_ = exec.Command("sh", "-c",
-		fmt.Sprintf(`grep -q '%s' /etc/pf.conf || echo 'rdr-anchor "%s"\nanchor "%s"' >> /etc/pf.conf`, pfAnchor, pfAnchor, pfAnchor),
-	).Run()
+	ensurePFAnchorReferenced()
 	cmd := exec.Command("pfctl", "-a", pfAnchor, "-f", path)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -42,4 +41,19 @@ func removeRedirect(spec Spec) error {
 	path := filepath.Join("/etc/pf.anchors", pfAnchor)
 	_ = os.Remove(path)
 	return nil
+}
+
+// ensurePFAnchorReferenced appends the DenyOut anchor to /etc/pf.conf once (pure Go: no shell).
+func ensurePFAnchorReferenced() {
+	const conf = "/etc/pf.conf"
+	b, err := os.ReadFile(conf)
+	if err != nil || strings.Contains(string(b), pfAnchor) {
+		return
+	}
+	f, err := os.OpenFile(conf, os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	_, _ = fmt.Fprintf(f, "\nrdr-anchor \"%s\"\nanchor \"%s\"\n", pfAnchor, pfAnchor)
 }
