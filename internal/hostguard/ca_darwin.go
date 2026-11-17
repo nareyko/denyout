@@ -35,3 +35,9 @@ func uninstallCA() error {
 	_ = cmd.Run()
 	return nil
 }
+
+// caInstalled reports whether the DenyOut CA is in the System keychain (read-only query).
+func caInstalled() bool {
+	return exec.Command("security", "find-certificate", "-c", DesktopCANickname,
+		"/Library/Keychains/System.keychain").Run() == nil
+}
