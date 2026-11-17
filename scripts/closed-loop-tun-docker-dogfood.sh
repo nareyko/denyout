@@ -39,6 +39,7 @@ docker run --rm --privileged \
     apt-get update -qq
     apt-get install -y -qq iproute2 nftables >/dev/null
     echo "== helper-serve =="
+    mkdir -p /var/lib/denyout && echo "${TEST_UID:-1000}" > /var/lib/denyout/owner_uid
     DENYOUT_TLS_INSECURE_UPSTREAM=1 denyout-cli hostctl helper-serve &
     hp=$!
     trap "kill $hp 2>/dev/null || true" EXIT

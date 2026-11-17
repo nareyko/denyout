@@ -68,6 +68,7 @@ docker run --rm --privileged \
     grep -q READY /tmp/g6lab.log
 
     echo "== helper-serve + proxyd =="
+    mkdir -p /var/lib/denyout && echo "${TEST_UID:-1000}" > /var/lib/denyout/owner_uid
     DENYOUT_TLS_INSECURE_UPSTREAM=1 denyout-cli hostctl helper-serve >/tmp/helper.log 2>&1 &
     HP=$!
     for i in $(seq 1 50); do
