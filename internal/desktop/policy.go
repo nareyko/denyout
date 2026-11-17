@@ -7,20 +7,6 @@ import (
 )
 
 // Policy profiles for desktop Computer.
-const (
-	PolicyProfileAgent  = "agent"  // Agents only - default-deny allowlist
-	PolicyProfileBrowse = "browse" // Safe desktop - web OK, scanners on
-)
-
-func normalizePolicyProfile(p string) string {
-	switch strings.ToLower(strings.TrimSpace(p)) {
-	case PolicyProfileAgent:
-		return PolicyProfileAgent
-	default:
-		return PolicyProfileBrowse
-	}
-}
-
 // desktopPolicyConfig builds the live policy for proxyd/session from state.
 func (a *App) desktopPolicyConfig() (*policy.Config, error) {
 	a.mu.Lock()

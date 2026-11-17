@@ -1186,30 +1186,6 @@ func (a *App) UIRemoveTimedDeny(host, reason string) error {
 	return SaveState(st)
 }
 
-func effectiveNotifyLevel(st State) string {
-	if strings.TrimSpace(st.NotifyLevel) != "" {
-		return st.NotifyLevel
-	}
-	if st.Notify {
-		return "normal"
-	}
-	return "quiet"
-}
-
-func effectiveDecisionTimeoutSec(st State) int {
-	if st.DecisionTimeoutSec > 0 {
-		return st.DecisionTimeoutSec
-	}
-	return 15
-}
-
-func effectiveReaskIntervalSec(st State) int {
-	if st.ReaskIntervalSec > 0 {
-		return st.ReaskIntervalSec
-	}
-	return 60
-}
-
 // UISetAutostart toggles login autostart for denyout (GUI) when available.
 func (a *App) UISetAutostart(on bool) error {
 	a.mu.Lock()

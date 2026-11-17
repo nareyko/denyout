@@ -2,6 +2,7 @@ package desktop
 
 import (
 	"fmt"
+	"github.com/nareyko/denyout/internal/appstate"
 	"strings"
 	"sync"
 	"time"
@@ -35,29 +36,7 @@ func primaryPostBlockReason(reasons []string) string {
 	return ""
 }
 
-func postBlockKey(host, reason string) string {
-	return strings.ToLower(strings.TrimSpace(host)) + "|" + strings.TrimSpace(reason)
-}
-
-func (st State) RememberedKeep(host, reason string) bool {
-	key := postBlockKey(host, reason)
-	for _, k := range st.RememberedKeeps {
-		if k == key {
-			return true
-		}
-	}
-	now := time.Now()
-	for _, t := range st.TimedDenies {
-		if postBlockKey(t.Host, t.Reason) != key {
-			continue
-		}
-		exp, err := time.Parse(time.RFC3339, t.ExpiresAt)
-		if err == nil && now.Before(exp) {
-			return true
-		}
-	}
-	return false
-}
+func postBlockKey(host, reason string) string { return appstate.PostBlockKey(host, reason) }
 
 func (a *App) rememberKeep(host, reason string) {
 	key := postBlockKey(host, reason)

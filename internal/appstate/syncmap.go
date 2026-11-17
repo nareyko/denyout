@@ -1,4 +1,4 @@
-package desktop
+package appstate
 
 import (
 	"net"
@@ -26,9 +26,9 @@ func ExportSyncDocument(st State, threat ThreatSyncPrefs, packIDs []string) clou
 		SchemaVersion: cloudsync.SchemaVersion,
 		UpdatedAt:     syncUpdatedAt(st),
 		Settings: cloudsync.Settings{
-			NotifyLevel:            effectiveNotifyLevel(st),
-			DecisionTimeoutSec:     effectiveDecisionTimeoutSec(st),
-			ReaskIntervalSec:       effectiveReaskIntervalSec(st),
+			NotifyLevel:            EffectiveNotifyLevel(st),
+			DecisionTimeoutSec:     EffectiveDecisionTimeoutSec(st),
+			ReaskIntervalSec:       EffectiveReaskIntervalSec(st),
 			AlwaysAllowHosts:       append([]string(nil), st.AlwaysAllowHosts...),
 			RememberedKeeps:        append([]string(nil), st.RememberedKeeps...),
 			RememberedSignalAllows: append([]string(nil), st.RememberedSignalAllows...),
@@ -164,4 +164,31 @@ func cloneBoolPtr(p *bool) *bool {
 	}
 	v := *p
 	return &v
+}
+
+// EffectiveNotifyLevel resolves the notification level (legacy Notify bool fallback).
+func EffectiveNotifyLevel(st State) string {
+	if strings.TrimSpace(st.NotifyLevel) != "" {
+		return st.NotifyLevel
+	}
+	if st.Notify {
+		return "normal"
+	}
+	return "quiet"
+}
+
+// EffectiveDecisionTimeoutSec is the Ask decision timeout (default 15s).
+func EffectiveDecisionTimeoutSec(st State) int {
+	if st.DecisionTimeoutSec > 0 {
+		return st.DecisionTimeoutSec
+	}
+	return 15
+}
+
+// EffectiveReaskIntervalSec is the re-ask interval (default 60s).
+func EffectiveReaskIntervalSec(st State) int {
+	if st.ReaskIntervalSec > 0 {
+		return st.ReaskIntervalSec
+	}
+	return 60
 }
