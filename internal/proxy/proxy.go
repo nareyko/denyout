@@ -409,7 +409,27 @@ func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, redactDenyMsg(d), http.StatusForbidden)
 		return
 	}
-	transport := http.DefaultTransport
+	// Pin the dial to the IPs that were just validated (no second DNS lookup, no
+	// HTTP(S)_PROXY from the environment): closes DNS-rebinding SSRF.
+	allowPrivate := s.cfg.Engine.Cfg.AllowPrivate
+	transport := &http.Transport{
+		Proxy:             nil,
+		DisableKeepAlives: true,
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			ip, err := safeDialIP(host, ips, allowPrivate)
+			if err != nil {
+				return nil, err
+			}
+			_, p, _ := net.SplitHostPort(addr)
+			return s.dialTCP(net.JoinHostPort(ip.String(), p), 15*time.Second)
+		},
+		ResponseHeaderTimeout: 60 * time.Second,
+	}
+	defer transport.CloseIdleConnections()
+	r.RequestURI = ""
+	// Hop-by-hop proxy headers must not leak upstream.
+	r.Header.Del("Proxy-Authorization")
+	r.Header.Del("Proxy-Connection")
 	resp, err := transport.RoundTrip(r)
 	if err != nil {
 		http.Error(w, "upstream error", http.StatusBadGateway)

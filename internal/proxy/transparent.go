@@ -153,6 +153,10 @@ func (s *Server) handleTransparentHTTP(conn net.Conn, req *http.Request, host st
 	if !strings.HasPrefix(raw, "http") {
 		raw = fmt.Sprintf("http://%s%s", req.Host, req.URL.RequestURI())
 	}
+	bodyMax := 65536
+	if s.cfg.Engine != nil && s.cfg.Engine.Cfg != nil {
+		bodyMax = s.cfg.Engine.Cfg.BodyScanMaxBytesOrDefault()
+	}
 	rv := policy.RequestView{
 		SessionID:  s.cfg.SessionID,
 		DestHost:   host,
@@ -160,8 +164,12 @@ func (s *Server) handleTransparentHTTP(conn net.Conn, req *http.Request, host st
 		DestIPs:    ips,
 		Protocol:   "http",
 		Method:     req.Method,
+		Path:       req.URL.Path,
+		RawQuery:   req.URL.RawQuery,
 		Inspection: "transparent",
 		RawURL:     raw,
+		Headers:    req.Header, // header + body scanners must see cleartext traffic too
+		BodyPrefix: peekRequestBody(req, bodyMax),
 	}
 	d := s.cfg.Engine.Evaluate(rv)
 	if d.Verdict == "deny" {
@@ -169,7 +177,13 @@ func (s *Server) handleTransparentHTTP(conn net.Conn, req *http.Request, host st
 		fmt.Fprintf(conn, "HTTP/1.1 403 Forbidden\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n%s\n", redactDenyMsg(d))
 		return
 	}
-	out, err := s.dialTCP(net.JoinHostPort(host, fmt.Sprintf("%d", port)), 10*time.Second)
+	// Dial the validated IP (never re-resolve the name: DNS-rebinding TOCTOU).
+	dialIP, derr := safeDialIP(host, ips, s.cfg.Engine.Cfg.AllowPrivate)
+	if derr != nil {
+		fmt.Fprintf(conn, "HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n")
+		return
+	}
+	out, err := s.dialTCP(net.JoinHostPort(dialIP.String(), fmt.Sprintf("%d", port)), 10*time.Second)
 	if err != nil {
 		return
 	}
