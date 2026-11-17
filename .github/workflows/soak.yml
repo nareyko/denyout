@@ -1,0 +1,27 @@
+name: soak
+
+# Optional, non-blocking: longer proxy/helper restart + concurrency soak (Docker only).
+on:
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: "Soak duration in seconds"
+        default: "600"
+      conc:
+        description: "Concurrent client workers"
+        default: "48"
+  schedule:
+    - cron: "17 3 * * 1"
+
+jobs:
+  soak:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Soak (Docker)
+        env:
+          SOAK_SECONDS: ${{ github.event.inputs.seconds || '600' }}
+          SOAK_CONC: ${{ github.event.inputs.conc || '48' }}
+        run: sh scripts/soak-docker.sh

@@ -54,5 +54,6 @@ Scope: all Go packages (`internal/*`, `cmd/denyout-cli`), the Wails desktop shel
 ./scripts/security-helper-regression-docker.sh   # root-helper exploit replay
 ./scripts/watchdog-e2e-docker.sh                 # watchdog + IPv6 listener
 ./scripts/install-verify-test-docker.sh          # installer integrity gates
+SOAK_SECONDS=60 ./scripts/soak-docker.sh         # concurrency + proxy/helper restart soak
 ./scripts/closed-loop-tun-g6-docker-dogfood.sh   # TUN/QUIC lab
 ```

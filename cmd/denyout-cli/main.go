@@ -1093,6 +1093,7 @@ func cmdHostctlProxyd(args []string) int {
 	} else {
 		threats = att.Store
 	}
+	startDebugStats()
 	var sessRef *run.Session
 	insecureUp := false
 	if settings.EnvBool(os.Getenv("DENYOUT_TLS_INSECURE_UPSTREAM")) {

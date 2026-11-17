@@ -1,6 +1,7 @@
 # Binaries / build
 /bin/
 /dist/
+/.soak-bin/
 /target/
 *.exe
 /denyout
