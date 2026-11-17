@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -31,9 +33,33 @@ func (c *Client) httpClient() *http.Client {
 func (c *Client) base() string {
 	u := DefaultAPIBase
 	if c != nil && strings.TrimSpace(c.BaseURL) != "" {
-		u = strings.TrimRight(strings.TrimSpace(c.BaseURL), "/")
+		cand := strings.TrimRight(strings.TrimSpace(c.BaseURL), "/")
+		if SafeAPIBase(cand) {
+			u = cand
+		}
 	}
 	return u
+}
+
+// SafeAPIBase allows https:// bases, and plain http only for loopback (dev/tests),
+// so the bearer token is never sent in cleartext to a remote host.
+func SafeAPIBase(base string) bool {
+	pu, err := url.Parse(base)
+	if err != nil || pu.Host == "" {
+		return false
+	}
+	switch pu.Scheme {
+	case "https":
+		return true
+	case "http":
+		h := pu.Hostname()
+		if h == "localhost" {
+			return true
+		}
+		ip := net.ParseIP(h)
+		return ip != nil && ip.IsLoopback()
+	}
+	return false
 }
 
 // RequestMagicLink starts email OTP (server may only log code in stub).

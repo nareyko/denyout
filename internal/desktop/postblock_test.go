@@ -1,6 +1,9 @@
 package desktop
 
-import "testing"
+import (
+	"path/filepath"
+	"testing"
+)
 
 func TestPrimaryPostBlockReason(t *testing.T) {
 	if primaryPostBlockReason([]string{"host_not_allowed"}) != "" {
@@ -31,5 +34,20 @@ func TestRememberedKeepRoundTrip(t *testing.T) {
 	st.RememberedKeeps = append(st.RememberedKeeps, postBlockKey("Evil.Example", "secret_in_url"))
 	if !st.RememberedKeep("evil.example", "secret_in_url") {
 		t.Fatal("want remembered")
+	}
+}
+
+func TestProfilePathCannotEscape(t *testing.T) {
+	for _, id := range []string{"../../etc/x", "a/b", "..", "x\x00y", ""} {
+		got := profilePath(id)
+		if filepath.Dir(got) != filepath.Clean(ProfilesDir()) {
+			t.Errorf("profilePath(%q)=%q escapes ProfilesDir", id, got)
+		}
+		if err := DeleteProfile(id); err == nil {
+			t.Errorf("DeleteProfile(%q) should fail", id)
+		}
+	}
+	if !ValidProfileID("my-agent_1") || ValidProfileID("../x") {
+		t.Error("ValidProfileID wrong")
 	}
 }
