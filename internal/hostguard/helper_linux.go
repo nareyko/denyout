@@ -4,6 +4,7 @@ package hostguard
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -23,6 +24,7 @@ import (
 
 var (
 	helperOpMu    sync.Mutex // serializes state-changing helper verbs
+	tunSuppressed bool       // guarded by lastApplyMu: TUN currently owns IPv4 TCP
 	lastApplyMu   sync.Mutex
 	lastApplySpec Spec
 	lastApplyOK   bool
@@ -198,16 +200,29 @@ func helperTunVerb(verb string, uid int, real, mitm bool) (string, error) {
 	}
 }
 
+func clearApplied() {
+	lastApplyMu.Lock()
+	lastApplyOK = false
+	tunSuppressed = false
+	lastApplyMu.Unlock()
+	_ = os.Remove(helperStateFile)
+}
+
 func suppressT0ForTUN(suppress bool) {
 	lastApplyMu.Lock()
 	defer lastApplyMu.Unlock()
 	if !lastApplyOK || lastApplySpec.ProxyPort <= 0 {
 		return
 	}
+	tunSuppressed = suppress
 	s := lastApplySpec
 	if suppress {
-		s.AllowQUIC = true // omit denyout-block-quic; TUN steers/drops instead
-		s.TunTCP = true    // omit TCP redirect; gVisor owns TCP
+		wantBlockQUIC := !s.AllowQUIC
+		s.AllowQUIC = true // omit IPv4 denyout-block-quic; TUN steers/drops instead
+		s.TunTCP = true    // omit IPv4 TCP redirect; gVisor owns TCP
+		// TUN only carries IPv4: keep IPv6 redirect + QUIC drop (no IPv6 bypass).
+		s.TunV6Guard = true
+		s.TunV6DropQUIC = wantBlockQUIC
 	}
 	_ = Apply(s)
 }
@@ -408,6 +423,9 @@ func ServeHelper() error {
 		helperOpMu.Unlock()
 		_ = ln.Close()
 	}()
+	wctx, wcancel := context.WithCancel(context.Background())
+	defer wcancel()
+	go runWatchdog(wctx)
 	// Owner-only socket (plus root); SO_PEERCRED is checked again per connection.
 	if owner > 0 {
 		_ = os.Chown(helperSockPath, owner, 0)
@@ -484,14 +502,17 @@ func handleHelperConn(c net.Conn, ownerUID int) {
 			lastApplyMu.Unlock()
 		}
 	case "remove":
+		clearApplied() // Protect Off: the watchdog must not re-apply rules later
 		_ = tun.GlobalRuntime().StopReal()
 		_ = tun.RemoveVPNEgress()
 		opErr = Remove(spec)
 	case "teardown":
+		clearApplied()
 		_ = tun.GlobalRuntime().StopReal()
 		_ = tun.RemoveVPNEgress()
 		opErr = Teardown(spec)
 	case "uninstall-helper":
+		clearApplied()
 		_ = tun.GlobalRuntime().StopReal()
 		_ = tun.RemoveVPNEgress()
 		opErr = UninstallHelper()

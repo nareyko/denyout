@@ -55,6 +55,7 @@ type Config struct {
 type Server struct {
 	cfg     Config
 	ln      net.Listener
+	ln6     net.Listener // transparent mode: ::1 twin so nft IPv6 redirects land somewhere
 	httpSrv *http.Server
 	mu      sync.Mutex
 	closed  bool
@@ -80,7 +81,15 @@ func Start(ctx context.Context, cfg Config) (*Server, error) {
 		IdleTimeout:       2 * time.Minute,
 	}
 	if cfg.Transparent {
-		go s.serveTransparent()
+		go s.serveTransparentOn(ln)
+		// nft redirects IPv6 80/443 to ::1:<port>; without this listener IPv6 web traffic
+		// is refused (or, worse, users disable the v6 rules). Best-effort: v6 may be off.
+		if cfg.ListenHost == "127.0.0.1" {
+			if ln6, err6 := net.Listen("tcp", fmt.Sprintf("[::1]:%d", ln.Addr().(*net.TCPAddr).Port)); err6 == nil {
+				s.ln6 = ln6
+				go s.serveTransparentOn(ln6)
+			}
+		}
 	} else {
 		go func() {
 			_ = s.httpSrv.Serve(ln)
@@ -115,6 +124,9 @@ func (s *Server) Close() error {
 	defer cancel()
 	if s.httpSrv != nil && !s.cfg.Transparent {
 		_ = s.httpSrv.Shutdown(ctx)
+	}
+	if s.ln6 != nil {
+		_ = s.ln6.Close()
 	}
 	return s.ln.Close()
 }

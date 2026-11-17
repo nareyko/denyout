@@ -33,10 +33,20 @@ func renderLinuxNFT(spec Spec) string {
 	if !spec.TunTCP {
 		fmt.Fprintf(&b, "    meta skuid %d tcp dport { 80, 443 } ip daddr != 127.0.0.0/8 redirect to :%d\n", spec.UID, spec.ProxyPort)
 		fmt.Fprintf(&b, "    meta skuid %d tcp dport { 80, 443 } ip6 daddr != ::1 redirect to :%d\n", spec.UID, spec.ProxyPort)
+	} else if spec.TunV6Guard {
+		fmt.Fprintf(&b, "    # TunTCP: IPv4 80/443 owned by denyout0; IPv6 is not steered, keep the redirect\n")
+		fmt.Fprintf(&b, "    meta skuid %d tcp dport { 80, 443 } ip6 daddr != ::1 redirect to :%d\n", spec.UID, spec.ProxyPort)
 	} else {
 		fmt.Fprintf(&b, "    # TunTCP: TCP 80/443 steered to denyout0 / gVisor (no redirect)\n")
 	}
 	fmt.Fprintf(&b, "  }\n")
+	if spec.AllowQUIC && spec.TunV6DropQUIC {
+		fmt.Fprintf(&b, "  chain output_filter {\n")
+		fmt.Fprintf(&b, "    type filter hook output priority 0; policy accept;\n")
+		fmt.Fprintf(&b, "    meta mark %d return\n", mark)
+		fmt.Fprintf(&b, "    meta nfproto ipv6 meta skuid %d udp dport 443 counter drop comment \"denyout-block-quic\"\n", spec.UID)
+		fmt.Fprintf(&b, "  }\n")
+	}
 	if !spec.AllowQUIC {
 		fmt.Fprintf(&b, "  chain output_filter {\n")
 		fmt.Fprintf(&b, "    type filter hook output priority 0; policy accept;\n")

@@ -48,6 +48,12 @@ type Spec struct {
 	AllowQUIC bool
 	// TunTCP: when true, omit nft TCP redirect (gVisor on denyout0 owns TCP 80/443).
 	TunTCP bool
+	// TunV6Guard: while TunTCP omits the IPv4 redirect (TUN steers only IPv4), keep the
+	// IPv6 TCP 80/443 redirect so IPv6 web traffic cannot bypass Protect.
+	TunV6Guard bool
+	// TunV6DropQUIC: while AllowQUIC is forced on for TUN, still drop IPv6 UDP/443
+	// (set when the user's own setting is "block browser QUIC").
+	TunV6DropQUIC bool
 }
 
 // Status is a short machine-readable state for the tray/UI.

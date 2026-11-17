@@ -1,0 +1,41 @@
+#!/bin/bash
+# Runs inside a NET_ADMIN container. $1 = denyout-cli. Checks helper watchdog + IPv6 listener.
+set -u
+BIN=$1
+apt-get update -qq >/dev/null 2>&1; apt-get install -y -qq iproute2 nftables ca-certificates >/dev/null 2>&1
+id -u owner >/dev/null 2>&1 || useradd -u 1000 -M -s /usr/sbin/nologin owner
+mkdir -p /var/lib/denyout; echo 1000 > /var/lib/denyout/owner_uid
+CA=/tmp/ca; mkdir -p $CA; PORT=18443; fail=0
+ok()  { echo "PASS: $*"; }
+bad() { echo "FAIL: $*"; fail=1; }
+$BIN hostctl helper-serve >/tmp/helper.log 2>&1 &
+for i in $(seq 1 50); do [ -S /run/denyout-hostguard.sock ] && break; sleep 0.1; done
+start_proxy() { $BIN hostctl proxyd --port $PORT --ca-dir $CA >/tmp/proxyd.log 2>&1 & PP=$!; for i in $(seq 1 50); do ss -ltn | grep -q ":$PORT" && break; sleep 0.1; done; }
+has_table() { nft list tables 2>/dev/null | grep -q "inet denyout"; }
+start_proxy
+for i in $(seq 1 50); do [ -f $CA/ca.crt ] && break; sleep 0.1; done
+[ -f $CA/ca.crt ] || bad "proxyd did not create CA"
+$BIN hostctl apply --port $PORT --ca $CA/ca.crt --uid 1000 >/tmp/apply.txt 2>&1 || { cat /tmp/apply.txt; bad "apply"; }
+has_table && ok "rules applied" || bad "rules not applied"
+ss -ltn | grep -q "\[::1\]:$PORT" && ok "proxy also listens on [::1]:$PORT (IPv6 redirect target)" || bad "no IPv6 listener"
+nft list ruleset | grep -q "ip6 daddr" && ok "ruleset has IPv6 redirect" || bad "no IPv6 redirect rule"
+
+echo "== proxy dies: expect degrade (rules removed) within ~10s"
+kill $PP; wait $PP 2>/dev/null
+for i in $(seq 1 12); do has_table || break; sleep 1; done
+has_table && bad "rules still present with dead proxy (orphan blackhole)" || ok "rules removed after proxy death"
+grep -q degraded /run/denyout-hostguard.state 2>/dev/null && ok "state=degraded" || bad "state file not degraded"
+
+echo "== proxy returns: expect rules re-applied"
+start_proxy
+for i in $(seq 1 12); do has_table && break; sleep 1; done
+has_table && ok "rules re-applied after recovery" || bad "rules not restored"
+grep -q protected /run/denyout-hostguard.state 2>/dev/null && ok "state=protected" || bad "state not protected"
+
+echo "== Protect Off: watchdog must not resurrect rules"
+$BIN hostctl remove --port $PORT --uid 1000 --no-elevate >/dev/null 2>&1
+has_table && bad "rules still present after remove" || ok "rules removed by remove"
+kill $PP 2>/dev/null; wait $PP 2>/dev/null; sleep 1; start_proxy; sleep 6
+has_table && bad "watchdog re-applied rules after Protect Off" || ok "no resurrection after Protect Off"
+[ $fail = 0 ] && echo "watchdog-e2e: OK" || echo "watchdog-e2e: FAILED"
+exit $fail
