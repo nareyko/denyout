@@ -65,12 +65,6 @@ func (a *App) setScreenLocked(on bool) {
 	a.syncAwayNotify()
 }
 
-func (a *App) stayQuietWhileAway() bool {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return !a.state.QuietWhileAwayOff
-}
-
 // isAway reports whether DenyOut should suppress Ask/Decision and grow tray unread.
 func (a *App) isAway() bool {
 	a.mu.Lock()
