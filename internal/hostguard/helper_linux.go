@@ -275,6 +275,11 @@ func InstallHelper(ownerUID int) error {
 	if err != nil {
 		return err
 	}
+	// Never point a root service at a binary an unprivileged user can replace.
+	exe, err = trustedHelperExe(exe)
+	if err != nil {
+		return err
+	}
 	if err := os.MkdirAll(helperStateDir, 0o755); err != nil {
 		return err
 	}
