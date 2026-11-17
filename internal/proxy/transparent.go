@@ -15,8 +15,6 @@ import (
 	"github.com/nareyko/denyout/internal/policy"
 )
 
-func (s *Server) serveTransparent() { s.serveTransparentOn(s.ln) }
-
 func (s *Server) serveTransparentOn(ln net.Listener) {
 	for {
 		conn, err := ln.Accept()

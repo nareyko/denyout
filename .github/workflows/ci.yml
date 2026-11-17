@@ -50,6 +50,42 @@ jobs:
       - name: govulncheck
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.4"
+      - name: gofmt
+        run: |
+          out=$(gofmt -l cmd internal)
+          if [ -n "$out" ]; then echo "gofmt needed:"; echo "$out"; exit 1; fi
+      - name: vet (linux, darwin, windows)
+        run: |
+          for os in linux darwin windows; do
+            echo "== GOOS=$os"; GOOS=$os go vet ./internal/... ./cmd/denyout-cli
+          done
+      - name: staticcheck
+        run: go run honnef.co/go/tools/cmd/staticcheck@latest ./internal/... ./cmd/denyout-cli
+      - name: Race tests
+        run: go test -race -count=1 ./internal/...
+
+  docker-security:
+    # Root helper + installer checks run in containers only (never on the runner's own network).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.4"
+      - name: Root-helper exploit regression
+        run: sh scripts/security-helper-regression-docker.sh
+      - name: Helper watchdog + IPv6 listener e2e
+        run: sh scripts/watchdog-e2e-docker.sh
+      - name: Installer integrity gates
+        run: sh scripts/install-verify-test-docker.sh
+
   copy-hygiene:
     runs-on: ubuntu-latest
     steps:
