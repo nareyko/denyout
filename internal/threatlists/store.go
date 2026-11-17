@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sync"
 	"time"
 )
@@ -55,7 +56,10 @@ func Open(dir string) (*Store, error) {
 		},
 	}
 	if err := s.loadStatus(); err != nil && !os.IsNotExist(err) {
-		return nil, err
+		// Self-heal: quarantine an unreadable/corrupt status file instead of failing
+		// Open (which silently disabled all threat protection).
+		_ = os.Rename(s.statusPath(), s.statusPath()+".corrupt")
+		s.status = StatusFile{PollHours: DefaultPollHours, Feeds: make(map[string]FeedStatus)}
 	}
 	if s.status.Feeds == nil {
 		s.status.Feeds = make(map[string]FeedStatus)
@@ -66,6 +70,8 @@ func Open(dir string) (*Store, error) {
 	}
 	return s, nil
 }
+
+var feedIDRE = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,64}$`)
 
 func (s *Store) statusPath() string {
 	return filepath.Join(s.Dir, "status.json")
@@ -126,12 +132,12 @@ func (s *Store) saveStatusLocked() error {
 
 func (s *Store) loadCachedFeeds() error {
 	for id, st := range s.status.Feeds {
+		if !feedIDRE.MatchString(id) { // ids come from status.json: never build paths from junk
+			continue
+		}
 		raw, err := os.ReadFile(s.feedPath(id))
 		if err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
-			return err
+			continue // one unreadable feed must not disable the others
 		}
 		format := st.Format
 		if format == "" {
