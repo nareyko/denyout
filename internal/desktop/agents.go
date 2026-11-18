@@ -29,6 +29,48 @@ func (a *App) ensureWraps() {
 	a.mu.Unlock()
 }
 
+// profileSandbox resolves the sandbox mode for a profile ("srt" when isolation is required).
+func profileSandbox(p AgentProfile) string {
+	sandbox := strings.TrimSpace(p.Sandbox)
+	if p.RequireIsolation && sandbox == "" {
+		sandbox = "srt"
+	}
+	return sandbox
+}
+
+// isolationError reports when stronger isolation is required but srt is missing.
+func isolationError(p AgentProfile, sandbox string, srtAvailable func() bool) error {
+	if (sandbox == "srt" || p.RequireIsolation) && !srtAvailable() {
+		return fmt.Errorf("stronger isolation required but srt was not found in PATH - install sandbox-runtime or turn off require_isolation")
+	}
+	return nil
+}
+
+// wrapEnvironment builds the child environment for a wrapped agent. Pure.
+func wrapEnvironment(base []string, p AgentProfile, sessEnv map[string]string, envExtra []string) []string {
+	for k, v := range sessEnv {
+		base = append(base, k+"="+v)
+	}
+	base = append(base, envExtra...)
+	base = append(base, "DENYOUT_PROFILE_ID="+p.ID)
+	if p.Notify {
+		base = append(base, "DENYOUT_DESKTOP_NOTIFY=1")
+	}
+	return base
+}
+
+// reapWrap waits for the wrapped process, stops its session and forgets it.
+func (a *App) reapWrap(wp *wrapProc) {
+	_ = wp.cmd.Wait()
+	_ = wp.sess.Stop()
+	a.mu.Lock()
+	delete(a.wraps, wp.id)
+	a.state.WrapPIDs = removePID(a.state.WrapPIDs, wp.cmd.Process.Pid)
+	st2 := a.state
+	a.mu.Unlock()
+	_ = SaveState(st2)
+}
+
 func (a *App) startProfile(id string) error {
 	a.ensureWraps()
 	p, err := LoadProfile(id)
@@ -46,12 +88,9 @@ func (a *App) startProfile(id string) error {
 	if err != nil {
 		return err
 	}
-	sandbox := strings.TrimSpace(p.Sandbox)
-	if p.RequireIsolation && sandbox == "" {
-		sandbox = "srt"
-	}
-	if (sandbox == "srt" || p.RequireIsolation) && !run.SRTAvailable() {
-		return fmt.Errorf("stronger isolation required but srt was not found in PATH - install sandbox-runtime or turn off require_isolation")
+	sandbox := profileSandbox(p)
+	if err := isolationError(p, sandbox, run.SRTAvailable); err != nil {
+		return err
 	}
 
 	var sessRef *run.Session
@@ -98,16 +137,7 @@ func (a *App) startProfile(id string) error {
 	}
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	base := os.Environ()
-	for k, v := range st.Env {
-		base = append(base, k+"="+v)
-	}
-	base = append(base, envExtra...)
-	base = append(base, "DENYOUT_PROFILE_ID="+p.ID)
-	if p.Notify {
-		base = append(base, "DENYOUT_DESKTOP_NOTIFY=1")
-	}
-	cmd.Env = base
+	cmd.Env = wrapEnvironment(os.Environ(), p, st.Env, envExtra)
 
 	if err := cmd.Start(); err != nil {
 		_ = sess.Stop()
@@ -125,16 +155,7 @@ func (a *App) startProfile(id string) error {
 		fmt.Fprintln(os.Stderr, "denyout: note - without Stronger isolation (srt), some tools can bypass the proxy")
 	}
 
-	go func() {
-		_ = cmd.Wait()
-		_ = sess.Stop()
-		a.mu.Lock()
-		delete(a.wraps, p.ID)
-		a.state.WrapPIDs = removePID(a.state.WrapPIDs, cmd.Process.Pid)
-		st2 := a.state
-		a.mu.Unlock()
-		_ = SaveState(st2)
-	}()
+	go a.reapWrap(wp)
 	return nil
 }
 
