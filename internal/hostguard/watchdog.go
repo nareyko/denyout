@@ -61,3 +61,34 @@ func (w *watchdog) forceDegraded() {
 	w.degraded = true
 	w.mu.Unlock()
 }
+
+// setPolicy applies the current effective policy live (called every tick, so a policy
+// change needs no restart). It returns "reclose" when the policy just became closed
+// while the redirect had been removed: the caller must put the rules back (tightening
+// takes effect immediately, even though the proxy is still down). Switching to open
+// needs no edge: the failure counter keeps counting while closed, so the next down
+// probe degrades at once.
+func (w *watchdog) setPolicy(closed bool) string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	was := w.failClosed
+	w.failClosed = closed
+	if closed && !was && w.degraded {
+		w.degraded = false
+		return "reclose"
+	}
+	return ""
+}
+
+// proxyDown reports whether the failure threshold has been reached.
+func (w *watchdog) proxyDown() bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.fails >= watchdogThreshold
+}
+
+func (w *watchdog) closed() bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.failClosed
+}

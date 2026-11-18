@@ -5,6 +5,7 @@ package appstate
 import (
 	"encoding/json"
 	"github.com/nareyko/denyout/internal/appdata"
+	"github.com/nareyko/denyout/internal/protectstate"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,6 +25,19 @@ const (
 	PolicyProfileAgent  = "agent"  // Agents only - default-deny allowlist
 	PolicyProfileBrowse = "browse" // Safe desktop - web OK, scanners on
 )
+
+// NormalizeFailPolicy canonicalises a persisted fail policy: "" stays "" (default
+// open), "open"/"closed" (and the aliases protectstate accepts) are canonicalised,
+// anything unrecognised becomes "closed" - garbage never silently loosens protection.
+func NormalizeFailPolicy(s string) string {
+	if strings.TrimSpace(s) == "" {
+		return ""
+	}
+	if p, ok := protectstate.ParseFailPolicy(s); ok {
+		return string(p)
+	}
+	return string(protectstate.FailClosed)
+}
 
 // NormalizePolicyProfile maps any input to a known profile (default: browse).
 func NormalizePolicyProfile(p string) string {
@@ -72,7 +86,13 @@ type State struct {
 	TunDataplane bool `json:"tun_dataplane,omitempty"`
 	// QuicMITM: experimental HTTP/3 decrypt (G6 Q2). Default false; requires TunDataplane
 	// (or DENYOUT_TUN_E2E) and DENYOUT_QUIC_MITM=1 or this pref. Cursor hosts stay drop/sight.
-	QuicMITM           bool        `json:"quic_mitm,omitempty"`
+	QuicMITM bool `json:"quic_mitm,omitempty"`
+	// FailPolicy: what the helper does when the local proxy stops answering.
+	// "" (default) and "open" keep the internet working (redirect removed, state
+	// degraded); "closed" keeps the redirect and blocks web traffic until recovery.
+	// Env vars on the helper override it (see docs/configuration.md). Cloud sync can
+	// only set it to "closed".
+	FailPolicy         string      `json:"fail_policy,omitempty"`
 	AskMode            bool        `json:"ask_mode"`
 	PolicyProfile      string      `json:"policy_profile,omitempty"` // browse (Safe desktop) | agent (Agents only)
 	ActiveProfileID    string      `json:"active_profile_id,omitempty"`
@@ -157,6 +177,7 @@ func LoadState() State {
 	}
 	_ = json.Unmarshal(b, &st)
 	migrate(&st, b)
+	st.FailPolicy = NormalizeFailPolicy(st.FailPolicy)
 	return st
 }
 

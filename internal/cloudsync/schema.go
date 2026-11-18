@@ -34,7 +34,10 @@ type Settings struct {
 	SensitiveWritesEnabled *bool    `json:"sensitive_writes_enabled,omitempty"`
 	BodyPureA              bool     `json:"body_pure_a,omitempty"`
 	AntiChunkEnabled       bool     `json:"anti_chunk_enabled,omitempty"`
-	AppliedPackIDs         []string `json:"applied_pack_ids,omitempty"`
+	// FailPolicy is "closed" or absent. A remote value can only tighten: the client
+	// ignores anything but "closed" (see appstate.ApplySyncSettings).
+	FailPolicy     string   `json:"fail_policy,omitempty"`
+	AppliedPackIDs []string `json:"applied_pack_ids,omitempty"`
 }
 
 // NeverSync lists categories that must not appear in the blob (documentation + tests).

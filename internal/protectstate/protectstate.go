@@ -49,6 +49,9 @@ type Inputs struct {
 	CAPresent bool
 	// Paused: an active (unexpired) pause or "off until you turn it on" is in effect.
 	Paused bool
+	// FailPolicy is the effective proxy-loss policy ("" = unknown; messages then stay
+	// generic). It only changes the wording of Message, never the State.
+	FailPolicy FailPolicy
 }
 
 // Result is the computed state.
@@ -74,11 +77,11 @@ func Compute(in Inputs) Result {
 			r.Message = "Protection reported an error."
 		case !in.ProxydLive && !in.SessionLive:
 			r.NeedsAttention, r.Reason = true, ReasonNotRunning
-			r.Message = "Protection is meant to be on but is not running."
+			r.Message = "Protection is meant to be on but is not running." + policyNote(in.FailPolicy, false)
 		case in.ProxydLive && in.HelperDegraded:
 			// Watchdog pulled the redirect (proxy stopped answering): traffic is unfiltered.
 			r.NeedsAttention, r.Reason = true, ReasonHelperDegraded
-			r.Message = "The proxy stopped answering; traffic is unfiltered until it recovers."
+			r.Message = "The proxy stopped answering; traffic is unfiltered until it recovers." + policyNote(in.FailPolicy, true)
 		case !in.CAPresent:
 			r.NeedsAttention, r.Reason = true, ReasonCAMissing
 			r.Message = "The DenyOut certificate is missing."
@@ -106,6 +109,20 @@ func Compute(in Inputs) Result {
 		}
 	}
 	return r
+}
+
+// policyNote says which proxy-loss policy is active ("" when unknown).
+func policyNote(p FailPolicy, degraded bool) string {
+	switch p {
+	case FailOpen:
+		if degraded {
+			return " Your setting keeps the internet working when the proxy stops."
+		}
+		return " Your setting keeps the internet working when the proxy stops, so traffic may be unfiltered."
+	case FailClosed:
+		return " Your setting blocks web traffic until the proxy recovers."
+	}
+	return ""
 }
 
 func liveMode(in Inputs) string {

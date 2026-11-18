@@ -108,6 +108,7 @@ func (a *App) applyRemoteDocument(doc cloudsync.Document) error {
 		return err
 	}
 	applyNotifyPrefs(st)
+	_ = a.pushFailPolicy(needRebind) // sync can only tighten; tell the helper right away
 	var threatErr error
 	if haveThreat {
 		if err := a.UISetBlockPhishing(prefs.BlockPhishing); err != nil {

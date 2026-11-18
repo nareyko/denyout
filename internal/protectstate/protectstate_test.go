@@ -50,7 +50,7 @@ func TestComputeMatchesLegacyExhaustive(t *testing.T) {
 						for _, hd := range b {
 							for _, ca := range b {
 								for _, pa := range b {
-									in := Inputs{intent, px, se, ag, st, hd, ca, pa}
+									in := Inputs{intent, px, se, ag, st, hd, ca, pa, ""}
 									r := Compute(in)
 									n++
 									if r.NeedsAttention != legacyUnhealthy(in) {
@@ -166,5 +166,45 @@ func TestTrackerDegradedHook(t *testing.T) {
 	}
 	if len(all) != 2 {
 		t.Fatalf("transitions: %+v", all)
+	}
+}
+
+func TestResolveFailPolicySource(t *testing.T) {
+	cases := []struct {
+		env     map[string]string
+		setting FailPolicy
+		want    FailPolicy
+		src     string
+	}{
+		{nil, "", FailOpen, PolicySourceDefault},
+		{nil, FailClosed, FailClosed, PolicySourceSetting},
+		{nil, "bogus", FailOpen, PolicySourceDefault},
+		{map[string]string{"DENYOUT_FAIL_POLICY": "open"}, FailClosed, FailOpen, PolicySourceEnv},
+		{map[string]string{"DENYOUT_FAIL_POLICY": "closed"}, FailOpen, FailClosed, PolicySourceEnv},
+		{map[string]string{"DENYOUT_FAIL_CLOSED": "1", "DENYOUT_FAIL_POLICY": "open"}, FailOpen, FailClosed, PolicySourceEnvLegacy},
+		{map[string]string{"DENYOUT_FAIL_CLOSED": "0"}, FailClosed, FailClosed, PolicySourceSetting},
+	}
+	for i, c := range cases {
+		m := c.env
+		p, src := ResolveFailPolicy(func(k string) string { return m[k] }, c.setting)
+		if p != c.want || src != c.src {
+			t.Errorf("case %d: got %s/%s want %s/%s", i, p, src, c.want, c.src)
+		}
+	}
+}
+
+func TestMessageMentionsPolicy(t *testing.T) {
+	deg := Inputs{Intent: true, ProxydLive: true, HelperDegraded: true, CAPresent: true}
+	if m := Compute(deg).Message; strings.Contains(m, "setting") {
+		t.Fatalf("unknown policy must keep the generic message: %q", m)
+	}
+	deg.FailPolicy = FailOpen
+	if m := Compute(deg).Message; !strings.Contains(m, "keeps the internet working") {
+		t.Fatalf("open: %q", m)
+	}
+	down := Inputs{Intent: true, CAPresent: true, FailPolicy: FailClosed}
+	r := Compute(down)
+	if r.State != NeedsAttention || !strings.Contains(r.Message, "blocks web traffic") {
+		t.Fatalf("closed: %+v", r)
 	}
 }

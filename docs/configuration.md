@@ -38,13 +38,32 @@ nor a tampered state file can enable them.
 
 ## 2. State file and schema version
 
-`desktop.json` carries `schema_version` (current: **1**). Files without it are
+`desktop.json` carries `schema_version` (current: **2**; v2 added `fail_policy`). Files without it are
 version 0 (written by older builds) and are migrated on read in
 `internal/appstate/migrate.go`: legacy defaults are applied in memory and the
 file is rewritten at the next save. A file with a *newer* version than the
 binary knows is loaded as-is and never downgraded. Adding a migration: bump
 `CurrentSchemaVersion`, add a step, add a fixture under
 `internal/appstate/testdata`.
+
+### 2.0 If DenyOut's proxy stops (`fail_policy`)
+
+What the root helper does when the local proxy stops answering while Protect is on.
+Settings, Protect: *Keep the internet working (default)* = `open` (the redirect is
+removed after ~6 s, state `degraded`, restored when the proxy is back) or *Block web
+traffic until it recovers* = `closed` (rules stay, HTTPS fails until recovery).
+
+Precedence (highest first): `DENYOUT_FAIL_CLOSED=1` > `DENYOUT_FAIL_POLICY` > the
+`fail_policy` setting > default `open`. The environment variables are read by the
+helper process (a root service), not by the desktop app. The desktop sends the
+setting to the helper with every `apply` (token `fail=open|closed`) and live through
+the `fail-policy` verb; the helper persists it in `helper_state.json` so a helper
+restart keeps it, applies a change within ~2 s without restarting, and reports the
+effective policy and its source (`setting`, `default`, `env:DENYOUT_FAIL_POLICY`,
+`env:DENYOUT_FAIL_CLOSED`) through `fail-status` (`denyout-cli hostctl fail-policy status`).
+Only the exact values `open` and `closed` are accepted. Cloud sync can set
+`closed` but never `open`. Tightening while the redirect is already removed puts the
+rules back immediately.
 
 ### 2.1 Settings (typed, in `internal/settings`)
 
@@ -62,6 +81,7 @@ binary knows is loaded as-is and never downgraded. Adding a migration: bump
 | `anti_chunk_enabled` | bool | false | yes | none | | sync can raise, never lower |
 | `sensitive_sinks_enabled` | bool | true | yes | | | absent = on |
 | `sensitive_writes_enabled` | bool | true | yes | | | absent = on |
+| `fail_policy` | string | open | yes | `DENYOUT_FAIL_POLICY` (and `DENYOUT_FAIL_CLOSED=1`) | | `open` = keep the internet working if the proxy stops, `closed` = block web traffic until it recovers; sync can only set `closed`; env wins |
 | `always_allow_hosts` | list | empty | yes | | | plain DNS names only when synced |
 | `update_manifest_url` | string | built-in | yes | `DENYOUT_UPDATE_MANIFEST_URL` | | https only; state wins |
 | `account_api_base` | string | built-in | yes | `DENYOUT_API_BASE` | | https only; state wins |
@@ -92,8 +112,7 @@ Written by the desktop app; edit through the UI. `setup_done`, `notify`,
 `dismissed_tips`, `update_available_*`, `update_checked_at`,
 `config_updated_at`, `sync_enabled`, `sync_enabled_set`.
 
-Extension point: new boolean/enum settings (for example a fail-soft policy
-switch) are added as one `State` field plus one entry in `settings.Specs`; the
+Extension point: new boolean/enum settings are added as one `State` field plus one entry in `settings.Specs`; the
 docs test then forces a row here.
 
 ## 3. Environment variables
@@ -110,7 +129,6 @@ Everything else:
 | `DENYOUT_TUN_E2E` | tun gate | enables experimental TUN data plane | experimental |
 | `DENYOUT_QUIC_MITM` | tun gate | enables experimental HTTP/3 decryption | experimental |
 | `DENYOUT_VPN_EGRESS_E2E` | tun gate | VPN-egress lab path | lab only |
-| `DENYOUT_FAIL_POLICY` | helper watchdog | `open` | `closed`: proxy-loss behaviour (`DENYOUT_FAIL_CLOSED=1` always wins) | `closed` blocks HTTPS while the proxy is down |
 | `DENYOUT_DEBUG_STATS` | denyout-cli proxyd | `1` prints goroutine/fd counts on SIGUSR1 (soak test) | diagnostics only |
 | `DENYOUT_TEST_NO_ELEVATE` | hostguard | tests never prompt for elevation | tests only |
 | `DENYOUT_UNINSTALL_NO_ELEVATE` | uninstall | skip elevated uninstall step | |

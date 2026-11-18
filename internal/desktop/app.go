@@ -18,6 +18,7 @@ import (
 
 	"github.com/nareyko/denyout/internal/hostguard"
 	"github.com/nareyko/denyout/internal/notify"
+	"github.com/nareyko/denyout/internal/protectstate"
 	"github.com/nareyko/denyout/internal/run"
 	"github.com/nareyko/denyout/internal/threatlists"
 )
@@ -72,8 +73,9 @@ type App struct {
 	session            *run.Session // session-mode in-process proxy
 	proxyd             *exec.Cmd    // computer-mode transparent proxy subprocess
 	proxyPort          int
-	wizardURL          string // only set when WebUI is enabled
-	controlURL         string // Ask IPC for proxyd
+	failHelper         *hostguard.FailPolicyStatus // helper's last report of the effective fail policy
+	wizardURL          string                      // only set when WebUI is enabled
+	controlURL         string                      // Ask IPC for proxyd
 	asks               *askFlight
 	wraps              map[string]*wrapProc
 	threats            *threatlists.Store // Book C cache (shared across Protect restarts)
@@ -116,6 +118,7 @@ func applyNotifyPrefs(st State) {
 func NewApp(opts Options) *App {
 	a := &App{opts: opts, state: LoadState(), status: "Off", wraps: map[string]*wrapProc{}, asks: newAskFlight()}
 	applyNotifyPrefs(a.state)
+	hostguard.SetFailPolicy(protectstate.FailPolicy(a.state.FailPolicy))
 	a.initPresence()
 	if a.state.LastDenyHost != "" {
 		a.lastDeny = a.state.LastDenyHost

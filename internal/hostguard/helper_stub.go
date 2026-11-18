@@ -51,3 +51,8 @@ func UninstallHelper() error { return nil }
 func ServeHelper() error {
 	return ErrUnsupported
 }
+
+func helperFailCall(line string) (FailPolicyStatus, error) {
+	_ = line
+	return FailPolicyStatus{}, ErrHelperUnavailable
+}

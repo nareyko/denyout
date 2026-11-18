@@ -12,6 +12,7 @@ import (
 
 	"github.com/nareyko/denyout/internal/hostguard"
 	"github.com/nareyko/denyout/internal/notify"
+	"github.com/nareyko/denyout/internal/protectstate"
 	"github.com/nareyko/denyout/internal/proxy"
 )
 
@@ -48,6 +49,10 @@ func (a *App) startComputer() error {
 	a.mu.Lock()
 	allowQUIC := a.state.AllowBrowserQUIC
 	a.mu.Unlock()
+	a.mu.Lock()
+	failPolicy := protectstate.FailPolicy(a.state.FailPolicy)
+	a.mu.Unlock()
+	hostguard.SetFailPolicy(failPolicy) // rides along on the helper apply
 	if err := hostguard.ElevateApply(port, caPath, uid, allowQUIC); err != nil {
 		a.setStatus("Needs admin")
 		// Test/CI elevate skip is not a user password cancel — do not sticky Off (unavailable).
@@ -64,6 +69,7 @@ func (a *App) startComputer() error {
 		}
 		return err
 	}
+	a.refreshFailHelper()
 	// Chrome/Electron use NSS, not only the system trust store.
 	if err := hostguard.TrustCAForUserBrowsers(caPath); err != nil {
 		AppendDesktopLog("WARN browser CA trust (NSS): %v - Chrome may show SSL errors", err)

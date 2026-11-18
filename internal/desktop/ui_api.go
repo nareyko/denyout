@@ -95,6 +95,7 @@ type UISnapshot struct {
 	SystemBanners       bool            `json:"system_banners"`
 	RespectFullscreen   bool            `json:"respect_fullscreen"`
 	BlockBrowserQUIC    bool            `json:"block_browser_quic"` // inverse of AllowBrowserQUIC; default on
+	FailPolicy          FailPolicyView  `json:"fail_policy"`        // "If DenyOut's proxy stops" setting + effective policy
 	TunDataplane        bool            `json:"tun_dataplane"`      // experimental UDP via denyout0 (Linux)
 	QuicMITM            bool            `json:"quic_mitm"`          // experimental HTTP/3 MITM (Linux; needs TunDataplane)
 	ExperimentalLinux   bool            `json:"experimental_linux"` // show Settings → Experimental (GOOS==linux)

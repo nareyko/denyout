@@ -1,0 +1,7 @@
+{
+ "schema_version": 1,
+ "setup_done": true,
+ "policy_profile": "browse",
+ "fail_policy": "strict",
+ "computer_available": true
+}

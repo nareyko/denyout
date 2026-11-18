@@ -32,6 +32,7 @@ var (
 	ThreatPrefsFromSettings = appstate.ThreatPrefsFromSettings
 
 	normalizePolicyProfile      = appstate.NormalizePolicyProfile
+	appstateNormalizeFailPolicy = appstate.NormalizeFailPolicy
 	effectiveNotifyLevel        = appstate.EffectiveNotifyLevel
 	effectiveDecisionTimeoutSec = appstate.EffectiveDecisionTimeoutSec
 	effectiveReaskIntervalSec   = appstate.EffectiveReaskIntervalSec
