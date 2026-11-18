@@ -21,58 +21,87 @@ const doctorUsage = `Usage: denyout-cli doctor [--json] [-n N] [--proxy-port POR
   --protect-on        treat a missing CA or proxy as a failure
   --strict            exit 1 when any check fails`
 
-func cmdDoctor(args []string, stdout, stderr io.Writer) int {
-	in := diag.LocalInputs(version)
-	jsonOut, strict := false, false
+type doctorOpts struct {
+	jsonOut bool
+	strict  bool
+}
+
+// setDoctorNumber applies -n / --limit / --proxy-port, returning the stderr
+// message on invalid input ("" = ok).
+func setDoctorNumber(in *diag.Inputs, flag, val string) string {
+	n, err := strconv.Atoi(val)
+	if err != nil || n <= 0 || n > 65535 {
+		return fmt.Sprintf("denyout-cli doctor: invalid %s %q\n", flag, val)
+	}
+	if flag == "--proxy-port" {
+		in.ProxyPort = n
+	} else {
+		in.MaxDenials = n
+	}
+	return ""
+}
+
+// parseDoctorArgs parses doctor flags, adjusting the report inputs in place.
+func parseDoctorArgs(args []string, in *diag.Inputs) (doctorOpts, *cliExit) {
+	var o doctorOpts
 	for i := 0; i < len(args); i++ {
 		switch a := args[i]; a {
 		case "--help", "-h":
-			fmt.Fprintln(stdout, doctorUsage)
-			return 0
+			return o, helpExit(doctorUsage)
 		case "--json":
-			jsonOut = true
+			o.jsonOut = true
 		case "--strict":
-			strict = true
+			o.strict = true
 		case "--protect-on":
 			in.ProtectionOn = true
 		case "-n", "--limit", "--proxy-port":
 			i++
 			if i >= len(args) {
-				fmt.Fprintf(stderr, "denyout-cli doctor: %s requires a number\n", a)
-				return 2
+				return o, &cliExit{code: 2, err: fmt.Sprintf("denyout-cli doctor: %s requires a number\n", a)}
 			}
-			n, err := strconv.Atoi(args[i])
-			if err != nil || n <= 0 || n > 65535 {
-				fmt.Fprintf(stderr, "denyout-cli doctor: invalid %s %q\n", a, args[i])
-				return 2
-			}
-			if a == "--proxy-port" {
-				in.ProxyPort = n
-			} else {
-				in.MaxDenials = n
+			if msg := setDoctorNumber(in, a, args[i]); msg != "" {
+				return o, &cliExit{code: 2, err: msg}
 			}
 		default:
-			fmt.Fprintf(stderr, "denyout-cli doctor: unknown argument %q\n\n%s\n", a, doctorUsage)
-			return 2
+			return o, &cliExit{code: 2, err: fmt.Sprintf("denyout-cli doctor: unknown argument %q\n\n%s\n", a, doctorUsage)}
 		}
 	}
-	r := diag.Build(in)
-	if jsonOut {
+	return o, nil
+}
+
+// renderDoctor formats the report; with --strict any failed check exits 1.
+func renderDoctor(r diag.Report, o doctorOpts) *cliExit {
+	var out string
+	if o.jsonOut {
 		b, err := r.JSON()
 		if err != nil {
-			fmt.Fprintf(stderr, "denyout-cli doctor: %v\n", err)
-			return 1
+			return &cliExit{code: 1, err: fmt.Sprintf("denyout-cli doctor: %v\n", err)}
 		}
-		fmt.Fprintln(stdout, string(b))
+		out = string(b) + "\n"
 	} else {
-		fmt.Fprint(stdout, r.Text())
+		out = r.Text()
 	}
-	if strict {
-		for _, c := range r.Checks {
-			if c.Status == diag.Fail {
-				return 1
-			}
+	ex := &cliExit{out: out}
+	if o.strict && hasFailedCheck(r) {
+		ex.code = 1
+	}
+	return ex
+}
+
+func hasFailedCheck(r diag.Report) bool {
+	for _, c := range r.Checks {
+		if c.Status == diag.Fail {
+			return true
 		}
 	}
-	return 0
+	return false
+}
+
+func cmdDoctor(args []string, stdout, stderr io.Writer) int {
+	in := diag.LocalInputs(version)
+	o, ex := parseDoctorArgs(args, &in)
+	if ex != nil {
+		return ex.emitTo(stdout, stderr)
+	}
+	return renderDoctor(diag.Build(in), o).emitTo(stdout, stderr)
 }
