@@ -39,6 +39,10 @@ func (r *Runtime) StartReal(uid int) error {
 }
 
 // StartRealOpts is the full G3–G6 bring-up entrypoint.
+//
+// Every step that leaves state behind registers an undo on the rollback list;
+// a failing step runs the list newest-first (steer is removed before the device
+// goes away) and the list is discarded on success.
 func (r *Runtime) StartRealOpts(opts StartOpts) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -53,112 +57,153 @@ func (r *Runtime) StartRealOpts(opts StartOpts) error {
 	_ = destroyDeviceBestEffort()
 	_ = removeSteerBestEffort(uid)
 
-	dev, err := wgtun.CreateTUN(DeviceName, 1500)
+	var undo undoList
+	fail := func(err error) error { undo.run(); return err }
+
+	dev, err := createDevice(&undo)
 	if err != nil {
-		return fmt.Errorf("tun: create %s: %w", DeviceName, err)
+		return fail(err)
 	}
-	name, _ := dev.Name()
-	if name != "" && name != DeviceName {
-		_ = dev.Close()
-		return fmt.Errorf("tun: got iface %q want %s", name, DeviceName)
-	}
-	if err := privexec.Run("ip", "addr", "replace", AddrCIDR, "dev", DeviceName); err != nil {
-		_ = dev.Close()
-		_ = destroyDeviceBestEffort()
-		return fmt.Errorf("tun: addr: %w", err)
-	}
-	if err := privexec.Run("ip", "link", "set", DeviceName, "up"); err != nil {
-		_ = dev.Close()
-		_ = destroyDeviceBestEffort()
-		return fmt.Errorf("tun: link up: %w", err)
-	}
+	undo.add(func() { _ = removeSteerBestEffort(uid) })
 	if err := applySteer(uid, opts.EnableTCP); err != nil {
-		_ = dev.Close()
-		_ = destroyDeviceBestEffort()
-		_ = removeSteerBestEffort(uid)
-		return err
+		return fail(err)
 	}
 
 	var ns *Netstack
 	if opts.EnableTCP {
-		proxyPort := opts.ProxyPort
-		ns, err = NewNetstack(func(conn net.Conn, dstIP net.IP, dstPort uint16) {
-			defer conn.Close()
-			if proxyPort <= 0 {
-				return
-			}
-			upstream, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", proxyPort), 5*time.Second)
-			if err != nil {
-				return
-			}
-			defer upstream.Close()
-			errCh := make(chan struct{}, 2)
-			go func() { _, _ = copyClose(upstream, conn); errCh <- struct{}{} }()
-			go func() { _, _ = copyClose(conn, upstream); errCh <- struct{}{} }()
-			<-errCh
-			_ = dstIP
-			_ = dstPort
-		})
-		if err != nil {
-			_ = dev.Close()
-			_ = destroyDeviceBestEffort()
-			_ = removeSteerBestEffort(uid)
-			return err
+		if ns, err = NewNetstack(proxyHandoff(opts.ProxyPort)); err != nil {
+			return fail(err)
 		}
+		undo.add(ns.Close)
 	}
 
 	mitmOn := opts.QUICMITM || WantQUICMITM()
-	var bridge *quicTUNPacketConn
-	var mitmCancel context.CancelFunc
-	if mitmOn && opts.MITM.GetCertificate != nil {
-		bridge = newQUICTUNPacketConn(func(dst, src *net.UDPAddr, payload []byte) error {
-			pkt := buildIPv4UDP(src, dst, payload)
-			_, err := writeTUN(dev, pkt)
-			return err
-		})
-		mitmCtx, cancel := context.WithCancel(context.Background())
-		mitmCancel = cancel
-		ln, lerr := ListenMITM(mitmCtx, bridge, opts.MITM)
-		if lerr != nil {
-			cancel()
-			_ = bridge.Close()
-			if ns != nil {
-				ns.Close()
-			}
-			_ = dev.Close()
-			_ = destroyDeviceBestEffort()
-			_ = removeSteerBestEffort(uid)
-			return fmt.Errorf("tun: quic mitm listen: %w", lerr)
-		}
-		go func() {
-			_ = ServeHTTP3MITM(mitmCtx, ln, opts.MITM, nil)
-			_ = ln.Close()
-		}()
+	bridge, mitmCancel, err := startQUICMITM(dev, opts, mitmOn, &undo)
+	if err != nil {
+		return fail(err)
 	}
 
 	done := make(chan struct{})
-	var closed bool
 	insp := DefaultQUICInspector{MITM: mitmOn}
-	onSight := opts.OnSighting
-	if onSight == nil {
-		onSight = func(dec QUICDecision) {
-			r.RecordSighting(dec.SNI)
-			log.Printf("denyout tun quic sight action=%s sni=%q reason=%s", dec.Action, dec.SNI, dec.Reason)
-		}
-	} else {
-		user := onSight
-		onSight = func(dec QUICDecision) {
-			r.RecordSighting(dec.SNI)
-			user(dec)
-		}
-	}
+	onSight := r.sightingHandler(opts.OnSighting)
 	if ns != nil {
 		go func() {
 			_ = ns.ReadOutbound(&tunWriter{dev: dev})
 		}()
 	}
 	go readLoop(dev, r, ns, insp, onSight, bridge, done)
-	r.cancel = func() {
+	r.cancel = newStopFunc(done, mitmCancel, bridge, ns, dev)
+	r.active = true
+	r.uid = uid
+	r.resetCountersLocked()
+	return nil
+}
+
+// undoList is a rollback list: add after each successful step, run on failure.
+type undoList []func()
+
+func (u *undoList) add(f func()) { *u = append(*u, f) }
+
+// run executes the undos newest-first and empties the list.
+func (u *undoList) run() {
+	for i := len(*u) - 1; i >= 0; i-- {
+		(*u)[i]()
+	}
+	*u = nil
+}
+
+// createDevice creates denyout0, addresses it and brings it up. On success
+// the device-close+delete undo is registered; on failure nothing is left.
+func createDevice(undo *undoList) (wgtun.Device, error) {
+	dev, err := wgtun.CreateTUN(DeviceName, 1500)
+	if err != nil {
+		return nil, fmt.Errorf("tun: create %s: %w", DeviceName, err)
+	}
+	name, _ := dev.Name()
+	if name != "" && name != DeviceName {
+		_ = dev.Close()
+		return nil, fmt.Errorf("tun: got iface %q want %s", name, DeviceName)
+	}
+	undo.add(func() {
+		_ = dev.Close()
+		_ = destroyDeviceBestEffort()
+	})
+	if err := privexec.Run("ip", "addr", "replace", AddrCIDR, "dev", DeviceName); err != nil {
+		return nil, fmt.Errorf("tun: addr: %w", err)
+	}
+	if err := privexec.Run("ip", "link", "set", DeviceName, "up"); err != nil {
+		return nil, fmt.Errorf("tun: link up: %w", err)
+	}
+	return dev, nil
+}
+
+// proxyHandoff returns the gVisor TCP handler that relays each accepted
+// connection to the local proxy on 127.0.0.1:proxyPort (dial timeout 5s).
+// proxyPort <= 0 closes the connection.
+func proxyHandoff(proxyPort int) TCPHandler {
+	return func(conn net.Conn, _ net.IP, _ uint16) {
+		defer conn.Close()
+		if proxyPort <= 0 {
+			return
+		}
+		upstream, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", proxyPort), 5*time.Second)
+		if err != nil {
+			return
+		}
+		defer upstream.Close()
+		errCh := make(chan struct{}, 2)
+		go func() { _, _ = copyClose(upstream, conn); errCh <- struct{}{} }()
+		go func() { _, _ = copyClose(conn, upstream); errCh <- struct{}{} }()
+		<-errCh
+	}
+}
+
+// startQUICMITM brings up the QUIC MITM bridge+listener when requested and a
+// certificate source is configured; otherwise returns nils.
+func startQUICMITM(dev wgtun.Device, opts StartOpts, mitmOn bool, undo *undoList) (*quicTUNPacketConn, context.CancelFunc, error) {
+	if !mitmOn || opts.MITM.GetCertificate == nil {
+		return nil, nil, nil
+	}
+	bridge := newQUICTUNPacketConn(func(dst, src *net.UDPAddr, payload []byte) error {
+		pkt := buildIPv4UDP(src, dst, payload)
+		_, err := writeTUN(dev, pkt)
+		return err
+	})
+	mitmCtx, cancel := context.WithCancel(context.Background())
+	ln, lerr := ListenMITM(mitmCtx, bridge, opts.MITM)
+	if lerr != nil {
+		cancel()
+		_ = bridge.Close()
+		return nil, nil, fmt.Errorf("tun: quic mitm listen: %w", lerr)
+	}
+	undo.add(func() { cancel(); _ = bridge.Close() })
+	go func() {
+		_ = ServeHTTP3MITM(mitmCtx, ln, opts.MITM, nil)
+		_ = ln.Close()
+	}()
+	return bridge, cancel, nil
+}
+
+// sightingHandler wraps the optional user callback: every sighting is recorded
+// in the runtime counters first; without a callback it is logged.
+func (r *Runtime) sightingHandler(user func(QUICDecision)) func(QUICDecision) {
+	if user == nil {
+		return func(dec QUICDecision) {
+			r.RecordSighting(dec.SNI)
+			log.Printf("denyout tun quic sight action=%s sni=%q reason=%s", dec.Action, dec.SNI, dec.Reason)
+		}
+	}
+	return func(dec QUICDecision) {
+		r.RecordSighting(dec.SNI)
+		user(dec)
+	}
+}
+
+// newStopFunc builds Runtime.cancel: idempotent close of done, then tear down
+// MITM, bridge, netstack and device.
+func newStopFunc(done chan struct{}, mitmCancel context.CancelFunc, bridge *quicTUNPacketConn, ns *Netstack, dev wgtun.Device) func() {
+	var closed bool
+	return func() {
 		if !closed {
 			closed = true
 			close(done)
@@ -174,10 +219,6 @@ func (r *Runtime) StartRealOpts(opts StartOpts) error {
 		}
 		_ = dev.Close()
 	}
-	r.active = true
-	r.uid = uid
-	r.resetCountersLocked()
-	return nil
 }
 
 // tunWriteOffset is headroom for virtio_net_hdr required by wireguard-go TUN Write.
@@ -258,41 +299,24 @@ func readLoop(dev wgtun.Device, r *Runtime, ns *Netstack, insp DefaultQUICInspec
 			return
 		}
 		for i := 0; i < n; i++ {
-			pkt := bufs[i][:sizes[i]]
-			cl, cerr := ClassifyIPPacket(pkt, SteerMark, 0)
-			if cerr == nil && strings.EqualFold(cl.Proto, "udp") && cl.DstPort == 443 {
-				src, dst, payload, pok := parseIPv4UDP(pkt)
-				decideBuf := pkt
-				if pok {
-					decideBuf = payload
-				}
-				dec := insp.Decide(context.TODO(), decideBuf)
-				if onSight != nil && (dec.Action == QUICActionSight || dec.Action == QUICActionMITM || dec.HasSNI()) {
-					onSight(dec)
-				}
-				if dec.Action == QUICActionMITM && bridge != nil && pok {
-					bridge.push(quicDatagram{payload: payload, from: src, to: dst})
-					continue
-				}
-				r.addDrop(len(pkt))
-				continue
-			}
-			if ns != nil && cerr == nil && strings.EqualFold(cl.Proto, "tcp") {
-				ns.InjectInbound(pkt)
-				continue
-			}
-			if ns != nil && cerr != nil {
-				ver := 0
-				if len(pkt) > 0 {
-					ver = int(pkt[0] >> 4)
-				}
-				if ver == 4 || ver == 6 {
-					ns.InjectInbound(pkt)
-					continue
-				}
-			}
-			r.addDrop(len(pkt))
+			dispatchPacket(bufs[i][:sizes[i]], r, ns, insp, onSight, bridge)
 		}
+	}
+}
+
+// dispatchPacket applies routePacket's decision to one packet.
+func dispatchPacket(pkt []byte, r *Runtime, ns *Netstack, insp DefaultQUICInspector, onSight func(QUICDecision), bridge *quicTUNPacketConn) {
+	rd := routePacket(pkt, insp, ns != nil, bridge != nil)
+	if rd.sight && onSight != nil {
+		onSight(rd.decision)
+	}
+	switch rd.verdict {
+	case verdictNetstack:
+		ns.InjectInbound(pkt)
+	case verdictMITMQUIC:
+		bridge.push(quicDatagram{payload: rd.payload, from: rd.src, to: rd.dst})
+	default:
+		r.addDrop(len(pkt))
 	}
 }
 
