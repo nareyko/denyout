@@ -183,3 +183,24 @@ jobs:
       - name: npm audit (frontend, production deps)
         working-directory: cmd/denyout/frontend
         run: npm audit --omit=dev --audit-level=high
+
+  frontend:
+    # The UI is embedded in the desktop binary; build it on every PR so dependency bumps
+    # (react/vite/typescript) are verified before merge, not at release time.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: cmd/denyout/frontend/package-lock.json
+      - name: Build frontend (tsc + vite)
+        working-directory: cmd/denyout/frontend
+        run: |
+          npm ci
+          npm run build

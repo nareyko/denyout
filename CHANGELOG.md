@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Dependencies: sqlite 1.62, beeep 0.12, wails 2.17.1; frontend React 19, Vite 8, plugin-react 6, TypeScript 7. CI now builds the frontend on every PR.
+
 ## 0.4.13 - Security review, refactor series, signed releases (2026-11-18)
 
 ### Security
