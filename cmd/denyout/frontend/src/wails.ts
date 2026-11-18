@@ -91,6 +91,13 @@ export type UISnapshot = {
  system_banners?: boolean;
  respect_fullscreen?: boolean;
  block_browser_quic?: boolean;
+ fail_policy?: {
+ setting: "open" | "closed";
+ effective: "open" | "closed";
+ source: string;
+ env_override: boolean;
+ note?: string;
+ };
  tun_dataplane?: boolean;
  quic_mitm?: boolean;
  experimental_linux?: boolean;
@@ -300,6 +307,7 @@ type Bridge = {
  UISetSystemBanners(on: boolean): Promise<void>;
  UISetRespectFullscreen(on: boolean): Promise<void>;
  UISetBlockBrowserQUIC(on: boolean): Promise<void>;
+ UISetFailPolicy(policy: string): Promise<void>;
  UISetTunDataplane(on: boolean): Promise<void>;
  UISetQuicMITM(on: boolean): Promise<void>;
  UISetSilentWhenOpen(on: boolean): Promise<void>;
@@ -424,6 +432,7 @@ export const api = {
  setSystemBanners: (on: boolean) => bridge().UISetSystemBanners(on),
  setRespectFullscreen: (on: boolean) => bridge().UISetRespectFullscreen(on),
  setBlockBrowserQUIC: (on: boolean) => bridge().UISetBlockBrowserQUIC(on),
+ setFailPolicy: (policy: "open" | "closed") => bridge().UISetFailPolicy(policy),
  setTunDataplane: (on: boolean) => bridge().UISetTunDataplane(on),
  setQuicMITM: (on: boolean) => bridge().UISetQuicMITM(on),
  setSilentWhenOpen: (on: boolean) => bridge().UISetSilentWhenOpen(on),

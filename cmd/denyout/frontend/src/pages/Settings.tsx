@@ -1524,6 +1524,73 @@ export function Settings({
 
  {showSection(
  [
+ "proxy stops",
+ "fail",
+ "fail open",
+ "fail closed",
+ "keep the internet working",
+ "block web traffic",
+ "recover",
+ "strict",
+ ],
+ "fail-policy",
+ ) && (
+ <section className="card" id="settings-fail-policy">
+ <h2>If DenyOut's proxy stops</h2>
+ <p className="muted">
+ What should happen to your web traffic if DenyOut's proxy stops answering while
+ Protect is on.
+ </p>
+ <label style={{ display: "block" }}>
+ <input
+ type="radio"
+ name="fail-policy"
+ checked={(snap.fail_policy?.setting ?? "open") === "open"}
+ onChange={() =>
+ void api
+ .setFailPolicy("open")
+ .then(reload)
+ .catch((err) => fail(err))
+ }
+ />{" "}
+ Keep the internet working (default)
+ </label>
+ <label style={{ display: "block" }}>
+ <input
+ type="radio"
+ name="fail-policy"
+ checked={snap.fail_policy?.setting === "closed"}
+ onChange={() =>
+ void api
+ .setFailPolicy("closed")
+ .then(reload)
+ .catch((err) => fail(err))
+ }
+ />{" "}
+ Block web traffic until it recovers
+ </label>
+ <p className="muted" style={{ marginTop: "0.25rem" }}>
+ Keep working: for about 6 seconds after the proxy stops, then DenyOut steps aside
+ and traffic is not inspected until it is back. Block: nothing is let through
+ uninspected, but websites will not load until DenyOut recovers or you turn Protect
+ off. Takes effect right away while Protect is on.
+ </p>
+ {snap.fail_policy && (
+ <p className="muted" data-testid="fail-policy-effective">
+ In effect now:{" "}
+ <strong>
+ {snap.fail_policy.effective === "closed"
+ ? "Block web traffic until it recovers"
+ : "Keep the internet working"}
+ </strong>
+ {snap.fail_policy.note ? ` - ${snap.fail_policy.note}` : ""}
+ </p>
+ )}
+ </section>
+ )}
+
+ {showSection(
+ [
  "quic",
  "http3",
  "http/3",

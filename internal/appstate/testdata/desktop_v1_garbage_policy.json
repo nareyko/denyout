@@ -1,0 +1,6 @@
+{
+ "schema_version": 1,
+ "policy_profile": "browse",
+ "fail_policy": "banana",
+ "computer_available": true
+}

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/nareyko/denyout/internal/privexec"
+	"github.com/nareyko/denyout/internal/protectstate"
 )
 
 // Helper protocol.
@@ -30,7 +31,9 @@ type Request struct {
 	AllowQUIC bool
 	Real      bool
 	Mitm      bool
-	JSON      bool // reply encoding
+	// FailPolicy is the requested proxy-loss policy: "" (not supplied) or open|closed.
+	FailPolicy protectstate.FailPolicy
+	JSON       bool // reply encoding
 }
 
 type verbDef struct {
@@ -43,6 +46,16 @@ type rawArgs struct {
 	port  int
 	arg   string // CA path or interface name, depending on verb
 	flags map[string]bool
+	fail  string // fail_policy (JSON) / fail=<p> token (legacy); "" = absent
+}
+
+// parseFailPolicy accepts exactly "open" or "closed" (no aliases); "" means absent.
+func parseFailPolicy(s string) (protectstate.FailPolicy, error) {
+	s = strings.ToLower(s)
+	if s != "" && !protectstate.ValidFailPolicy(s) {
+		return "", fmt.Errorf("fail policy must be open or closed")
+	}
+	return protectstate.FailPolicy(s), nil
 }
 
 func (a rawArgs) has(f ...string) bool {
@@ -77,8 +90,31 @@ var verbs = map[string]verbDef{
 		}
 		r.CA = a.arg
 		r.AllowQUIC = a.has("1", "true", "allow_quic")
+		p, err := parseFailPolicy(a.fail)
+		if err != nil {
+			return err
+		}
+		r.FailPolicy = p
 		return nil
 	}},
+	// fail-policy changes the proxy-loss policy live (watchdog picks it up on its next
+	// tick); fail-status reports the effective policy and where it came from.
+	"fail-policy": {mutating: true, parse: func(r *Request, a rawArgs, _ int) error {
+		v := a.fail
+		if v == "" && a.arg != "-" {
+			v = a.arg // legacy: fail-policy 0 0 closed
+		}
+		p, err := parseFailPolicy(v)
+		if err != nil {
+			return err
+		}
+		if p == "" {
+			return fmt.Errorf("fail policy required")
+		}
+		r.FailPolicy = p
+		return nil
+	}},
+	"fail-status":      {parse: noArgs},
 	"remove":           {mutating: true, parse: noArgs},
 	"teardown":         {mutating: true, parse: noArgs},
 	"uninstall-helper": {mutating: true, parse: noArgs},
@@ -121,6 +157,7 @@ func ParseRequest(line string, ownerUID int) (Request, error) {
 			CA    string   `json:"ca"`
 			Iface string   `json:"iface"`
 			Flags []string `json:"flags"`
+			Fail  string   `json:"fail_policy"`
 		}
 		dec := json.NewDecoder(strings.NewReader(line))
 		dec.DisallowUnknownFields()
@@ -134,6 +171,7 @@ func ParseRequest(line string, ownerUID int) (Request, error) {
 		for _, f := range j.Flags {
 			raw.flags[strings.ToLower(f)] = true
 		}
+		raw.fail = j.Fail
 		r.JSON = true
 	} else {
 		parts := strings.Fields(line)
@@ -147,7 +185,15 @@ func ParseRequest(line string, ownerUID int) (Request, error) {
 			raw.arg = parts[3]
 		}
 		for _, p := range parts[3:] {
-			raw.flags[strings.ToLower(p)] = true
+			lp := strings.ToLower(p)
+			if strings.HasPrefix(lp, "fail=") {
+				raw.fail = strings.TrimPrefix(lp, "fail=")
+				if raw.fail == "" {
+					raw.fail = "-" // present but empty: rejected by parseFailPolicy
+				}
+				continue
+			}
+			raw.flags[lp] = true
 		}
 	}
 	def, ok := verbs[verb]

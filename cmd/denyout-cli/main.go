@@ -26,6 +26,7 @@ import (
 	"github.com/nareyko/denyout/internal/notify"
 	"github.com/nareyko/denyout/internal/policy"
 	"github.com/nareyko/denyout/internal/profiles"
+	"github.com/nareyko/denyout/internal/protectstate"
 	"github.com/nareyko/denyout/internal/proxy"
 	"github.com/nareyko/denyout/internal/run"
 	"github.com/nareyko/denyout/internal/serve"
@@ -637,7 +638,7 @@ Profiles live in ~/.config/denyout/profiles/`)
 
 func cmdHostctl(args []string) int {
 	if len(args) == 0 || args[0] == "--help" || args[0] == "-h" {
-		fmt.Println(`Usage: denyout-cli hostctl apply|remove|teardown|render|proxyd|quic-stats|tun-stats|tun-start|tun-stop|tun-rollback-plan|tun-device-plan|tun-device-rollback-plan|vpn-egress-plan|vpn-egress-rollback-plan|vpn-egress-apply|vpn-egress-remove|helper-serve|helper-install|helper-uninstall|caps [flags]
+		fmt.Println(`Usage: denyout-cli hostctl apply|remove|teardown|render|proxyd|quic-stats|tun-stats|tun-start|tun-stop|tun-rollback-plan|tun-device-plan|tun-device-rollback-plan|vpn-egress-plan|vpn-egress-rollback-plan|vpn-egress-apply|vpn-egress-remove|fail-policy|helper-serve|helper-install|helper-uninstall|caps [flags]
 
   Privileged helper for Protect this computer (transparent redirect + CA trust).
   proxyd runs the transparent proxy (started after setcap so SO_MARK works).
@@ -651,7 +652,9 @@ func cmdHostctl(args []string) int {
   vpn-egress-rollback-plan  print remove commands for that plan (not executed).
   vpn-egress-apply --iface IF  apply mark→VPN routes (requires DENYOUT_VPN_EGRESS_E2E=1 + admin/helper).
   vpn-egress-remove  remove VPN egress routes (admin/helper).
-  caps  print helper capability tags (quic1 tun1 vpn1).
+  caps  print helper capability tags (quic1 tun1 vpn1 fail1).
+  fail-policy open|closed|status  set or show what the helper does when the proxy stops
+    (open = keep the internet working, closed = block web traffic until it recovers).
   helper-serve runs the root unix-socket helper (systemd; Linux).
   helper-install installs/restarts denyout-hostguard.service from this binary (Linux; root).
   helper-uninstall stops/removes denyout-hostguard.service (Linux; used by uninstall).
@@ -663,6 +666,7 @@ Flags:
   --uid N      desktop user uid (Unix)
   --iface IF   VPN egress interface (vpn-egress-plan/apply; e.g. wg0)
   --real       with tun-start|stop: request real denyout0 (helper; Linux)
+  --fail-policy P  with apply: open|closed proxy-loss policy sent to the helper
   --allow-quic allow UDP/443 (HTTP/3); default is drop QUIC so browsers use TCP MITM
   --tun        with render: append T1 steer table preview (not applied)
   --ask        Ask mode policy (proxyd)
@@ -818,6 +822,25 @@ Flags:
 		fmt.Println("OK vpn1 removed source=local")
 		return 0
 	}
+	if action == "fail-policy" {
+		var st hostguard.FailPolicyStatus
+		var err error
+		switch {
+		case len(args) == 2 && args[1] == "status":
+			st, err = hostguard.HelperFailPolicyStatus()
+		case len(args) == 2 && (args[1] == "open" || args[1] == "closed"):
+			st, err = hostguard.HelperSetFailPolicy(protectstate.FailPolicy(args[1]))
+		default:
+			fmt.Fprintln(os.Stderr, "Usage: denyout-cli hostctl fail-policy open|closed|status")
+			return 2
+		}
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "denyout-cli hostctl fail-policy: %v\n", err)
+			return 2
+		}
+		fmt.Println(hostguard.FormatFailPolicyReply(st.Policy, st.Source, st.Configured))
+		return 0
+	}
 	if action == "helper-install" {
 		uid, _ := hostguard.CurrentUID()
 		noElevate := false
@@ -880,6 +903,7 @@ Flags:
 	uid := 0
 	noElevate := false
 	allowQUIC := false
+	failPolicy := ""
 	tunPreview := false
 	for i := 1; i < len(args); i++ {
 		a := args[i]
@@ -890,6 +914,13 @@ Flags:
 			allowQUIC = true
 		case a == "--tun":
 			tunPreview = true
+		case strings.HasPrefix(a, "--fail-policy="):
+			failPolicy = strings.TrimPrefix(a, "--fail-policy=")
+		case a == "--fail-policy":
+			i++
+			if i < len(args) {
+				failPolicy = args[i]
+			}
 		case strings.HasPrefix(a, "--port="):
 			fmt.Sscanf(strings.TrimPrefix(a, "--port="), "%d", &port)
 		case a == "--port":
@@ -933,6 +964,13 @@ Flags:
 		fmt.Print(out)
 		return 0
 	case "apply":
+		if failPolicy != "" {
+			if !protectstate.ValidFailPolicy(failPolicy) {
+				fmt.Fprintln(os.Stderr, "denyout-cli hostctl: --fail-policy must be open or closed")
+				return 2
+			}
+			hostguard.SetFailPolicy(protectstate.FailPolicy(failPolicy))
+		}
 		if !noElevate {
 			if err := hostguard.ElevateApply(port, ca, uid, allowQUIC); err != nil {
 				fmt.Fprintf(os.Stderr, "denyout-cli hostctl: %v\n", err)

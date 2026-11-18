@@ -212,6 +212,7 @@ func (b *Bridge) UISetSoundOnlyAnswer(on bool) error    { return b.app.UISetSoun
 func (b *Bridge) UISetSystemBanners(on bool) error      { return b.app.UISetSystemBanners(on) }
 func (b *Bridge) UISetRespectFullscreen(on bool) error  { return b.app.UISetRespectFullscreen(on) }
 func (b *Bridge) UISetBlockBrowserQUIC(on bool) error   { return b.app.UISetBlockBrowserQUIC(on) }
+func (b *Bridge) UISetFailPolicy(policy string) error   { return b.app.UISetFailPolicy(policy) }
 func (b *Bridge) UISetTunDataplane(on bool) error       { return b.app.UISetTunDataplane(on) }
 func (b *Bridge) UISetQuicMITM(on bool) error           { return b.app.UISetQuicMITM(on) }
 func (b *Bridge) UISetSilentWhenOpen(on bool) error     { return b.app.UISetSilentWhenOpen(on) }

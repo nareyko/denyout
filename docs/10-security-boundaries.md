@@ -28,7 +28,7 @@ DenyOut **must not** claim that it:
 
 ### Residual limits added by the 2026-11 review
 
-- The helper is fail-soft by default: after ~6s with a dead proxy the redirect is removed (state `degraded`) to avoid blackholing HTTPS. Strict users set `DENYOUT_FAIL_CLOSED=1` (or `DENYOUT_FAIL_POLICY=closed`); the tray notifies when the state enters `degraded`.
+- The helper is fail-soft by default: after ~6s with a dead proxy the redirect is removed (state `degraded`) to avoid blackholing HTTPS. Strict users pick "Block web traffic until it recovers" in Settings (`fail_policy`), or set `DENYOUT_FAIL_CLOSED=1` / `DENYOUT_FAIL_POLICY=closed` for the helper; the tray notifies when the state enters `degraded`.
 - Any process running as the *owner uid* (including a sandboxed agent) can talk to the helper; its verbs are validated and constrained, but the owner uid is inside the trust boundary of the helper API.
 - IPv6 is protected via the nft redirect + QUIC drop, not through the TUN data plane. DNS (and DoH), non-80/443 TCP and other UIDs are out of scope.
 - Release authenticity needs the cosign signature check (`DENYOUT_VERIFY_SIG=require`); a bare checksum only detects corruption.

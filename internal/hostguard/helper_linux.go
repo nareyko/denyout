@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/nareyko/denyout/internal/privexec"
+	"github.com/nareyko/denyout/internal/protectstate"
 	"github.com/nareyko/denyout/internal/tun"
 )
 
@@ -62,7 +63,12 @@ func helperCall(verb string, proxyPort int, caCert string, uid int, allowQUIC bo
 		aq = "1"
 	}
 	// apply PORT UID CA allow_quic(0|1) — older helpers ignore the 5th field.
-	line := fmt.Sprintf("%s %d %d %s %s\n", verb, proxyPort, uid, strings.ReplaceAll(caCert, " ", ""), aq)
+	line := fmt.Sprintf("%s %d %d %s %s", verb, proxyPort, uid, strings.ReplaceAll(caCert, " ", ""), aq)
+	// Older helpers ignore unknown trailing tokens, so this stays backward compatible.
+	if cfg := ConfiguredFailPolicy(); verb == "apply" && protectstate.ValidFailPolicy(string(cfg)) {
+		line += " fail=" + string(cfg)
+	}
+	line += "\n"
 	if _, err := c.Write([]byte(line)); err != nil {
 		return err
 	}
@@ -80,6 +86,27 @@ func helperCall(verb string, proxyPort int, caCert string, uid int, allowQUIC bo
 		return nil
 	}
 	return fmt.Errorf("helper %s: %s", verb, resp)
+}
+
+// helperFailCall sends a fail-policy / fail-status line and parses the reply.
+func helperFailCall(line string) (FailPolicyStatus, error) {
+	c, err := net.Dial("unix", helperSockPath)
+	if err != nil {
+		return FailPolicyStatus{}, fmt.Errorf("%w: %v", ErrHelperUnavailable, err)
+	}
+	defer c.Close()
+	_ = c.SetDeadline(time.Now().Add(10 * time.Second))
+	if _, err := c.Write([]byte(line + "\n")); err != nil {
+		return FailPolicyStatus{}, err
+	}
+	resp, err := bufio.NewReader(c).ReadString('\n')
+	if err != nil {
+		return FailPolicyStatus{}, err
+	}
+	if strings.Contains(resp, "unknown verb") {
+		return FailPolicyStatus{}, fmt.Errorf("%w: helper lacks %s", ErrHelperUnavailable, CapFailPolicy)
+	}
+	return ParseFailPolicyReply(resp)
 }
 
 func helperQUICStats(uid int) (QUICDropStats, error) {
@@ -479,7 +506,7 @@ func executeHelperRequest(req Request) (string, error) {
 		if p, e := SelfExe(); e == nil {
 			exe = filepath.Base(p)
 		}
-		return FormatCapsReply(exe, CapQUIC, CapTUN, CapVPN), nil
+		return FormatCapsReply(exe, CapQUIC, CapTUN, CapVPN, CapFailPolicy), nil
 	case "apply":
 		_ = tun.GlobalRuntime().StopReal()
 		if err := Apply(spec); err != nil {
@@ -489,7 +516,21 @@ func executeHelperRequest(req Request) (string, error) {
 		lastApplySpec = spec
 		lastApplyOK = true
 		lastApplyMu.Unlock()
+		if req.FailPolicy != "" {
+			SetFailPolicy(req.FailPolicy)
+		}
 		persistHelperState(spec)
+	case "fail-policy":
+		SetFailPolicy(req.FailPolicy)
+		lastApplyMu.Lock()
+		spec, on := lastApplySpec, lastApplyOK
+		lastApplyMu.Unlock()
+		if on {
+			persistHelperState(spec) // survives a helper restart while Protect is on
+		}
+		return failStatusReply(), nil
+	case "fail-status":
+		return failStatusReply(), nil
 	case "remove":
 		clearApplied() // Protect Off: the watchdog must not re-apply rules later
 		_ = tun.GlobalRuntime().StopReal()
@@ -533,6 +574,11 @@ func executeHelperRequest(req Request) (string, error) {
 	}
 	// Cap tag lets clients detect a pre-QUIC helper (plain "OK") and re-elevate once.
 	return "OK quic1", nil
+}
+
+func failStatusReply() string {
+	p, src := EffectiveFailPolicy()
+	return FormatFailPolicyReply(p, src, ConfiguredFailPolicy())
 }
 
 func peerUID(c net.Conn) int {

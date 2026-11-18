@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/nareyko/denyout/internal/appstate"
+	"github.com/nareyko/denyout/internal/protectstate"
 )
 
 // SchemaVersion is the settings schema this build understands; it equals the
@@ -163,6 +164,16 @@ var Specs = []Spec{
 	{Key: "sensitive_writes_enabled", Kind: KindBool, Default: "true", State: true,
 		Doc: "Sensitive-write detection (nil in the file = on).",
 		get: func(s appstate.State) (string, bool) { return ptrBool(s.SensitiveWritesEnabled) }},
+	{Key: "fail_policy", Kind: KindString, Default: "open", State: true, Env: "DENYOUT_FAIL_POLICY",
+		Doc:      "If DenyOut's proxy stops: open = keep the internet working (default; the redirect is removed, state degraded) | closed = block web traffic until it recovers. Precedence: DENYOUT_FAIL_CLOSED=1 > DENYOUT_FAIL_POLICY > this setting > open. The env vars are read by the root helper; the desktop sends the setting to it (also live, no restart).",
+		Security: "Cloud sync can set closed but never open. Env vars can override the setting.",
+		get: func(s appstate.State) (string, bool) {
+			p := appstate.NormalizeFailPolicy(s.FailPolicy)
+			if p == "" {
+				return "open", false
+			}
+			return p, true
+		}},
 	{Key: "always_allow_hosts", Kind: KindList, Default: "", State: true,
 		Doc:      "Hosts the user chose to always allow.",
 		Security: "Synced lists are re-validated (plain DNS names only, max 500).",
@@ -292,6 +303,22 @@ func Resolve(st appstate.State, getenv func(string) string, flags map[string]str
 			useState()
 			useEnv()
 		}
+		if sp.Key == "fail_policy" {
+			// Same resolver the helper uses: DENYOUT_FAIL_CLOSED=1 beats DENYOUT_FAIL_POLICY
+			// beats the state value beats open.
+			pol, src := protectstate.ResolveFailPolicy(getenv, protectstate.FailPolicy(appstate.NormalizeFailPolicy(st.FailPolicy)))
+			v.Value = string(pol)
+			switch src {
+			case protectstate.PolicySourceEnvLegacy:
+				v.Source, v.Env = SourceEnv, "DENYOUT_FAIL_CLOSED"
+			case protectstate.PolicySourceEnv:
+				v.Source = SourceEnv
+			case protectstate.PolicySourceSetting:
+				v.Source = SourceState
+			default:
+				v.Source = SourceDefault
+			}
+		}
 		if fv, ok := flags[sp.Key]; ok {
 			v.Value, v.Source = fv, SourceFlag
 		}
@@ -307,6 +334,7 @@ type Settings struct {
 	DecisionTimeoutSec  int
 	ReaskIntervalSec    int
 	PolicyProfile       string
+	FailPolicy          string // open | closed (effective; see fail_policy)
 	AskMode             bool
 	AllowBrowserQUIC    bool
 	TunDataplane        bool
@@ -346,6 +374,7 @@ func Effective(st appstate.State, getenv func(string) string, flags map[string]s
 		DecisionTimeoutSec:  n("decision_timeout_sec"),
 		ReaskIntervalSec:    n("reask_interval_sec"),
 		PolicyProfile:       appstate.NormalizePolicyProfile(m["policy_profile"].Value),
+		FailPolicy:          m["fail_policy"].Value,
 		AskMode:             b("ask_mode"),
 		AllowBrowserQUIC:    b("allow_browser_quic"),
 		TunDataplane:        b("tun_dataplane"),
@@ -387,6 +416,9 @@ func Validate(st appstate.State) []error {
 	case "", appstate.PolicyProfileAgent, appstate.PolicyProfileBrowse:
 	default:
 		add("policy_profile %q: want browse|agent (unknown values behave as browse)", st.PolicyProfile)
+	}
+	if fp := strings.TrimSpace(st.FailPolicy); fp != "" && fp != "open" && fp != "closed" {
+		add("fail_policy %q: want open|closed (anything else is treated as closed)", st.FailPolicy)
 	}
 	switch st.Scope {
 	case appstate.ScopeOff, appstate.ScopeComputer, appstate.ScopeSession:

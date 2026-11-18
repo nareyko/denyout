@@ -12,7 +12,7 @@ import (
 var helperSpecFile = filepath.Join(helperStateDir, "helper_state.json")
 
 func persistHelperState(spec Spec) {
-	b, err := encodeHelperState(spec)
+	b, err := encodeHelperStatePolicy(spec, ConfiguredFailPolicy())
 	if err != nil {
 		return
 	}
@@ -58,6 +58,9 @@ func reconcileHelperOnStart(ownerUID int) {
 	if err != nil {
 		forgetHelperState()
 		return
+	}
+	if p := decodeHelperFailPolicy(b); p != "" {
+		SetFailPolicy(p)
 	}
 	if _, err := privexec.Output("nft", "list", "table", "inet", "denyout"); err != nil {
 		forgetHelperState() // rules are gone: nothing to restore

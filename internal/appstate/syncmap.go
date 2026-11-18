@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/nareyko/denyout/internal/cloudsync"
+	"github.com/nareyko/denyout/internal/protectstate"
 )
 
 // ThreatSyncPrefs are Book C toggles exported into the sync blob (not full feed cache).
@@ -41,6 +42,7 @@ func ExportSyncDocument(st State, threat ThreatSyncPrefs, packIDs []string) clou
 			SensitiveWritesEnabled: cloneBoolPtr(st.SensitiveWritesEnabled),
 			BodyPureA:              st.BodyPureA,
 			AntiChunkEnabled:       st.AntiChunkEnabled,
+			FailPolicy:             exportFailPolicy(st),
 			AppliedPackIDs:         append([]string(nil), packIDs...),
 		},
 	}
@@ -83,6 +85,20 @@ func ApplySyncSettings(st *State, s cloudsync.Settings) {
 	// decodes as false and must never silently switch them off.
 	st.BodyPureA = st.BodyPureA || s.BodyPureA
 	st.AntiChunkEnabled = st.AntiChunkEnabled || s.AntiChunkEnabled
+	// fail_policy: the remote may only tighten ("closed"). "open", an absent field or
+	// any junk is ignored, so a hostile or stale blob can never reopen a strict machine.
+	if p, ok := protectstate.ParseFailPolicy(s.FailPolicy); ok && p == protectstate.FailClosed {
+		st.FailPolicy = string(protectstate.FailClosed)
+	}
+}
+
+// exportFailPolicy exports only the strict value; "open"/default is the baseline and
+// never needs to be pushed.
+func exportFailPolicy(st State) string {
+	if NormalizeFailPolicy(st.FailPolicy) == string(protectstate.FailClosed) {
+		return string(protectstate.FailClosed)
+	}
+	return ""
 }
 
 func clampInt(v, lo, hi int) int {

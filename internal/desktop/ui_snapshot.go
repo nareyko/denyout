@@ -159,6 +159,7 @@ func (a *App) GetUISnapshot() UISnapshot {
 		SystemBanners:      !a.state.SystemBannersOff,
 		RespectFullscreen:  !a.state.RespectFullscreenOff,
 		BlockBrowserQUIC:   !a.state.AllowBrowserQUIC,
+		FailPolicy:         failPolicyViewLocked(a),
 		TunDataplane:       a.state.TunDataplane && runtime.GOOS == "linux",
 		QuicMITM:           a.state.QuicMITM && runtime.GOOS == "linux",
 		ExperimentalLinux:  runtime.GOOS == "linux",
@@ -312,6 +313,7 @@ func protectInputsLocked(a *App) protectstate.Inputs {
 		AgentsProfile:  normalizePolicyProfile(a.state.PolicyProfile) == PolicyProfileAgent,
 		Status:         a.status,
 		HelperDegraded: a.proxyd != nil && hostguard.HelperDegraded(),
+		FailPolicy:     effectiveFailPolicyLocked(a),
 		CAPresent:      caErr == nil,
 		Paused:         pause,
 	}

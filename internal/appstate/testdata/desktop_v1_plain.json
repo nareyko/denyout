@@ -1,0 +1,10 @@
+{
+ "schema_version": 1,
+ "setup_done": true,
+ "policy_profile": "browse",
+ "computer_available": true,
+ "autostart": false,
+ "autostart_asked": true,
+ "scope": "computer",
+ "protection_on": true
+}

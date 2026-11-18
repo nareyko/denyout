@@ -28,22 +28,40 @@ func ParseFailPolicy(s string) (FailPolicy, bool) {
 	return FailOpen, false
 }
 
-// FailPolicyFromEnv resolves the policy. DENYOUT_FAIL_CLOSED=1 (legacy) always
-// wins; otherwise DENYOUT_FAIL_POLICY=open|closed; otherwise def (empty = open).
-func FailPolicyFromEnv(getenv func(string) string, def FailPolicy) FailPolicy {
+// Sources of the effective fail policy, strongest first.
+const (
+	PolicySourceEnvLegacy = "env:DENYOUT_FAIL_CLOSED"
+	PolicySourceEnv       = "env:DENYOUT_FAIL_POLICY"
+	PolicySourceSetting   = "setting"
+	PolicySourceDefault   = "default"
+)
+
+// ValidFailPolicy reports whether s is exactly "open" or "closed" (the only values the
+// helper protocol and the state file accept; no aliases).
+func ValidFailPolicy(s string) bool { return s == string(FailOpen) || s == string(FailClosed) }
+
+// ResolveFailPolicy resolves the effective policy and where it came from.
+// Precedence: DENYOUT_FAIL_CLOSED=1 > DENYOUT_FAIL_POLICY > setting > default (open).
+func ResolveFailPolicy(getenv func(string) string, setting FailPolicy) (FailPolicy, string) {
 	if getenv == nil {
 		getenv = os.Getenv
 	}
 	if getenv("DENYOUT_FAIL_CLOSED") == "1" {
-		return FailClosed
+		return FailClosed, PolicySourceEnvLegacy
 	}
 	if p, ok := ParseFailPolicy(getenv("DENYOUT_FAIL_POLICY")); ok {
-		return p
+		return p, PolicySourceEnv
 	}
-	if def == "" {
-		return FailOpen
+	if ValidFailPolicy(string(setting)) {
+		return setting, PolicySourceSetting
 	}
-	return def
+	return FailOpen, PolicySourceDefault
+}
+
+// FailPolicyFromEnv resolves the policy (see ResolveFailPolicy); def empty = open.
+func FailPolicyFromEnv(getenv func(string) string, def FailPolicy) FailPolicy {
+	p, _ := ResolveFailPolicy(getenv, def)
+	return p
 }
 
 // Transition is a state change seen by a Tracker.
