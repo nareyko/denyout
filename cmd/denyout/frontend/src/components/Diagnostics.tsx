@@ -100,7 +100,7 @@ export function SelfCheckPanel({ autoRun = false, onDone }: { autoRun?: boolean;
         </p>
       ) : (
         <>
-          {verified ? <p className="ok">Verified. The certificate works and interception is ready.</p> : null}
+          {verified ? <p className="ok">Protected and verified. The certificate works and interception is ready.</p> : null}
           {failed ? <p className="warn-box">Something needs fixing before protection can work.</p> : null}
           <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
             {checks.map((c) => (

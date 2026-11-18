@@ -100,8 +100,9 @@ func (a *App) maybeAskAutostart(kind string) {
 	if asked {
 		return
 	}
-	yes := true
-	if dialogToolkitAvailable() {
+	// No dialog toolkit means we cannot ask, so the answer is No (never a silent Yes).
+	yes := false
+	if a.toolkitAvailable() {
 		body := "Start DenyOut automatically when you log in?\n\nRecommended so DenyOut is ready after reboot."
 		switch strings.ToLower(strings.TrimSpace(kind)) {
 		case "protect", "safe", "computer":
@@ -109,7 +110,7 @@ func (a *App) maybeAskAutostart(kind string) {
 		case "agents":
 			body = "Start DenyOut automatically when you log in?\n\nRecommended so DenyOut is ready for My agents after reboot. Everyday browsing stays unprotected until you turn on Protect computer."
 		}
-		yes = nativeConfirm(
+		yes = a.confirmDialog(
 			"DenyOut",
 			body,
 			"Yes, start at login",
@@ -123,7 +124,7 @@ func (a *App) maybeAskAutostart(kind string) {
 	a.mu.Unlock()
 	_ = SaveState(st)
 	if yes {
-		if err := RegisterAutostart(); err != nil {
+		if err := a.registerAutostart(); err != nil {
 			fmt.Fprintf(os.Stderr, "denyout desktop: autostart: %v\n", err)
 		}
 	}

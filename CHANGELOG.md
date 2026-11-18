@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Shorter first run.** The windowed app now needs one chooser (Protect computer expands the list of what it changes: helper and certificate, then one confirm) and one final screen ("Protected and verified", Fix buttons, optional "Start DenyOut when I log in" checkbox, unchecked). The separate confirm modal and the "how chatty" question are gone from first run. Not now is a single screen and installs nothing. Native dialogs (zenity, kdialog, osascript) go from 3 to 2, and Not now to 1; Windows gets a PowerShell Yes / No / Cancel choice instead of silently choosing Not now. Docs: [`docs/first-run-flow.md`](docs/first-run-flow.md).
+- **Login launch is never defaulted on.** The tray path that enabled autostart silently after setup now asks, and with no dialog toolkit the answer is No.
+
 - Dependencies: sqlite 1.62, beeep 0.12, wails 2.17.1; frontend React 19, Vite 8, plugin-react 6, TypeScript 7. CI now builds the frontend on every PR.
 
 ## 0.4.13 - Security review, refactor series, signed releases (2026-11-18)
