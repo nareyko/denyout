@@ -27,14 +27,13 @@ export default function App() {
  const [onboardMsgWarn, setOnboardMsgWarn] = useState(false);
  /** First-run chatty choice. "keep" = Detailed already on, no Quiet/A bit more pick yet. */
  const [onboardChatty, setOnboardChatty] = useState<"quiet" | "normal" | "keep">("quiet");
- /** True after user clicks Quiet / A bit more (avoids Quiet flash while Detailed is active). */
- const [chattyTouched, setChattyTouched] = useState(false);
  function setOnboardToast(msg: string, warn = true) {
  setOnboardMsg(msg);
  setOnboardMsgWarn(!!msg && warn);
  }
- const shownOnboardChatty: "quiet" | "normal" | "keep" =
-  !chattyTouched && snap?.notify_level === "detailed" ? "keep" : onboardChatty;
+ // The chatty question left first-run (default Quiet, changeable in Settings); this only
+ // keeps the saved level when setup finishes.
+ const shownOnboardChatty: "quiet" | "normal" | "keep" = onboardChatty;
  async function applyOnboardChatty() {
  // Preserve Detailed only until the user explicitly picks Quiet or A bit more.
  if (shownOnboardChatty === "keep") return;
@@ -1518,50 +1517,9 @@ export default function App() {
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h2>How should DenyOut protect this computer?</h2>
             <p className="muted">
-              Choose a mode. Protect computer may ask for your password once; My agents do not.
-              {snap?.helper_ok
-                ? " A helper is already on this computer, so Protect often skips the password."
-                : ""}
+              Pick one. Nothing is installed until you confirm. You can change this later in
+              Settings.
             </p>
-            <div style={{ marginTop: "1rem" }}>
-              <p className="muted" style={{ marginBottom: "0.45rem" }}>
-                How should DenyOut talk to you?
-              </p>
-              <p className="muted" style={{ marginBottom: "0.55rem", fontSize: "0.9em" }}>
-                Blocks always go to History. The system stays mostly quiet unless you ask for more.
-              </p>
-              <div className="row-actions" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
-                <button
-                  type="button"
-                  className={shownOnboardChatty === "quiet" ? "btn primary" : "btn"}
-                  disabled={onboardBusy}
-                  onClick={() => {
-                    setChattyTouched(true);
-                    setOnboardChatty("quiet");
-                  }}
-                >
-                  Quiet (recommended)
-                </button>
-                <button
-                  type="button"
-                  className={shownOnboardChatty === "normal" ? "btn primary" : "btn"}
-                  disabled={onboardBusy}
-                  onClick={() => {
-                    setChattyTouched(true);
-                    setOnboardChatty("normal");
-                  }}
-                >
-                  A bit more
-                </button>
-              </div>
-              {snap?.notify_level === "detailed" ? (
-                <p className="muted" style={{ marginTop: "0.45rem", fontSize: "0.9em" }}>
-                  Detailed is already on (adds the auto-resume OS banner for Protect or Agents
-                  only vs A bit more). Quiet / A bit more apply only if you pick one above;
-                  otherwise Detailed stays. Change under Settings → Advanced → System banners.
-                </p>
-              ) : null}
-            </div>
             {snap?.problems_alert ? (
               <p className="warn-box" style={{ marginTop: "0.75rem" }}>
                 {(snap?.policy_profile || "").toLowerCase() === "agent"
@@ -1614,7 +1572,8 @@ export default function App() {
  <button
  className="btn primary"
  disabled={onboardBusy}
- onClick={() => setShowProtectConfirm(true)}
+ onClick={() => setShowProtectConfirm((v) => !v)}
+ aria-expanded={showProtectConfirm}
  style={{ width: "100%", textAlign: "left", padding: "0.85rem 1rem" }}
  >
  <strong>Protect computer</strong>
@@ -1636,8 +1595,37 @@ export default function App() {
  Wrap tools you choose. Rest of the PC unchanged. No admin password.
  </div>
  </button>
+ {showProtectConfirm ? (
+ <div className="notice-box" role="group" aria-label="What Protect computer changes">
+ <strong>What Protect computer changes on this computer</strong>
+ <ul style={{ margin: "0.4rem 0 0.6rem 1.1rem" }}>
+ <li>
+ {snap?.helper_ok
+ ? "A small helper that sets network rules is already installed."
+ : "It installs a small helper that sets network rules. Your system asks for your password."}
+ </li>
+ <li>It creates a DenyOut certificate and trusts it, so secure sites can be checked.</li>
+ <li>Both stay on this computer. Nothing is sent anywhere.</li>
+ </ul>
+ <div className="row-actions">
+ <button className="btn primary" disabled={onboardBusy} onClick={() => void confirmProtectComputer()}>
+ Turn on Protect computer
+ </button>
+ <button
+ className="btn"
+ disabled={onboardBusy}
+ onClick={() => {
+ setShowProtectConfirm(false);
+ setOnboardToast("");
+ }}
+ >
+ Back
+ </button>
+ </div>
+ </div>
+ ) : null}
  <button className="btn" disabled={onboardBusy} onClick={() => void chooseNotNow()}>
- Not now
+ Not now, install nothing
  </button>
  </div>
  {onboardMsg ? (
@@ -1696,36 +1684,6 @@ export default function App() {
  </div>
  )}
 
- {showProtectConfirm && (
- <div className="modal-backdrop" style={{ zIndex: 55 }}>
- <div className="modal" onClick={(e) => e.stopPropagation()}>
- <h2>{snap?.protect_confirm_title || "Turn on Protect computer?"}</h2>
- <p style={{ whiteSpace: "pre-wrap" }}>
- {snap?.protect_confirm_body ||
- "Your system may ask for a password so DenyOut can set network rules. Continue?"}
- </p>
- {onboardMsg ? (
- <p className={onboardMsgWarn ? "warn-box" : "notice-box"}>{onboardMsg}</p>
- ) : null}
- <div className="row-actions">
- <button className="btn primary" disabled={onboardBusy} onClick={() => void confirmProtectComputer()}>
- Continue
- </button>
- <button
- className="btn"
- disabled={onboardBusy}
- onClick={() => {
- setShowProtectConfirm(false);
- setOnboardToast("");
- }}
- >
- Cancel
- </button>
- </div>
- </div>
- </div>
- )}
-
  {yourSetupModalOpen && snap && (
  <div className="modal-backdrop">
  <div className="modal">
@@ -1753,6 +1711,19 @@ export default function App() {
  {snap.protection_on && !afterAgentsSetup ? (
  <SelfCheckPanel autoRun onDone={() => void refreshSnap()} />
  ) : null}
+ <label className="check" style={{ display: "flex", gap: "0.5rem", alignItems: "center", margin: "0.75rem 0" }}>
+ <input
+ type="checkbox"
+ checked={!!snap.autostart}
+ onChange={(e) =>
+ void api
+ .setAutostart(e.target.checked)
+ .then(() => refreshSnap())
+ .catch((err) => setOnboardToast(String(err)))
+ }
+ />
+ <span>Start DenyOut when I log in (optional)</span>
+ </label>
  <div className="row-actions">
  <button
  className="btn primary"

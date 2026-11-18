@@ -61,7 +61,8 @@ type Options struct {
 
 // App is the non-technical desktop entry (tray + hostguard / session proxy).
 type App struct {
-	opts Options
+	opts  Options
+	hooks firstRunHooks // tests only; nil in production
 
 	mu                 sync.Mutex
 	state              State

@@ -18,7 +18,13 @@ func (a *App) UIOnboardingNotNow() error {
 	_ = SaveState(st)
 	LogEvent("setup_choice", map[string]any{"choice": "not_now"})
 	a.completeSetupSideEffects()
-	a.showYourSetup("off")
+	// Not now installs nothing, so there is no result to verify: skip the final screen.
+	a.mu.Lock()
+	a.state.YourSetupShown = true
+	a.state.PendingYourSetup = ""
+	st = a.state
+	a.mu.Unlock()
+	_ = SaveState(st)
 	return nil
 }
 
@@ -74,7 +80,7 @@ func (a *App) UIResetSetup() error {
 	if err := SaveState(st); err != nil {
 		return err
 	}
-	_ = UnregisterAutostart()
+	_ = a.unregisterAutostart()
 	if a.opts.OpenUI != nil {
 		a.RequestOpenUI("home")
 	}

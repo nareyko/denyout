@@ -7,17 +7,28 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nareyko/denyout/internal/diag"
 	"github.com/nareyko/denyout/internal/notify"
 )
 
-// runFirstRunWizard shows Protect computer / Protect AI agents / Not now.
+// runFirstRunWizard is the native (zenity/kdialog/osascript/PowerShell) first run.
+// It asks at most two questions:
+//  1. the choice dialog (Protect computer / Protect AI agents / Not now). The text
+//     lists exactly what Protect computer changes, so choosing it is the one
+//     combined consent for the helper and the local certificate. The system
+//     password prompt that follows stays.
+//  2. one closing dialog with the result, the self-check summary and the
+//     optional "start at login" question. Skipped for Not now, which installs
+//     nothing and registers nothing.
+//
 // Headless / no dialog toolkit -> mark setup done Off (CLI path).
 func (a *App) runFirstRunWizard() {
-	if runtime.GOOS == "linux" && !dialogToolkitAvailable() {
+	if runtime.GOOS == "linux" && !a.toolkitAvailable() {
 		_ = a.finishSetupNotNow("Install zenity (or kdialog) for the desktop setup dialog, or use: denyout profile create")
+		a.markFirstRunClosed(false)
 		return
 	}
-	choice := nativeFirstRunChoice()
+	choice := a.firstRunChoice()
 	switch choice {
 	case "computer":
 		a.mu.Lock()
@@ -29,13 +40,12 @@ func (a *App) runFirstRunWizard() {
 		st := a.state
 		a.mu.Unlock()
 		_ = SaveState(st)
-		a.maybeAskAutostart("protect")
+		mode := "safe"
 		if err := a.enableSafeDesktop(); err != nil {
 			notify.Emit(notify.KindProtectFailed, "DenyOut", "Could not turn on Protect computer (admin may be required). You can retry from the tray.")
-			a.showYourSetup("off")
-		} else {
-			a.showYourSetup("safe")
+			mode = "off"
 		}
+		a.finishNativeFirstRun(mode)
 	case "agents":
 		a.mu.Lock()
 		a.state.SetupDone = true
@@ -48,10 +58,9 @@ func (a *App) runFirstRunWizard() {
 		st := a.state
 		a.mu.Unlock()
 		_ = SaveState(st)
-		a.maybeAskAutostart("agents")
-		a.showYourSetup("agents")
+		a.finishNativeFirstRun("agents")
 		go func() {
-			// Wails already opens New agent from the frontend — do not re-emit
+			// Wails already opens New agent from the frontend; do not re-emit
 			// profiles-new (that resets the form while the user is typing).
 			if a.opts.SkipNativeYourSetup {
 				return
@@ -62,11 +71,82 @@ func (a *App) runFirstRunWizard() {
 			}
 			a.wizardNewAgent(true)
 		}()
-	default: // not now / cancel
+	default: // not now / cancel: nothing is installed, nothing is asked again.
 		_ = a.finishSetupNotNow("")
-		a.maybeAskAutostart("off")
-		a.showYourSetup("off")
+		a.markFirstRunClosed(false)
 	}
+}
+
+// finishNativeFirstRun shows the single closing dialog: what happened, the
+// self-check result when Protect is on, and the optional login-launch question.
+func (a *App) finishNativeFirstRun(mode string) {
+	var checks []diag.Check
+	if mode == "safe" {
+		checks = a.firstRunSelfCheck()
+	}
+	text := firstRunSummaryText(mode, checks)
+	yes := false
+	if a.toolkitAvailable() {
+		yes = a.confirmDialog("DenyOut", text, "Start at login", "Not now")
+	} else {
+		notify.Info("DenyOut", text)
+	}
+	a.markFirstRunClosed(yes)
+}
+
+// markFirstRunClosed records that first run is over and the login-launch
+// question is settled. autostart is only ever true after an explicit Yes.
+func (a *App) markFirstRunClosed(autostart bool) {
+	a.mu.Lock()
+	a.state.AutostartAsked = true
+	a.state.Autostart = autostart
+	a.state.YourSetupShown = true
+	a.state.PendingYourSetup = ""
+	st := a.state
+	a.mu.Unlock()
+	_ = SaveState(st)
+	if autostart {
+		if err := a.registerAutostart(); err != nil {
+			AppendDesktopLog("WARN autostart after setup: %v", err)
+			a.mu.Lock()
+			a.state.Autostart = false
+			stFail := a.state
+			a.mu.Unlock()
+			_ = SaveState(stFail)
+		}
+	}
+}
+
+// firstRunSummaryText is the closing native dialog body (plain ASCII).
+// Problems from the self-check are listed with the place to fix them.
+func firstRunSummaryText(mode string, checks []diag.Check) string {
+	var b strings.Builder
+	switch mode {
+	case "safe":
+		var bad []diag.Check
+		for _, c := range checks {
+			if c.Status == diag.Fail || c.Status == diag.Warn {
+				bad = append(bad, c)
+			}
+		}
+		if len(checks) == 0 {
+			b.WriteString("Protect is on. The check could not run, so open DenyOut and look at Problems.")
+		} else if len(bad) == 0 {
+			b.WriteString("Protected and verified.\nBrowse as usual. We only interrupt for clear risks.")
+		} else {
+			b.WriteString("Protect is on, but the check found something to fix:\n")
+			for _, c := range bad {
+				fmt.Fprintf(&b, "- %s: %s\n", c.Name, c.Detail)
+			}
+			b.WriteString("Open DenyOut, then Problems, to fix it.")
+		}
+	case "agents":
+		b.WriteString("Protect AI agents is set up.\nThe rest of the computer is unchanged. Add an agent from My agents.")
+	default:
+		b.WriteString("Protect computer did not turn on, so nothing is protected yet.\nYou can try again from the tray.")
+	}
+	b.WriteString("\n\nOptional: start DenyOut when you log in?")
+	return b.String()
 }
 
 func (a *App) finishSetupNotNow(extra string) error {
@@ -215,19 +295,18 @@ func YourSetupText(mode string, autostart bool, unhealthy bool, quietWhileAway b
 }
 
 // completeSetupSideEffects marks first-run finished.
-// Native tray: D9=C enables login autostart. Wails: leave Off until Settings (in-app consent).
+// Login autostart is never switched on silently. Wails leaves it Off until the
+// checkbox on the final screen (or Settings). The native tray asks explicitly.
 func (a *App) completeSetupSideEffects() {
 	wails := a.opts.SkipNativeYourSetup
 	a.mu.Lock()
 	a.state.SetupDone = true
-	a.state.AutostartAsked = true
-	a.state.UXv2Migrated = true
 	if wails {
+		a.state.AutostartAsked = true
 		a.state.Autostart = false
-	} else {
-		a.state.Autostart = true
 	}
-	// Preserve onboarding chatty choice; empty → Quiet (Presence wave).
+	a.state.UXv2Migrated = true
+	// Preserve onboarding chatty choice; empty -> Quiet (Presence wave).
 	if strings.TrimSpace(a.state.NotifyLevel) == "" {
 		a.state.NotifyLevel = "quiet"
 	}
@@ -237,17 +316,10 @@ func (a *App) completeSetupSideEffects() {
 	_ = SaveState(st)
 	applyNotifyPrefs(st)
 	if wails {
-		_ = UnregisterAutostart() // clear any leftover login entry
+		_ = a.unregisterAutostart() // clear any leftover login entry
 		return
 	}
-	if err := RegisterAutostart(); err != nil {
-		AppendDesktopLog("WARN autostart after setup: %v", err)
-		a.mu.Lock()
-		a.state.Autostart = false
-		stFail := a.state
-		a.mu.Unlock()
-		_ = SaveState(stFail)
-	}
+	a.maybeAskAutostart("protect")
 }
 
 // ProtectConfirmText is the DenyOut confirm before Off→On (D5/D12).
@@ -267,12 +339,57 @@ func ProtectConfirmText(helperOK bool) (title, body string) {
 	return title, body
 }
 
+// firstRunChoiceText is the one native consent screen. Protect computer lists
+// everything it changes; choosing it is the consent, and the system password
+// prompt still follows. Not now installs nothing.
+const firstRunChoiceText = "How should DenyOut protect this computer?\n\n" +
+	"- Protect computer: internet works as usual and risky links are blocked. " +
+	"This changes two things on this computer: it installs a small helper that sets network rules, " +
+	"and it creates a DenyOut certificate and trusts it so secure sites can be checked. " +
+	"Your system will ask for your password. Both stay on this computer.\n" +
+	"- Protect AI agents: wrap a program such as python or an agent. The rest of the computer is unchanged. No password.\n" +
+	"- Not now: nothing is installed or changed. Open the tray later."
+
+// firstRunChoiceFromLabel maps a pressed button label to a choice.
+func firstRunChoiceFromLabel(s string) string {
+	switch {
+	case strings.Contains(s, "AI agents"):
+		return "agents"
+	case strings.Contains(s, "Protect computer"):
+		return "computer"
+	default:
+		return "notnow"
+	}
+}
+
+// firstRunChoiceFromKdialog maps kdialog --yesnocancel exit codes.
+func firstRunChoiceFromKdialog(code int) string {
+	switch code {
+	case 0:
+		return "computer"
+	case 1:
+		return "agents"
+	default:
+		return "notnow"
+	}
+}
+
+// firstRunChoiceFromWindows maps the PowerShell MessageBox result
+// (Yes = Protect computer, No = Protect AI agents, Cancel = Not now).
+func firstRunChoiceFromWindows(s string) string {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "yes":
+		return "computer"
+	case "no":
+		return "agents"
+	default:
+		return "notnow"
+	}
+}
+
 func nativeFirstRunChoice() string {
 	title := "DenyOut"
-	text := "How should DenyOut protect this computer?\n\n" +
-		"- Protect computer - Safe desktop: internet works as usual. Blocks suspicious links. Needs your computer password once.\n" +
-		"- Protect AI agents - wrap a program (python, Cursor agent, ...). Rest of PC unchanged. No admin password.\n" +
-		"- Not now - leave off. Open the tray later."
+	text := firstRunChoiceText
 	switch runtime.GOOS {
 	case "linux":
 		if zenity, err := exec.LookPath("zenity"); err == nil {
@@ -282,7 +399,7 @@ func nativeFirstRunChoice() string {
 				"--ok-label=Protect computer",
 				"--cancel-label=Not now",
 				"--extra-button=Protect AI agents",
-				"--width=520",
+				"--width=560",
 			)
 			out, err := cmd.CombinedOutput()
 			s := strings.TrimSpace(string(out))
@@ -307,31 +424,27 @@ func nativeFirstRunChoice() string {
 			} else if ee, ok := err.(*exec.ExitError); ok {
 				code = ee.ExitCode()
 			}
-			switch code {
-			case 0:
-				return "computer"
-			case 1:
-				return "agents"
-			default:
-				return "notnow"
-			}
+			return firstRunChoiceFromKdialog(code)
 		}
 	case "darwin":
-		script := fmt.Sprintf(`set r to button returned of (display dialog %q buttons {"Not now","Protect AI agents","Protect computer"} default button "Protect computer" with title %q)
+		script := fmt.Sprintf(`set r to button returned of (display dialog %q buttons {"Not now","Protect AI agents","Protect computer"} default button "Not now" with title %q)
 return r`, text, title)
 		out, err := exec.Command("osascript", "-e", script).Output()
 		if err != nil {
 			return "notnow"
 		}
-		s := strings.TrimSpace(string(out))
-		switch {
-		case strings.Contains(s, "AI agents"):
-			return "agents"
-		case strings.Contains(s, "computer"):
-			return "computer"
-		default:
+		return firstRunChoiceFromLabel(strings.TrimSpace(string(out)))
+	case "windows":
+		// MessageBox has fixed buttons: Yes / No / Cancel. The text names them.
+		wtext := text + "\n\nYes = Protect computer.  No = Protect AI agents.  Cancel = Not now."
+		ps := fmt.Sprintf(`Add-Type -AssemblyName PresentationFramework
+$r = [System.Windows.MessageBox]::Show(%q, %q, 'YesNoCancel', 'Question', 'Cancel')
+$r.ToString()`, wtext, title)
+		out, err := exec.Command("powershell", "-NoProfile", "-Command", ps).Output()
+		if err != nil {
 			return "notnow"
 		}
+		return firstRunChoiceFromWindows(string(out))
 	}
 	return "notnow"
 }
@@ -348,7 +461,9 @@ func (a *App) enableSafeDesktop() error {
 	a.mu.Unlock()
 	_ = SaveState(st)
 	var err error
-	if hadSession {
+	if h := a.hooks.enableSafe; h != nil {
+		err = h() // tests only: never touches the helper
+	} else if hadSession {
 		// Do not restartActiveProtector — that would keep ScopeSession.
 		err = a.switchToSafeDesktopFromTray()
 	} else if hadProxyd {
