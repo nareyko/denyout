@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/gogpu/systray"
@@ -41,19 +40,7 @@ func (a *App) runTray(ctx context.Context) error {
 	tray.SetAppName("DenyOut")
 
 	// Left-click: Problems when Protect is broken or threat lists need a refresh; else Home.
-	tray.OnClick(func() {
-		go func() {
-			a.mu.Lock()
-			alert := problemsUnhealthyLocked(a)
-			threatWarn := a.threatNeedsAttentionLocked()
-			a.mu.Unlock()
-			if alert || threatWarn {
-				a.RequestOpenUI("problems")
-				return
-			}
-			a.RequestOpenUI("home")
-		}()
-	})
+	tray.OnClick(func() { go a.trayLeftClick() })
 
 	menu := systray.NewMenu()
 	statusItem := menu.Add("Off", nil)
@@ -89,27 +76,7 @@ func (a *App) runTray(ctx context.Context) error {
 	})
 	menu.AddSeparator()
 
-	menu.Add("Quit DenyOut", func() {
-		// Wails: in-app quit modal (works without zenity). Native fallback otherwise.
-		if a.opts.OpenUI != nil {
-			a.RequestOpenUI("quit")
-			return
-		}
-		choice := a.trayQuitChoice()
-		if choice == "" {
-			return // cancel
-		}
-		notify.CloseAll()
-		// Quit always fully unloads (password if helper is not installed).
-		if err := a.quitUnload(); err != nil {
-			fmt.Fprintf(os.Stderr, "denyout desktop: quit cancelled or failed: %v\n", err)
-			return
-		}
-		a.stopAllWrapsOpts("Quit", true)
-		a.stopProtect()
-		tray.Remove()
-		os.Exit(0)
-	})
+	menu.Add("Quit DenyOut", func() { a.trayQuit(tray) })
 
 	// Notify once when protection transitions into degraded (proxy lost, redirect pulled).
 	degradeTracker := &protectstate.Tracker{OnDegraded: func(tr protectstate.Transition) {
@@ -119,6 +86,7 @@ func (a *App) runTray(ctx context.Context) error {
 	tray.SetMenu(menu)
 	tray.Show()
 
+	ti := trayItems{status: statusItem, computer: computerItem, off: offItem, snooze1h: snooze1h, snoozeTomorrow: snoozeTomorrow, clearSnooze: clearSnooze}
 	go func() {
 		t := time.NewTicker(2 * time.Second)
 		defer t.Stop()
@@ -131,176 +99,7 @@ func (a *App) runTray(ctx context.Context) error {
 				tray.Remove()
 				return
 			case <-t.C:
-				mode := a.currentMode()
-				a.mu.Lock()
-				st := a.status
-				profile := normalizePolicyProfile(a.state.PolicyProfile)
-				avail := a.state.ComputerAvailable
-				pauseUntil := activeProtectPausedUntil(a.state.ProtectPausedUntil)
-				pauseLast := a.state.ProtectPauseLast
-				leaveOn := a.state.ProtectionOn || a.state.ComputerEnabled
-				pres := protectResultLocked(a)
-				needsAttention := pres.NeedsAttention
-				threatWarn := a.threatNeedsAttentionLocked()
-				unread := a.state.AwayUnreadBlocks
-				snoozeUntil := activeNotifySnoozeUntil(a.state.NotifySnoozeUntil)
-				a.mu.Unlock()
-				a.pollPresenceOnce()
-				degradeTracker.Observe(pres)
-
-				snooze1h.SetDisabled(snoozeUntil != "")
-				snoozeTomorrow.SetDisabled(snoozeUntil != "")
-				clearSnooze.SetDisabled(snoozeUntil == "")
-
-				label := userModeLabel(mode, profile)
-				paused := mode == ModeOff && (pauseUntil != "" || pauseLast == "forever")
-				agentsIntent := profile == PolicyProfileAgent
-				pausePrefix := ""
-				if agentsIntent {
-					pausePrefix = "Agents only "
-				}
-				if mode == ModeOff && pauseUntil != "" {
-					label = pausePrefix + "Paused"
-					if t, err := time.Parse(time.RFC3339, pauseUntil); err == nil {
-						local := t.Local()
-						// 24h local clock — matches chrome formatPauseUntil (hour12: false).
-						if local.Format("2006-01-02") == time.Now().Local().Format("2006-01-02") {
-							label = pausePrefix + "paused until " + local.Format("15:04")
-						} else {
-							label = pausePrefix + "paused until " + local.Format("Jan 2, 15:04")
-						}
-					}
-				} else if mode == ModeOff && pauseLast == "forever" {
-					if agentsIntent {
-						label = "Agents only off until you turn it on"
-					} else {
-						label = "Off until you turn it on"
-					}
-				} else if mode == ModeOff && !avail {
-					label = "Off (unavailable)"
-				}
-				if needsAttention {
-					label = "Needs attention"
-				}
-				// Threat-list warn stays in the tooltip (chrome keeps Protected + warn pill).
-				statusItem.SetLabel(label)
-
-				computerItem.SetLabel(checkedLabel("Protect computer", mode == ModeComputer && profile == PolicyProfileBrowse))
-				computerItem.SetDisabled(mode == ModeComputer && profile == PolicyProfileBrowse)
-				// Needs attention is ModeOff with leave-on intent — Off must stay
-				// clickable so PauseModal can clear broken Protect (same as Home).
-				offNoun := "Protect"
-				switch {
-				case mode == ModeComputer && profile == PolicyProfileAgent:
-					offNoun = "Agents only"
-				case mode == ModeSession:
-					offNoun = "Session protection"
-				case agentsIntent && (paused || mode == ModeOff):
-					offNoun = "Agents only"
-				}
-				if paused {
-					offItem.SetLabel("Change " + offNoun + " pause…")
-					offItem.SetDisabled(false)
-				} else if needsAttention && mode == ModeOff {
-					// Match Home/Jump: Clear intent only when Protect is not live.
-					if agentsIntent {
-						offItem.SetLabel("Clear Agents only intent…")
-					} else {
-						offItem.SetLabel("Clear Protect intent…")
-					}
-					offItem.SetDisabled(false)
-				} else if needsAttention || (mode == ModeOff && leaveOn) {
-					offItem.SetLabel("Pause / turn off " + offNoun + "…")
-					offItem.SetDisabled(false)
-				} else if mode != ModeOff {
-					// Match Home / Settings / Jump: live protector → pause wording, not bare "Off".
-					offItem.SetLabel("Pause / turn off " + offNoun + "…")
-					offItem.SetDisabled(false)
-				} else {
-					offItem.SetLabel(checkedLabel("Off", true))
-					offItem.SetDisabled(true)
-				}
-
-				tooltip := "DenyOut - " + label
-				statusExtra := ""
-				quietPhrase := a.quietReason()
-				// Mirror chrome: Needs attention pill drops snooze/quiet extras.
-				if !needsAttention {
-					if quietPhrase != "" {
-						tooltip += " · " + quietPhrase
-						statusExtra += " · " + quietPhrase
-					} else if snoozeUntil != "" {
-						// Fallback if phrase empty but snooze set (should not happen).
-						tooltip += " · snoozed"
-						statusExtra += " · snoozed"
-					}
-					if unread > 0 {
-						if unread == 1 {
-							tooltip += " · 1 quiet"
-							statusExtra += " · 1 quiet"
-						} else {
-							tooltip += fmt.Sprintf(" · %d quiet", unread)
-							statusExtra += fmt.Sprintf(" · %d quiet", unread)
-						}
-					}
-					if a.undoOfferActive() {
-						tooltip += " · Undo available — open DenyOut"
-						statusExtra += " · Undo"
-					}
-					if statusExtra != "" {
-						statusItem.SetLabel(label + statusExtra)
-					}
-				}
-				tray.SetTooltip(tooltip)
-
-				wrapsRunning := a.runningWrapCount() > 0
-				quieting := quietPhrase != ""
-				switch {
-				case needsAttention, strings.Contains(strings.ToLower(st), "error"), strings.Contains(st, "Needs"):
-					tray.SetIcon(iconAlertPNG)
-				case quieting:
-					// Slate-blue quiet icon — distinct from On (cream), Idle (white), Alert (brown).
-					tray.SetIcon(iconQuietPNG)
-					if threatWarn {
-						tray.SetTooltip(tooltip + " · Threat lists need a refresh")
-					}
-				case mode != ModeOff:
-					// Threat-list warn keeps the on icon (chrome: mode pill + warn chip).
-					tray.SetIcon(iconOnPNG)
-					if threatWarn {
-						tray.SetTooltip(tooltip + " · Threat lists need a refresh")
-					}
-				case threatWarn:
-					tray.SetIcon(iconIdlePNG)
-					tray.SetTooltip(tooltip + " · Threat lists need a refresh")
-				case wrapsRunning:
-					// Protect computer is Off — don't imply whole-PC Protect with the on icon.
-					tray.SetIcon(iconIdlePNG)
-					if !paused && !needsAttention && !threatWarn {
-						snoozeBit := ""
-						if snoozeUntil != "" {
-							snoozeBit = " · snoozed"
-						}
-						quietBit := ""
-						if unread == 1 {
-							quietBit = " · 1 quiet"
-						} else if unread > 1 {
-							quietBit = fmt.Sprintf(" · %d quiet", unread)
-						}
-						if mode == ModeOff && !avail {
-							// Match chrome: unavailable wins, agents still visible; keep snooze+quiet.
-							base := "Off (unavailable) · agents running"
-							statusItem.SetLabel(base + snoozeBit + quietBit)
-							tray.SetTooltip("DenyOut - " + base + snoozeBit + quietBit)
-						} else if mode == ModeOff && pauseUntil == "" && pauseLast != "forever" {
-							base := "Off · agents running"
-							statusItem.SetLabel(base + snoozeBit + quietBit)
-							tray.SetTooltip("DenyOut - " + base + snoozeBit + quietBit)
-						}
-					}
-				default:
-					tray.SetIcon(iconIdlePNG)
-				}
+				a.trayTick(tray, ti, degradeTracker)
 			}
 		}
 	}()
@@ -343,4 +142,75 @@ func userModeLabel(mode, profile string) string {
 	default:
 		return "Off"
 	}
+}
+
+type trayItems struct {
+	status, computer, off, snooze1h, snoozeTomorrow, clearSnooze *systray.MenuItem
+}
+
+func (a *App) trayLeftClick() {
+	a.mu.Lock()
+	alert := problemsUnhealthyLocked(a)
+	threatWarn := a.threatNeedsAttentionLocked()
+	a.mu.Unlock()
+	if alert || threatWarn {
+		a.RequestOpenUI("problems")
+		return
+	}
+	a.RequestOpenUI("home")
+}
+
+func (a *App) trayQuit(tray *systray.SystemTray) {
+	// Wails: in-app quit modal (works without zenity). Native fallback otherwise.
+	if a.opts.OpenUI != nil {
+		a.RequestOpenUI("quit")
+		return
+	}
+	choice := a.trayQuitChoice()
+	if choice == "" {
+		return // cancel
+	}
+	notify.CloseAll()
+	// Quit always fully unloads (password if helper is not installed).
+	if err := a.quitUnload(); err != nil {
+		fmt.Fprintf(os.Stderr, "denyout desktop: quit cancelled or failed: %v\n", err)
+		return
+	}
+	a.stopAllWrapsOpts("Quit", true)
+	a.stopProtect()
+	tray.Remove()
+	os.Exit(0)
+}
+
+// trayTick snapshots app state and applies the pure trayView to the tray.
+func (a *App) trayTick(tray *systray.SystemTray, ti trayItems, degradeTracker *protectstate.Tracker) {
+	mode := a.currentMode()
+	a.mu.Lock()
+	st := a.status
+	profile := normalizePolicyProfile(a.state.PolicyProfile)
+	avail := a.state.ComputerAvailable
+	pauseUntil := activeProtectPausedUntil(a.state.ProtectPausedUntil)
+	pauseLast := a.state.ProtectPauseLast
+	leaveOn := a.state.ProtectionOn || a.state.ComputerEnabled
+	pres := protectResultLocked(a)
+	needsAttention := pres.NeedsAttention
+	threatWarn := a.threatNeedsAttentionLocked()
+	unread := a.state.AwayUnreadBlocks
+	snoozeUntil := activeNotifySnoozeUntil(a.state.NotifySnoozeUntil)
+	a.mu.Unlock()
+	a.pollPresenceOnce()
+	degradeTracker.Observe(pres)
+
+	in := trayInputs{
+		Mode: mode, Profile: profile, Avail: avail, PauseUntil: pauseUntil,
+		PauseLast: pauseLast, LeaveOn: leaveOn, NeedsAttention: needsAttention,
+		ThreatWarn: threatWarn, Unread: unread, SnoozeUntil: snoozeUntil,
+		Status: st, Now: time.Now(),
+	}
+	in.QuietPhrase = a.quietReason()
+	if !needsAttention {
+		in.UndoActive = a.undoOfferActive()
+	}
+	in.WrapsRunning = a.runningWrapCount() > 0
+	applyTrayModel(trayView(in), tray, ti)
 }
