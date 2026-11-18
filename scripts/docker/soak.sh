@@ -95,7 +95,9 @@ wait_state '^(protected|restored_after_restart)' 10 || bad "pre-steady state: $(
 has_table || { apply; sleep 1; }
 G0=$(goroutines); F0=$(fds $PP); T0=$(threads $PP); R0=$(rss_kb $PP)
 D0=$(grep -c "^denyout: DENY" /tmp/proxyd.log); start_load; sleep 5; GP=$(goroutines); sleep 5; stop_load; sleep 5; D1=$(grep -c "^denyout: DENY" /tmp/proxyd.log)
-[ $((D1 - D0)) -ge 20 ] && ok "load reached the proxy ($((D1 - D0)) connections handled, mid-load goroutines ${GP:-?})" || bad "load did not reach the proxy ($((D1 - D0)) connections)"
+# Floor, not a throughput target: the 10 s window yields 15-38 handled connections depending on host
+# load (main: 21-35, n=6). The check only proves the load really went through the proxy.
+[ $((D1 - D0)) -ge 10 ] && ok "load reached the proxy ($((D1 - D0)) connections handled, mid-load goroutines ${GP:-?})" || bad "load did not reach the proxy ($((D1 - D0)) connections)"
 G1=$(goroutines); F1=$(fds $PP); T1=$(threads $PP); R1=$(rss_kb $PP)
 echo "proxy goroutines $G0 -> $G1, fds $F0 -> $F1, threads $T0 -> $T1, rss_kb $R0 -> $R1"
 [ -n "$G0" ] && [ -n "$G1" ] || bad "could not read goroutine counts"
