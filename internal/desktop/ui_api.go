@@ -68,6 +68,7 @@ type UISnapshot struct {
 	DismissedTips       []string        `json:"dismissed_tips"`
 	AskPaused           bool            `json:"ask_paused"`
 	ProblemsAlert       bool            `json:"problems_alert"`
+	Tamper              *TamperView     `json:"tamper,omitempty"` // unacknowledged suspicious Protect change
 	YourSetupText       string          `json:"your_setup_text"`
 	ChecklistDone       bool            `json:"checklist_done"`
 	NeedsUXv2Migration  bool            `json:"needs_uxv2_migration"`
@@ -119,34 +120,35 @@ type AwayDigestView struct {
 
 // ProblemsView is the Problems screen payload.
 type ProblemsView struct {
-	LastError           string `json:"last_error"`
-	LastDenyHost        string `json:"last_deny_host"`
-	LastDenyURL         string `json:"last_deny_url"`
-	LastDenySummary     string `json:"last_deny_summary"`
-	ControlOK           bool   `json:"control_ok"`
-	ProxydRunning       bool   `json:"proxyd_running"`
-	SessionRunning      bool   `json:"session_running"`
-	CAPresent           bool   `json:"ca_present"`
-	ClipboardOK         bool   `json:"clipboard_ok"`
-	HelperOK            bool   `json:"helper_ok"`
-	ProtectionOn        bool   `json:"protection_on"`
-	Unhealthy           bool   `json:"unhealthy"`         // Protect intended on but broken
-	ThreatListsWarn     bool   `json:"threat_lists_warn"` // enabled lists missing/stale (not Protect failure)
-	LogDir              string `json:"log_dir"`
-	AuditPath           string `json:"audit_path"`
-	Status              string `json:"status"`
-	Mode                string `json:"mode"` // safe | agents | off | session (live)
-	ModeLabel           string `json:"mode_label"`
-	PolicyProfile       string `json:"policy_profile"`
-	ProtectConfirmTitle string `json:"protect_confirm_title,omitempty"`
-	ProtectConfirmBody  string `json:"protect_confirm_body,omitempty"`
-	ProtectPausedUntil  string `json:"protect_paused_until,omitempty"`
-	ProtectPauseLast    string `json:"protect_pause_last,omitempty"`
-	AgentsRunning       int    `json:"agents_running,omitempty"`
-	ComputerAvailable   bool   `json:"computer_available"`
-	UpdateAvailable     bool   `json:"update_available"`
-	UpdateVersion       string `json:"update_version,omitempty"`
-	UpdateURL           string `json:"update_url,omitempty"`
+	LastError           string      `json:"last_error"`
+	LastDenyHost        string      `json:"last_deny_host"`
+	LastDenyURL         string      `json:"last_deny_url"`
+	LastDenySummary     string      `json:"last_deny_summary"`
+	ControlOK           bool        `json:"control_ok"`
+	ProxydRunning       bool        `json:"proxyd_running"`
+	SessionRunning      bool        `json:"session_running"`
+	CAPresent           bool        `json:"ca_present"`
+	ClipboardOK         bool        `json:"clipboard_ok"`
+	HelperOK            bool        `json:"helper_ok"`
+	ProtectionOn        bool        `json:"protection_on"`
+	Unhealthy           bool        `json:"unhealthy"`         // Protect intended on but broken
+	ThreatListsWarn     bool        `json:"threat_lists_warn"` // enabled lists missing/stale (not Protect failure)
+	LogDir              string      `json:"log_dir"`
+	AuditPath           string      `json:"audit_path"`
+	Status              string      `json:"status"`
+	Mode                string      `json:"mode"` // safe | agents | off | session (live)
+	ModeLabel           string      `json:"mode_label"`
+	PolicyProfile       string      `json:"policy_profile"`
+	ProtectConfirmTitle string      `json:"protect_confirm_title,omitempty"`
+	ProtectConfirmBody  string      `json:"protect_confirm_body,omitempty"`
+	ProtectPausedUntil  string      `json:"protect_paused_until,omitempty"`
+	ProtectPauseLast    string      `json:"protect_pause_last,omitempty"`
+	AgentsRunning       int         `json:"agents_running,omitempty"`
+	ComputerAvailable   bool        `json:"computer_available"`
+	UpdateAvailable     bool        `json:"update_available"`
+	UpdateVersion       string      `json:"update_version,omitempty"`
+	UpdateURL           string      `json:"update_url,omitempty"`
+	Tamper              *TamperView `json:"tamper,omitempty"`
 }
 
 // ProfileView is a profile row for the Profiles screen.

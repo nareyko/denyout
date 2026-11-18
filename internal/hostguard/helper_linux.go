@@ -372,6 +372,7 @@ func ServeHelper() error {
 		return err
 	}
 	defer ln.Close()
+	setAuditLog(NewAuditLog(helperAuditFile, auditDefaultBytes))
 	// Stale TUN/VPN state from a previous crashed helper must not linger.
 	_ = tun.GlobalRuntime().StopReal()
 	_ = tun.RemoveVPNEgress()
@@ -414,8 +415,11 @@ func ServeHelper() error {
 
 func handleHelperConn(c net.Conn, ownerUID int) {
 	defer c.Close()
-	if !helperPeerAuthorized(ownerUID, peerUID(c)) {
+	cred := peerCred(c)
+	peer := describePeer(cred, ownerUID, "/proc")
+	if !helperPeerAuthorized(ownerUID, peerUIDOf(cred)) {
 		_, _ = c.Write([]byte("ERR unauthorized\n"))
+		recordHelperAudit(time.Now(), Request{}, peer, AuditDenied, "unauthorized", false)
 		return
 	}
 	_ = c.SetDeadline(time.Now().Add(30 * time.Second))
@@ -426,12 +430,19 @@ func handleHelperConn(c net.Conn, ownerUID int) {
 	req, perr := ParseRequest(line, ownerUID)
 	if perr != nil {
 		_, _ = c.Write([]byte(encodeReply(Request{JSON: strings.HasPrefix(strings.TrimSpace(line), "{")}, "", perr)))
+		recordHelperAudit(time.Now(), Request{}, peer, AuditDenied, "bad_request", false)
 		return
 	}
 	helperOpMu.Lock()
+	lowers := helperRequestLowers(req)
 	reply, xerr := executeHelperRequest(req)
 	helperOpMu.Unlock()
 	_, _ = c.Write([]byte(encodeReply(req, reply, xerr)))
+	result, reason := AuditOK, ""
+	if xerr != nil {
+		result, reason = AuditError, "handler_failed"
+	}
+	recordHelperAudit(time.Now(), req, peer, result, reason, lowers)
 	// After uninstall teardown, drop the systemd helper so uninstall does not
 	// leave helper-serve running with a deleted binary path.
 	if req.Verb == "teardown" && xerr == nil {
@@ -439,28 +450,25 @@ func handleHelperConn(c net.Conn, ownerUID int) {
 	}
 }
 
+// helperRequestLowers evaluates requestLowers against the state before the request runs.
+func helperRequestLowers(req Request) bool {
+	lastApplyMu.Lock()
+	prev, ok := lastApplySpec, lastApplyOK
+	lastApplyMu.Unlock()
+	eff, _ := EffectiveFailPolicy()
+	return requestLowers(req, prev, ok, eff)
+}
+
 func failStatusReply() string {
 	p, src := EffectiveFailPolicy()
 	return FormatFailPolicyReply(p, src, ConfiguredFailPolicy())
 }
 
-func peerUID(c net.Conn) int {
-	uc, ok := c.(*net.UnixConn)
-	if !ok {
+func peerUIDOf(c peerCreds) int {
+	if !c.OK {
 		return -1
 	}
-	raw, err := uc.SyscallConn()
-	if err != nil {
-		return -1
-	}
-	var uid int = -1
-	_ = raw.Control(func(fd uintptr) {
-		cred, err := syscall.GetsockoptUcred(int(fd), syscall.SOL_SOCKET, syscall.SO_PEERCRED)
-		if err == nil {
-			uid = int(cred.Uid)
-		}
-	})
-	return uid
+	return c.UID
 }
 
 // suppressedSpec is the ruleset used while the TUN data plane owns IPv4 TCP/QUIC:

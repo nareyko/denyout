@@ -33,7 +33,9 @@ type Request struct {
 	Mitm      bool
 	// FailPolicy is the requested proxy-loss policy: "" (not supplied) or open|closed.
 	FailPolicy protectstate.FailPolicy
-	JSON       bool // reply encoding
+	// Count is how many audit events audit-tail returns (1..200; default 50).
+	Count int
+	JSON  bool // reply encoding
 }
 
 type verbDef struct {
@@ -114,7 +116,19 @@ var verbs = map[string]verbDef{
 		r.FailPolicy = p
 		return nil
 	}},
-	"fail-status":      {parse: noArgs},
+	"fail-status": {parse: noArgs},
+	// audit-tail returns the helper's recent audit events (read-only). The count rides in
+	// the port field in both encodings: "audit-tail 50 0 -" / {"verb":"audit-tail","port":50}.
+	"audit-tail": {parse: func(r *Request, a rawArgs, _ int) error {
+		r.Count = a.port
+		if r.Count <= 0 {
+			r.Count = auditDefaultTail
+		}
+		if r.Count > auditMaxTail {
+			r.Count = auditMaxTail
+		}
+		return nil
+	}},
 	"remove":           {mutating: true, parse: noArgs},
 	"teardown":         {mutating: true, parse: noArgs},
 	"uninstall-helper": {mutating: true, parse: noArgs},

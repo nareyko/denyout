@@ -86,6 +86,9 @@ type App struct {
 	legacySessionNote  string             // one-shot Home notice after clearing ScopeSession on restore
 	presence           presence           // Away / idle / lock (notify-presence wave)
 	undoOffer          *undoOffer         // in-app Undo (Pass 29; no OS Undo button)
+	tamper             *tamperInfo        // unacknowledged suspicious helper change (tamper.go)
+	tamperInit         bool               // tamperMark is set for this Protect session
+	tamperMark         int64              // newest audit event ts already judged
 }
 
 func applyNotifyPrefs(st State) {
@@ -170,6 +173,7 @@ func (a *App) Bootstrap(ctx context.Context) error {
 	a.restoreAskPause()
 	a.startTimedRulesWorker(ctx)
 	a.startThreatPollWorker(ctx)
+	a.startTamperWatch(ctx)
 
 	if a.opts.WebUI {
 		opts := a.opts

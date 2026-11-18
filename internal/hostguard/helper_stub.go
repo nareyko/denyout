@@ -56,3 +56,8 @@ func helperFailCall(line string) (FailPolicyStatus, error) {
 	_ = line
 	return FailPolicyStatus{}, ErrHelperUnavailable
 }
+
+func helperAuditTail(n int) (AuditTail, error) {
+	_ = n
+	return AuditTail{}, ErrHelperUnavailable
+}

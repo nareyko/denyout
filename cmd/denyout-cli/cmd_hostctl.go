@@ -1,14 +1,16 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"github.com/nareyko/denyout/internal/hostguard"
 	"github.com/nareyko/denyout/internal/protectstate"
 	"github.com/nareyko/denyout/internal/tun"
 )
 
-const hostctlUsage = `Usage: denyout-cli hostctl apply|remove|teardown|render|proxyd|quic-stats|tun-stats|tun-start|tun-stop|tun-rollback-plan|tun-device-plan|tun-device-rollback-plan|vpn-egress-plan|vpn-egress-rollback-plan|vpn-egress-apply|vpn-egress-remove|fail-policy|helper-serve|helper-install|helper-uninstall|caps [flags]
+const hostctlUsage = `Usage: denyout-cli hostctl apply|remove|teardown|render|proxyd|quic-stats|tun-stats|tun-start|tun-stop|audit-tail|tun-rollback-plan|tun-device-plan|tun-device-rollback-plan|vpn-egress-plan|vpn-egress-rollback-plan|vpn-egress-apply|vpn-egress-remove|fail-policy|helper-serve|helper-install|helper-uninstall|caps [flags]
 
   Privileged helper for Protect this computer (transparent redirect + CA trust).
   proxyd runs the transparent proxy (started after setcap so SO_MARK works).
@@ -25,6 +27,9 @@ const hostctlUsage = `Usage: denyout-cli hostctl apply|remove|teardown|render|pr
   caps  print helper capability tags (quic1 tun1 vpn1 fail1).
   fail-policy open|closed|status  set or show what the helper does when the proxy stops
     (open = keep the internet working, closed = block web traffic until it recovers).
+  audit-tail [N] [--json]  print the helper's last N handled mutating requests (who, which
+    program, result); lowering requests from untrusted programs are marked SUSPICIOUS.
+    Detection only: it does not stop anything.
   helper-serve runs the root unix-socket helper (systemd; Linux).
   helper-install installs/restarts denyout-hostguard.service from this binary (Linux; root).
   helper-uninstall stops/removes denyout-hostguard.service (Linux; used by uninstall).
@@ -57,6 +62,7 @@ type hostctlOps struct {
 	vpnApplyLocal    func(iface string) error
 	vpnRemoveHelper  func() (string, error)
 	vpnRemoveLocal   func() error
+	auditTail        func(n int) (hostguard.AuditTail, error)
 	failPolicyStatus func() (hostguard.FailPolicyStatus, error)
 	failPolicySet    func(p protectstate.FailPolicy) (hostguard.FailPolicyStatus, error)
 	failPolicyLocal  func(p protectstate.FailPolicy)
@@ -95,6 +101,7 @@ func realHostctlOps() hostctlOps {
 		vpnApplyLocal:    tun.ApplyVPNEgress,
 		vpnRemoveHelper:  hostguard.HelperVPNEgressRemove,
 		vpnRemoveLocal:   tun.RemoveVPNEgress,
+		auditTail:        hostguard.HelperAuditTail,
 		failPolicyStatus: hostguard.HelperFailPolicyStatus,
 		failPolicySet:    hostguard.HelperSetFailPolicy,
 		failPolicyLocal:  hostguard.SetFailPolicy,
@@ -138,6 +145,7 @@ var hostctlActions = map[string]hostctlHandler{
 	"vpn-egress-apply":         hostctlVPNApply,
 	"vpn-egress-remove":        hostctlVPNRemove,
 	"fail-policy":              hostctlFailPolicy,
+	"audit-tail":               hostctlAuditTail,
 	"helper-install":           hostctlHelperInstall,
 	"helper-serve":             hostctlHelperServe,
 	"helper-uninstall":         hostctlHelperUninstall,
@@ -303,6 +311,43 @@ func hostctlFailPolicy(_ string, rest []string) int {
 		return hostctlFail("fail-policy", err)
 	}
 	fmt.Println(hostguard.FormatFailPolicyReply(st.Policy, st.Source, st.Configured))
+	return 0
+}
+
+// parseAuditTailArgs reads "[N] [--json]"; anything else is an error.
+func parseAuditTailArgs(rest []string) (n int, asJSON bool, ok bool) {
+	n = 50
+	for _, a := range rest {
+		if a == "--json" {
+			asJSON = true
+			continue
+		}
+		v, err := strconv.Atoi(a)
+		if err != nil || v < 1 || v > 200 {
+			return 0, false, false
+		}
+		n = v
+	}
+	return n, asJSON, true
+}
+
+func hostctlAuditTail(_ string, rest []string) int {
+	n, asJSON, ok := parseAuditTailArgs(rest)
+	if !ok {
+		return failExit("Usage: denyout-cli hostctl audit-tail [N 1..200] [--json]").emit()
+	}
+	t, err := hostOps.auditTail(n)
+	if err != nil {
+		return hostctlFail("audit-tail", err)
+	}
+	if asJSON {
+		b, _ := json.Marshal(t)
+		fmt.Println(string(b))
+		return 0
+	}
+	for _, ev := range t.Events {
+		fmt.Println(hostguard.FormatAuditEvent(ev, 0))
+	}
 	return 0
 }
 

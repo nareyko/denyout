@@ -68,6 +68,7 @@ var helperHandlers = map[string]helperHandler{
 	"apply":             handleApply,
 	"fail-policy":       handleFailPolicy,
 	"fail-status":       func(Request, Spec) (string, error) { return failStatusReply(), nil },
+	"audit-tail":        handleAuditTail,
 	"remove":            handleRemove,
 	"teardown":          handleTeardown,
 	"uninstall-helper":  handleUninstall,
@@ -94,7 +95,11 @@ func handleCaps(Request, Spec) (string, error) {
 	if p, e := SelfExe(); e == nil {
 		exe = filepath.Base(p)
 	}
-	return FormatCapsReply(exe, CapQUIC, CapTUN, CapVPN, CapFailPolicy), nil
+	return FormatCapsReply(exe, CapQUIC, CapTUN, CapVPN, CapFailPolicy, CapAudit), nil
+}
+
+func handleAuditTail(req Request, _ Spec) (string, error) {
+	return FormatAuditTailReply(currentAuditLog().Tail(req.Count))
 }
 
 func handleApply(req Request, spec Spec) (string, error) {

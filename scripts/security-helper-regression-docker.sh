@@ -11,11 +11,11 @@ command -v docker >/dev/null 2>&1 || { echo "docker required" >&2; exit 2; }
 if [ -z "${DENYOUT_BIN:-}" ]; then
   (cd "$ROOT" && go build -buildvcs=false -o "$BIN" ./cmd/denyout-cli)
 fi
-out=$(docker run --rm --cap-add NET_ADMIN --cap-add SETUID --cap-add SETGID --cap-add SETPCAP \
+out=$(docker run --rm --cap-add NET_ADMIN --cap-add SYS_PTRACE --cap-add SETUID --cap-add SETGID --cap-add SETPCAP \
   -v "$BIN:/usr/local/bin/denyout-cli:ro" \
   -v "$ROOT/scripts/docker/helper-exploits.sh:/exploit.sh:ro" \
   debian:bookworm-slim bash /exploit.sh /usr/local/bin/denyout-cli 2>&1)
-echo "$out" | grep -E "RESULT|rules:"
+echo "$out" | grep -E "RESULT|rules:|^audit:"
 if echo "$out" | grep -q "EXPLOITED"; then
   echo "security-helper-regression: FAIL (exploit succeeded)" >&2
   exit 1

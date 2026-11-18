@@ -143,6 +143,7 @@ func (a *App) GetUISnapshot() UISnapshot {
 		AskPaused:          a.state.AskPaused() || (a.asks != nil && a.asks.Paused()),
 		AskPausedUntil:     strings.TrimSpace(a.state.AskPausedUntil),
 		ProblemsAlert:      problemsUnhealthyLocked(a),
+		Tamper:             tamperViewLocked(a),
 		YourSetupText:      YourSetupText(pendingYourSetupModeLocked(a, mode), a.state.Autostart, problemsUnhealthyLocked(a), !a.state.QuietWhileAwayOff),
 		ChecklistDone:      tipDismissedLocked(a, "checklist"),
 		NeedsUXv2Migration: a.state.NeedsUXv2Migration(),
@@ -306,7 +307,10 @@ func pendingYourSetupModeLocked(a *App, liveMode string) string {
 func protectInputsLocked(a *App) protectstate.Inputs {
 	_, caErr := os.Stat(filepath.Join(CADir(), "ca.crt"))
 	pause := activeProtectPausedUntil(a.state.ProtectPausedUntil) != ""
+	tampered, tamperNote := tamperNoteLocked(a)
 	return protectstate.Inputs{
+		Tampered:       tampered,
+		TamperNote:     tamperNote,
 		Intent:         a.state.ComputerEnabled || a.state.ProtectionOn,
 		ProxydLive:     a.proxyd != nil,
 		SessionLive:    a.session != nil,

@@ -1,6 +1,6 @@
 # Open security decisions (owner input needed)
 
-Design note only; nothing here is implemented. Context: `docs/security-review-2026-11.md`.
+Context: `docs/security-review-2026-11.md`.
 
 ## 1. Owner-uid trust boundary
 
@@ -14,6 +14,8 @@ Today any process running as the owner uid, including the sandboxed agent, can c
 | D. Accept + detect | Keep the model, audit every mutating verb and surface "Protect turned off by <pid>" | cheap, honest | detection, not prevention |
 
 Suggestion: D now, B as the real fix for agent-mode (Linux first), A only combined with B.
+
+Status: **D is implemented** (helper audit trail, `audit-tail` verb, desktop "Protect was changed" detection; see `docs/10-security-boundaries.md`). **B is worked out as a design** in [`docs/design-agent-uid-split.md`](design-agent-uid-split.md), pending an owner decision. Section 2 below is still design only.
 
 ## 2. IPv6 and DNS in the TUN data plane
 

@@ -30,6 +30,9 @@ const (
 	ReasonHelperDegraded = "helper_degraded"
 	ReasonCAMissing      = "ca_missing"
 	ReasonPaused         = "paused"
+	// ReasonTampered: the helper audit trail shows another program lowered protection
+	// (remove, teardown, fail-policy open, ...). Detection only; see docs/10-security-boundaries.md.
+	ReasonTampered = "tampered"
 )
 
 // Inputs are the facts the state is derived from.
@@ -52,6 +55,10 @@ type Inputs struct {
 	// FailPolicy is the effective proxy-loss policy ("" = unknown; messages then stay
 	// generic). It only changes the wording of Message, never the State.
 	FailPolicy FailPolicy
+	// Tampered is set while an unacknowledged suspicious helper change is on record;
+	// TamperNote is its one-sentence description ("Protect was changed by ...").
+	Tampered   bool
+	TamperNote string
 }
 
 // Result is the computed state.
@@ -72,6 +79,9 @@ func Compute(in Inputs) Result {
 	wantOn := in.Intent || in.ProxydLive || in.SessionLive
 	if wantOn {
 		switch {
+		case in.Tampered:
+			r.NeedsAttention, r.Reason = true, ReasonTampered
+			r.Message = tamperMessage(in.TamperNote)
 		case isErrorStatus(in.Status):
 			r.NeedsAttention, r.Reason = true, ReasonStatusError
 			r.Message = "Protection reported an error."
@@ -109,6 +119,13 @@ func Compute(in Inputs) Result {
 		}
 	}
 	return r
+}
+
+func tamperMessage(note string) string {
+	if note = strings.TrimSpace(note); note != "" {
+		return note
+	}
+	return "Protect was changed by another program."
 }
 
 // policyNote says which proxy-loss policy is active ("" when unknown).
