@@ -204,3 +204,24 @@ jobs:
         run: |
           npm ci
           npm run build
+
+  release-dryrun:
+    # Rehearses the release pipeline (build all targets via goreleaser, no signing, no publish)
+    # so action bumps and .goreleaser.yaml changes are caught on the PR, not on a tag.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: "1.27.4"
+      - name: GoReleaser (snapshot, no sign, no publish)
+        uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --snapshot --clean --skip=sign,publish

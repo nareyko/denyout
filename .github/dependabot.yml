@@ -8,11 +8,21 @@ updates:
       golang-x:
         patterns: ["golang.org/x/*"]
     open-pull-requests-limit: 5
+    ignore:
+      # beeep 0.12 pulls ebitengine/purego, whose fakecgo collides with goffi's (gogpu/systray)
+      # on darwin without CGO: "duplicated definition of symbol _cgo_init". Retry after upstream fix.
+      - dependency-name: "github.com/gen2brain/beeep"
+        versions: ["0.12.x"]
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      # cosign 3.x requires --bundle (no --output-signature/--certificate); release signing and
+      # install.sh verification need a coordinated migration first.
+      - dependency-name: "sigstore/cosign-installer"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: npm
     directory: "/cmd/denyout/frontend"
     schedule:
