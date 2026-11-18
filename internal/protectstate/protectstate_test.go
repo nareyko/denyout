@@ -50,7 +50,7 @@ func TestComputeMatchesLegacyExhaustive(t *testing.T) {
 						for _, hd := range b {
 							for _, ca := range b {
 								for _, pa := range b {
-									in := Inputs{intent, px, se, ag, st, hd, ca, pa, ""}
+									in := Inputs{intent, px, se, ag, st, hd, ca, pa, "", false, ""}
 									r := Compute(in)
 									n++
 									if r.NeedsAttention != legacyUnhealthy(in) {
@@ -93,6 +93,9 @@ func TestComputeStates(t *testing.T) {
 		{"intent no proc", func(i *Inputs) { i.Intent = true }, NeedsAttention, ReasonNotRunning},
 		{"ca missing", func(i *Inputs) { i.ProxydLive, i.CAPresent = true, false }, NeedsAttention, ReasonCAMissing},
 		{"status error", func(i *Inputs) { i.SessionLive, i.Status = true, "Error: boom" }, NeedsAttention, ReasonStatusError},
+		{"tampered live", func(i *Inputs) { i.ProxydLive, i.Tampered = true, true }, NeedsAttention, ReasonTampered},
+		{"tampered beats status error", func(i *Inputs) { i.ProxydLive, i.Tampered, i.Status = true, true, "Error: x" }, NeedsAttention, ReasonTampered},
+		{"tampered but off is ignored", func(i *Inputs) { i.Tampered = true }, Off, ""},
 		{"paused but live wins", func(i *Inputs) { i.Paused, i.ProxydLive = true, true }, Protected, ""},
 	}
 	for _, c := range cases {
@@ -206,5 +209,20 @@ func TestMessageMentionsPolicy(t *testing.T) {
 	r := Compute(down)
 	if r.State != NeedsAttention || !strings.Contains(r.Message, "blocks web traffic") {
 		t.Fatalf("closed: %+v", r)
+	}
+}
+
+func TestTamperMessage(t *testing.T) {
+	in := Inputs{CAPresent: true, ProxydLive: true, Tampered: true, TamperNote: "Protect was changed by nc (pid 7) at 10:00:00."}
+	if r := Compute(in); r.Message != in.TamperNote || !r.NeedsAttention || r.Mode != "safe" {
+		t.Fatalf("%+v", r)
+	}
+	in.TamperNote = ""
+	if r := Compute(in); r.Message != "Protect was changed by another program." {
+		t.Fatalf("%+v", r)
+	}
+	in.Tampered = false
+	if r := Compute(in); r.NeedsAttention {
+		t.Fatalf("untampered must be healthy: %+v", r)
 	}
 }

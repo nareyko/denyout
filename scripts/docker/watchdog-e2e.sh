@@ -2,7 +2,7 @@
 # Runs inside a NET_ADMIN container. $1 = denyout-cli. Checks helper watchdog + IPv6 listener.
 set -u
 BIN=$1
-apt-get update -qq >/dev/null 2>&1; apt-get install -y -qq iproute2 nftables ca-certificates procps >/dev/null 2>&1
+apt-get update -qq >/dev/null 2>&1; apt-get install -y -qq iproute2 nftables ca-certificates procps netcat-openbsd util-linux >/dev/null 2>&1
 id -u owner >/dev/null 2>&1 || useradd -u 1000 -M -s /usr/sbin/nologin owner
 mkdir -p /var/lib/denyout; echo 1000 > /var/lib/denyout/owner_uid
 CA=/tmp/ca; mkdir -p $CA; PORT=18443; fail=0
@@ -122,6 +122,17 @@ nft flush ruleset; printf '%s' '{"version":1,"spec":{"ProxyPort":18443,"UID":100
 $BIN hostctl helper-serve >/tmp/helper4.log 2>&1 &
 for i in $(seq 1 50); do [ -S /run/denyout-hostguard.sock ] && break; sleep 0.1; done; sleep 1
 has_table && bad "boot silently re-enabled protection" || ok "no silent re-enable when rules are gone"
+
+echo "== audit trail: survives helper restarts; untrusted peer lowering protection is flagged, trusted binary is not"
+AT=$($BIN hostctl audit-tail 200 2>&1)
+echo "$AT" | grep -q ' remove .*class=helper' && ok "earlier helper-routed remove still in the trail after kill -9 restarts" || bad "trail lost across restarts: $AT"
+echo "$AT" | grep -q 'SUSPICIOUS' && bad "calls from the trusted binary were flagged: $(echo "$AT" | grep SUSPICIOUS)" || ok "no trusted-binary call flagged"
+printf 'remove 0 0 -\n' > /tmp/rm.txt; chmod 644 /tmp/rm.txt
+setpriv --reuid=1000 --regid=1000 --clear-groups sh -c 'timeout 5 nc -U /run/denyout-hostguard.sock < /tmp/rm.txt' >/dev/null 2>&1
+AT=$($BIN hostctl audit-tail 200 2>&1)
+echo "$AT" | grep ' remove ' | grep 'uid=1000' | grep 'nc' | grep -q 'SUSPICIOUS:untrusted_exe' && ok "remove from a non-DenyOut process (nc as owner uid) flagged" || bad "untrusted remove not flagged: $AT"
+echo "$AT" | grep -c 'SUSPICIOUS' | grep -q '^1$' && ok "exactly one flagged event" || bad "unexpected flags: $AT"
+[ "$(stat -c '%a %U' /var/lib/denyout/helper_audit.jsonl)" = "600 root" ] && ok "audit file 0600 root" || bad "audit file mode"
 
 [ $fail = 0 ] && echo "watchdog-e2e: OK" || echo "watchdog-e2e: FAILED"
 exit $fail

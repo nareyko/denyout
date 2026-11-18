@@ -184,6 +184,14 @@ func (a *App) UIStopProtection() error {
 // UIRetryProtect retries the intended Protect path.
 // Broken Agents only keeps PolicyProfileAgent (does not silently flip to browse).
 func (a *App) UIRetryProtect() error {
+	err := a.retryProtect()
+	if err == nil {
+		a.clearTamper() // protection was re-applied by this desktop
+	}
+	return err
+}
+
+func (a *App) retryProtect() error {
 	a.mu.Lock()
 	profile := normalizePolicyProfile(a.state.PolicyProfile)
 	a.mu.Unlock()

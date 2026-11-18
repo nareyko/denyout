@@ -53,6 +53,7 @@ func (a *App) GetProblems() ProblemsView {
 		ProtectPausedUntil:  pauseUntil,
 		ProtectPauseLast:    strings.TrimSpace(a.state.ProtectPauseLast),
 		ComputerAvailable:   a.state.ComputerAvailable,
+		Tamper:              tamperViewLocked(a),
 	}
 	if a.wraps != nil {
 		pv.AgentsRunning = len(a.wraps)

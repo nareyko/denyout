@@ -142,6 +142,7 @@ export type UISnapshot = {
  ask_paused_until?: string;
  needs_uxv2_migration?: boolean;
  problems_alert: boolean;
+ tamper?: TamperView;
  your_setup_text: string;
  checklist_done: boolean;
  update_available?: boolean;
@@ -201,7 +202,18 @@ export type ThreatListsView = {
  product_exceptions_note: string;
 };
 
+// Set while an unacknowledged suspicious change to Protect is on record (helper audit trail).
+export type TamperView = {
+  message: string;
+  verb: string;
+  exe: string;
+  pid: number;
+  time: string;
+  reason: string;
+};
+
 export type ProblemsView = {
+  tamper?: TamperView;
   last_error: string;
   last_deny_host: string;
   last_deny_url: string;
@@ -329,6 +341,7 @@ type Bridge = {
  UIOpenLogs(): Promise<void>;
  UICopyLastError(): Promise<string>;
  UIRetryProtect(): Promise<void>;
+ UIDismissTamper(): Promise<void>;
  ListProfileViews(): Promise<ProfileView[]>;
  UISaveProfile(p: AgentProfile): Promise<void>;
  ListAllowPacks(): Promise<AllowPack[]>;
@@ -454,6 +467,7 @@ export const api = {
  openLogs: () => bridge().UIOpenLogs(),
  copyLastError: () => bridge().UICopyLastError(),
  retryProtect: () => bridge().UIRetryProtect(),
+ dismissTamper: () => bridge().UIDismissTamper(),
  profiles: () => bridge().ListProfileViews(),
  saveProfile: (p: AgentProfile) => bridge().UISaveProfile(p),
  listAllowPacks: () => bridge().ListAllowPacks(),

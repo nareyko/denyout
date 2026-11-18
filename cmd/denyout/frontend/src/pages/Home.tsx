@@ -76,7 +76,10 @@ export function Home({
  let headline = "Protection is off";
  let support =
  "Turn on Protect computer to block secret-looking links and clear threats while you browse.";
- if (needsHelp) {
+ if (snap?.tamper) {
+ headline = "Protection was changed";
+ support = `${snap.tamper.message} If that was not you, a program or agent on this computer switched it off. Restore it, or dismiss this if it was you.`;
+ } else if (needsHelp) {
  headline = "Needs your help";
  support = intentAgents
  ? "Agents only did not stay on. Try again, switch to Protect computer from Settings, or open Problems."
@@ -151,7 +154,7 @@ export function Home({
  setErr("");
  try {
  if (onBeforeProtect) await onBeforeProtect();
- if (turnOnAgents) await api.retryProtect();
+ if (turnOnAgents || snap?.tamper) await api.retryProtect();
  else if (agentsOnly || sessionOn) await api.switchSafe();
  else await api.enableSafe();
  setTurnOnOpen(false);
@@ -263,8 +266,28 @@ export function Home({
       {needsHelp ? (
         <>
           <button className="btn primary" disabled={busy} onClick={requestTurnOn}>
-            {intentAgents ? "Try Agents only again" : "Try Protect computer again"}
+            {snap?.tamper
+              ? "Restore protection"
+              : intentAgents
+                ? "Try Agents only again"
+                : "Try Protect computer again"}
           </button>
+          {snap?.tamper ? (
+            <button
+              className="btn"
+              disabled={busy}
+              onClick={async () => {
+                try {
+                  await api.dismissTamper();
+                } catch (e) {
+                  setErr(String(e));
+                }
+                onChanged?.();
+              }}
+            >
+              It was me
+            </button>
+          ) : null}
           <button className="btn" onClick={() => onOpenProblems?.()}>
             Open Problems
           </button>

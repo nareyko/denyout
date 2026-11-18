@@ -243,6 +243,7 @@ func (b *Bridge) GetLocalAnalytics(days int) desktop.LocalAnalytics {
 func (b *Bridge) UIOpenLogs() error                { return b.app.UIOpenLogs() }
 func (b *Bridge) UICopyLastError() (string, error) { return b.app.UICopyLastError() }
 func (b *Bridge) UIRetryProtect() error            { return b.app.UIRetryProtect() }
+func (b *Bridge) UIDismissTamper()                 { b.app.UIDismissTamper() }
 func (b *Bridge) ListProfileViews() ([]desktop.ProfileView, error) {
 	return b.app.ListProfileViews()
 }

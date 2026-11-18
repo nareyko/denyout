@@ -156,7 +156,10 @@ export function Problems({
                 ? "Protect is off; phishing/malware lists still need a refresh (below)."
                 : "Turn on Protect computer from Home when you want browsing protection.";
   if (unhealthy) {
-    if (hasError) {
+    if (p.tamper) {
+      summary = "Protection was changed.";
+      support = `${p.tamper.message} If that was not you, a program or agent on this computer switched it off. Restore protection below, or dismiss this if it was you.`;
+    } else if (hasError) {
       summary = "Something went wrong turning protection on.";
       support = intentAgents
         ? "A password window may have been cancelled, or a setup step failed. Try Agents only again, or copy the error for support."
@@ -205,8 +208,23 @@ export function Problems({
                 setProtectOpen(true);
               }}
             >
-              {retryLabel}
+              {p.tamper ? "Restore protection" : retryLabel}
             </button>
+            {p.tamper ? (
+              <button
+                className="btn"
+                onClick={async () => {
+                  try {
+                    await api.dismissTamper();
+                    await reload();
+                  } catch (e) {
+                    fail(e);
+                  }
+                }}
+              >
+                It was me
+              </button>
+            ) : null}
             <button
               className="btn danger"
               disabled={pauseBusy || pauseBlocked}
