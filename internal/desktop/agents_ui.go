@@ -9,35 +9,53 @@ import (
 	"github.com/nareyko/denyout/internal/run"
 )
 
-// wizardNewAgent creates a profile via native dialogs; optionally starts it.
-func (a *App) wizardNewAgent(start bool) {
-	if !dialogToolkitAvailable() {
-		notify.Info("DenyOut", "Install zenity for the agent wizard, or: denyout profile create --name ... -- cmd")
-		return
+// wizardAnswers are the user's answers from the native new-agent wizard.
+type wizardAnswers struct {
+	name, cmdLine, workdir, preset string
+	isolation                      bool
+}
+
+// buildWizardProfile turns wizard answers into an unsaved profile. Pure.
+func buildWizardProfile(w wizardAnswers) AgentProfile {
+	p := NewAgentProfile(w.name, splitCommand(w.cmdLine))
+	p.WorkDir = strings.TrimSpace(w.workdir)
+	p.Preset = w.preset
+	if w.isolation {
+		p.Sandbox = "srt"
+		p.RequireIsolation = true
 	}
-	name, ok := nativeEntry("DenyOut - new agent", "Name for this agent (1-40 characters):", "My agent")
-	if !ok || strings.TrimSpace(name) == "" {
-		return
+	return p
+}
+
+func wizardPackID(p AgentProfile) string {
+	if id := SuggestPackID(p.Name, p.Command); id != "" {
+		return id
 	}
-	cmdLine, ok := nativeEntry("DenyOut - command", "Command to run under protection (e.g. python app.py or claude):", "")
-	if !ok || strings.TrimSpace(cmdLine) == "" {
-		return
+	return "cursor-starter"
+}
+
+// wizardAsk walks the native dialogs; ok=false when the user cancelled.
+func wizardAsk() (w wizardAnswers, ok bool) {
+	w.name, ok = nativeEntry("DenyOut - new agent", "Name for this agent (1-40 characters):", "My agent")
+	if !ok || strings.TrimSpace(w.name) == "" {
+		return w, false
 	}
-	if looksLikeSecretInCmd(cmdLine) {
+	w.cmdLine, ok = nativeEntry("DenyOut - command", "Command to run under protection (e.g. python app.py or claude):", "")
+	if !ok || strings.TrimSpace(w.cmdLine) == "" {
+		return w, false
+	}
+	if looksLikeSecretInCmd(w.cmdLine) {
 		if !nativeConfirm("DenyOut", "That command may contain a secret (token/key-looking text).\n\nSave it anyway? Prefer env vars or a secrets file.", "Save anyway", "Cancel") {
-			return
+			return w, false
 		}
 	}
-	workdir, _ := nativeEntry("DenyOut - working folder", "Working directory (optional, leave blank for current):", "")
-	preset := "agent"
+	w.workdir, _ = nativeEntry("DenyOut - working folder", "Working directory (optional, leave blank for current):", "")
+	w.preset = "models"
 	if nativeConfirm("DenyOut - allowlist", "Use Agent + Cursor allowlist? (Recommended)\n\nNo = Models only (stricter).", "Agent + Cursor", "Models only") {
-		preset = "agent"
-	} else {
-		preset = "models"
+		w.preset = "agent"
 	}
-	isolation := false
 	if run.SRTAvailable() {
-		isolation = nativeConfirm(
+		w.isolation = nativeConfirm(
 			"DenyOut - stronger isolation",
 			"Enable Stronger isolation (srt)?\n\nBlocks bypass of the proxy. Requires the srt tool installed.",
 			"Enable",
@@ -46,37 +64,53 @@ func (a *App) wizardNewAgent(start bool) {
 	} else {
 		notify.Info("DenyOut", "Stronger isolation needs srt (sandbox-runtime). Wrap will run without it. Some tools can bypass the proxy.")
 	}
-	p := NewAgentProfile(name, splitCommand(cmdLine))
-	p.WorkDir = strings.TrimSpace(workdir)
-	p.Preset = preset
-	if isolation {
-		p.Sandbox = "srt"
-		p.RequireIsolation = true
+	return w, true
+}
+
+// wizardOfferPack offers the recommended allow pack and saves the result.
+func wizardOfferPack(p *AgentProfile) {
+	pack, err := LookupAllowPack(wizardPackID(*p))
+	if err != nil {
+		return
 	}
+	if !nativeConfirm(
+		"DenyOut - recommended hosts",
+		"Add recommended hosts?\n\n"+pack.Name+": "+pack.Description+"\n\nYou can Undo the pack later in My agents -> Edit.",
+		"Add hosts",
+		"Skip",
+	) {
+		return
+	}
+	added, err := ApplyPack(p, pack.ID)
+	if err != nil {
+		notify.Info("DenyOut", "Could not apply pack: "+err.Error())
+		return
+	}
+	if err := SaveProfile(*p); err != nil {
+		notify.Info("DenyOut", "Could not save pack hosts: "+err.Error())
+		return
+	}
+	if len(added) > 0 {
+		notify.Info("DenyOut", fmt.Sprintf("Added %d host(s) from %s", len(added), pack.Name))
+	}
+}
+
+// wizardNewAgent creates a profile via native dialogs; optionally starts it.
+func (a *App) wizardNewAgent(start bool) {
+	if !dialogToolkitAvailable() {
+		notify.Info("DenyOut", "Install zenity for the agent wizard, or: denyout profile create --name ... -- cmd")
+		return
+	}
+	w, ok := wizardAsk()
+	if !ok {
+		return
+	}
+	p := buildWizardProfile(w)
 	if err := SaveProfile(p); err != nil {
 		notify.Info("DenyOut", "Could not save profile: "+err.Error())
 		return
 	}
-	packID := SuggestPackID(p.Name, p.Command)
-	if packID == "" {
-		packID = "cursor-starter"
-	}
-	if pack, err := LookupAllowPack(packID); err == nil {
-		if nativeConfirm(
-			"DenyOut - recommended hosts",
-			"Add recommended hosts?\n\n"+pack.Name+": "+pack.Description+"\n\nYou can Undo the pack later in My agents -> Edit.",
-			"Add hosts",
-			"Skip",
-		) {
-			if added, err := ApplyPack(&p, pack.ID); err != nil {
-				notify.Info("DenyOut", "Could not apply pack: "+err.Error())
-			} else if err := SaveProfile(p); err != nil {
-				notify.Info("DenyOut", "Could not save pack hosts: "+err.Error())
-			} else if len(added) > 0 {
-				notify.Info("DenyOut", fmt.Sprintf("Added %d host(s) from %s", len(added), pack.Name))
-			}
-		}
-	}
+	wizardOfferPack(&p)
 	notify.Info("DenyOut", "Saved agent: "+p.Name)
 	if start {
 		if err := a.startProfile(p.ID); err != nil {

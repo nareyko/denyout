@@ -139,20 +139,25 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.handleHTTP(w, r)
 }
 
-func (s *Server) handleCONNECT(w http.ResponseWriter, r *http.Request) {
-	host, port, err := net.SplitHostPort(r.Host)
+// parseConnectTarget splits a CONNECT authority into host and port. A missing
+// port defaults to 443; ok is false for a non-numeric or out-of-range port
+// (no uint16 wraparound: 65616 must not become 80).
+func parseConnectTarget(authority string) (host, port string, portN int, ok bool) {
+	host, port, err := net.SplitHostPort(authority)
 	if err != nil {
-		host = r.Host
+		host = authority
 		port = "443"
 	}
 	portN, perr := strconv.Atoi(port)
-	if perr != nil || portN < 1 || portN > 65535 { // no uint16 wraparound (65616 -> 80)
-		http.Error(w, "bad port", http.StatusBadRequest)
-		return
+	if perr != nil || portN < 1 || portN > 65535 {
+		return "", "", 0, false
 	}
+	return host, port, portN, true
+}
 
-	start := time.Now()
-	ips, resolveErr := lookupIPs(host)
+// decideConnect is the L1 policy decision for a CONNECT (host / IP / deny list).
+// A DNS failure denies unless the engine config explicitly disables that.
+func (s *Server) decideConnect(host string, portN int, ips []net.IP, resolveErr error) (policy.RequestView, policy.Decision) {
 	rv := policy.RequestView{
 		SessionID:  s.cfg.SessionID,
 		DestHost:   host,
@@ -164,7 +169,6 @@ func (s *Server) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 		Inspection: string(s.cfg.TLSMode),
 		RawURL:     "https://" + host + "/",
 	}
-	// L1 decision (host / IP / deny list) — no query yet in passthrough.
 	d := s.cfg.Engine.Evaluate(rv)
 	if resolveErr != nil && d.Verdict != "deny" {
 		// Engine may not have Resolve set; enforce DNS failure here if configured.
@@ -176,6 +180,19 @@ func (s *Server) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 			d = policy.Decision{Verdict: "deny", Reasons: []string{policy.ReasonDNSFailure}}
 		}
 	}
+	return rv, d
+}
+
+func (s *Server) handleCONNECT(w http.ResponseWriter, r *http.Request) {
+	host, port, portN, ok := parseConnectTarget(r.Host)
+	if !ok {
+		http.Error(w, "bad port", http.StatusBadRequest)
+		return
+	}
+
+	start := time.Now()
+	ips, resolveErr := lookupIPs(host)
+	rv, d := s.decideConnect(host, portN, ips, resolveErr)
 	if d.Verdict == "deny" {
 		s.logDecision(rv, d, start)
 		http.Error(w, redactDenyMsg(d), http.StatusForbidden)
@@ -203,7 +220,12 @@ func (s *Server) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 		s.logDecision(rv, d, start)
 		return
 	}
+	s.serveIntercept(clientConn, rv, host, portN, ips, start)
+}
 
+// serveIntercept terminates the client's TLS with a per-host leaf and serves
+// its requests through roundTripIntercept until the client or server closes.
+func (s *Server) serveIntercept(clientConn net.Conn, rv policy.RequestView, host string, portN int, ips []net.IP, start time.Time) {
 	if s.cfg.CA == nil {
 		_ = clientConn.Close()
 		return
@@ -243,9 +265,7 @@ func (s *Server) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 		if !hostHeaderMatches(req.Host, host) {
 			// Domain fronting: policy was evaluated for the CONNECT/SNI host, so a
 			// different Host header would reach a host that was never checked.
-			resp := &http.Response{StatusCode: http.StatusMisdirectedRequest, ProtoMajor: 1, ProtoMinor: 1,
-				Header: make(http.Header), Body: io.NopCloser(strings.NewReader("host header does not match tunnel host\n"))}
-			_ = resp.Write(tlsClient)
+			_ = misdirectedResponse().Write(tlsClient)
 			return
 		}
 		s.roundTripIntercept(tlsClient, req, host, portN, ips, start)
@@ -253,6 +273,12 @@ func (s *Server) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+}
+
+// misdirectedResponse is the 421 sent when a Host header differs from the tunnel host.
+func misdirectedResponse() *http.Response {
+	return &http.Response{StatusCode: http.StatusMisdirectedRequest, ProtoMajor: 1, ProtoMinor: 1,
+		Header: make(http.Header), Body: io.NopCloser(strings.NewReader("host header does not match tunnel host\n"))}
 }
 
 func (s *Server) roundTripIntercept(client io.ReadWriteCloser, req *http.Request, host string, port int, ips []net.IP, start time.Time) {

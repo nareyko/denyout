@@ -298,47 +298,73 @@ func (a *App) quitUnload() error {
 	return a.stopProtectionErr()
 }
 
+// quitInputs is the state snapshot the Quit confirmation depends on.
+type quitInputs struct {
+	WrapsRunning bool
+	HasProxyd    bool
+	HasSession   bool
+	Unhealthy    bool
+	AgentsIntent bool
+	On           bool
+}
+
+func (q quitInputs) mode() string {
+	switch {
+	case q.HasProxyd:
+		return ModeComputer
+	case q.HasSession:
+		return ModeSession
+	}
+	return ModeOff
+}
+
+// quitPrompt returns the confirm body and primary button; ok=false when
+// nothing is live and Quit needs no confirmation.
+func quitPrompt(q quitInputs) (body, primary string, ok bool) {
+	if !q.On && !q.WrapsRunning {
+		return "", "", false
+	}
+	mode := q.mode()
+	body = "Quit turns off protection and stops My agents wraps.\n\nCancel keeps DenyOut running."
+	primary = "Turn off protection and quit"
+	switch {
+	case q.Unhealthy && mode == ModeOff:
+		primary = "Clear intent and quit"
+		if q.AgentsIntent {
+			body = "Agents only is not running. Quit clears restore intent.\n\nCancel keeps DenyOut open."
+		} else {
+			body = "Protect is not running. Quit clears restore intent.\n\nCancel keeps DenyOut open."
+		}
+	case !q.On && q.WrapsRunning:
+		body = "Quit stops My agents wraps.\n\nCancel keeps DenyOut running."
+		primary = "Stop agents and quit"
+	case mode == ModeComputer && q.AgentsIntent:
+		body = "Quit turns off Agents only and stops My agents wraps. Everyday browsing was already unprotected.\n\nCancel keeps DenyOut running."
+		primary = "Turn off Agents only and quit"
+	case q.HasSession && !q.HasProxyd:
+		body = "Quit turns off Session protection and stops My agents wraps.\n\nCancel keeps DenyOut running."
+		primary = "Turn off Session protection and quit"
+	}
+	return body, primary, true
+}
+
 // trayQuitChoice confirms full unload when quitting the tray.
 // Returns "off" or "" (cancel). Keep-protection-on was removed (Quit always unloads).
 func (a *App) trayQuitChoice() string {
 	wrapsRunning := a.runningWrapCount() > 0
 	a.mu.Lock()
-	hasProxyd := a.proxyd != nil
-	hasSession := a.session != nil
-	unhealthy := problemsUnhealthyLocked(a)
-	// Inline currentMode (already hold a.mu — do not call currentMode()).
-	mode := ModeOff
-	if hasProxyd {
-		mode = ModeComputer
-	} else if hasSession {
-		mode = ModeSession
+	q := quitInputs{
+		WrapsRunning: wrapsRunning,
+		HasProxyd:    a.proxyd != nil,
+		HasSession:   a.session != nil,
+		Unhealthy:    problemsUnhealthyLocked(a),
+		AgentsIntent: normalizePolicyProfile(a.state.PolicyProfile) == PolicyProfileAgent,
 	}
-	agentsIntent := normalizePolicyProfile(a.state.PolicyProfile) == PolicyProfileAgent
-	on := hasProxyd || hasSession || a.state.ProtectionOn || a.state.ComputerEnabled || unhealthy
+	q.On = q.HasProxyd || q.HasSession || a.state.ProtectionOn || a.state.ComputerEnabled || q.Unhealthy
 	a.mu.Unlock()
-	if !on && !wrapsRunning {
+	body, primary, ok := quitPrompt(q)
+	if !ok {
 		return "off" // nothing live — exit
-	}
-	body := "Quit turns off protection and stops My agents wraps.\n\nCancel keeps DenyOut running."
-	primary := "Turn off protection and quit"
-	switch {
-	case unhealthy && mode == ModeOff:
-		if agentsIntent {
-			body = "Agents only is not running. Quit clears restore intent.\n\nCancel keeps DenyOut open."
-			primary = "Clear intent and quit"
-		} else {
-			body = "Protect is not running. Quit clears restore intent.\n\nCancel keeps DenyOut open."
-			primary = "Clear intent and quit"
-		}
-	case !on && wrapsRunning:
-		body = "Quit stops My agents wraps.\n\nCancel keeps DenyOut running."
-		primary = "Stop agents and quit"
-	case mode == ModeComputer && agentsIntent:
-		body = "Quit turns off Agents only and stops My agents wraps. Everyday browsing was already unprotected.\n\nCancel keeps DenyOut running."
-		primary = "Turn off Agents only and quit"
-	case hasSession && !hasProxyd:
-		body = "Quit turns off Session protection and stops My agents wraps.\n\nCancel keeps DenyOut running."
-		primary = "Turn off Session protection and quit"
 	}
 	if !nativeConfirm("Quit DenyOut?", body, primary, "Cancel") {
 		return ""
