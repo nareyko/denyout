@@ -19,7 +19,7 @@ jobs:
     continue-on-error: true
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Soak (Docker)
         env:
           SOAK_SECONDS: ${{ github.event.inputs.seconds || '600' }}
