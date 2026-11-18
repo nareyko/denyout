@@ -48,88 +48,6 @@ func askDialogWithTimeout(host, reason, profileName string) string {
 	}
 }
 
-func runAskDialog(text string) string {
-	switch runtime.GOOS {
-	case "linux":
-		if zenity, err := exec.LookPath("zenity"); err == nil {
-			// Default (cancel) = Keep blocked; OK = Allow once; extra = Always.
-			cmd := exec.Command(zenity, "--question",
-				"--title=DenyOut",
-				"--text="+text,
-				"--ok-label=Allow once",
-				"--cancel-label=Keep blocked",
-				"--extra-button=Always allow",
-				"--width=480",
-				"--default-cancel",
-			)
-			out, err := cmd.CombinedOutput()
-			s := strings.TrimSpace(string(out))
-			if strings.Contains(s, "Always allow") {
-				return "always"
-			}
-			if err == nil {
-				return "once"
-			}
-			return "deny"
-		}
-		if kdialog, err := exec.LookPath("kdialog"); err == nil {
-			cmd := exec.Command(kdialog, "--yesnocancel", text,
-				"--yes-label", "Allow once",
-				"--no-label", "Always allow",
-				"--cancel-label", "Keep blocked",
-				"--title", "DenyOut",
-			)
-			err := cmd.Run()
-			code := 2
-			if err == nil {
-				code = 0
-			} else if ee, ok := err.(*exec.ExitError); ok {
-				code = ee.ExitCode()
-			}
-			switch code {
-			case 0:
-				return "once"
-			case 1:
-				return "always"
-			default:
-				return "deny"
-			}
-		}
-		notify.Info("DenyOut", "Install zenity for permission dialogs (e.g. apt install zenity).")
-		return "deny"
-	case "darwin":
-		script := fmt.Sprintf(`set r to button returned of (display dialog %q buttons {"Keep blocked","Allow once","Always allow"} default button "Keep blocked" with title "DenyOut")
-return r`, text)
-		out, err := exec.Command("osascript", "-e", script).Output()
-		if err != nil {
-			return "deny"
-		}
-		s := strings.TrimSpace(string(out))
-		switch {
-		case strings.Contains(s, "Always"):
-			return "always"
-		case strings.Contains(s, "once"):
-			return "once"
-		default:
-			return "deny"
-		}
-	case "windows":
-		ps := fmt.Sprintf(`Add-Type -AssemblyName PresentationFramework
-$r = [System.Windows.MessageBox]::Show(%q, 'DenyOut - new site', 'YesNoCancel', 'Question')
-# Yes=Allow once, No=Always allow, Cancel=Keep blocked (default Cancel via focus)
-if ($r -eq 'Yes') { 'once' } elseif ($r -eq 'No') { 'always' } else { 'deny' }`, text)
-		out, err := exec.Command("powershell", "-NoProfile", "-Command", ps).Output()
-		if err != nil {
-			return "deny"
-		}
-		s := strings.TrimSpace(strings.ToLower(string(out)))
-		if s == "once" || s == "always" || s == "deny" {
-			return s
-		}
-	}
-	return "deny"
-}
-
 // nativeConfirm Yes/No; returns true if primary (yesLabel) chosen.
 func nativeConfirm(title, text, yesLabel, noLabel string) bool {
 	if title == "" {
@@ -256,52 +174,50 @@ func (a *App) nativeShowActivity() {
 			continue
 		}
 		host, reason, action, ev := nativeDenialsChooserV2(events)
-		switch action {
-		case "details":
-			if ev == nil {
-				continue
-			}
-			a.showDenialDetails(*ev)
-		case "always":
-			if host == "" {
-				continue
-			}
-			if isIPLiteral(host) {
-				notify.Info("DenyOut", "Direct IP addresses cannot be always-allowed.")
-				continue
-			}
-			if reason != "" {
-				a.forgetKeep(host, reason)
-			}
-			if err := a.persistAlwaysHostFrom(host, "native"); err != nil {
-				notify.Info("DenyOut", "Always allow failed: "+err.Error())
-				continue
-			}
-			notify.Info("DenyOut", "Allowed this site: "+host)
-		case "undo":
-			if host == "" {
-				continue
-			}
-			if isIPLiteral(host) {
-				notify.Info("DenyOut", "Cannot undo IP blocks this way.")
-				continue
-			}
-			if reason != "" {
-				a.forgetKeep(host, reason)
-			}
-			if err := a.persistAlwaysHostFrom(host, "native"); err != nil {
-				notify.Info("DenyOut", "Undo failed: "+err.Error())
-				continue
-			}
-			notify.Info("DenyOut", "Allowed this site: "+host)
-		case "refresh":
-			continue
-		case "problems":
-			a.showProblems()
-		default:
-			// close -> back to menu
-		}
+		a.handleActivityAction(action, host, reason, ev)
 	}
+}
+
+// activityAllowMsgs are the notices for the always/undo paths of Activity.
+type activityAllowMsgs struct{ ip, fail string }
+
+var (
+	activityAlwaysMsgs = activityAllowMsgs{"Direct IP addresses cannot be always-allowed.", "Always allow failed: "}
+	activityUndoMsgs   = activityAllowMsgs{"Cannot undo IP blocks this way.", "Undo failed: "}
+)
+
+func (a *App) handleActivityAction(action, host, reason string, ev *audit.Event) {
+	switch action {
+	case "details":
+		if ev != nil {
+			a.showDenialDetails(*ev)
+		}
+	case "always":
+		a.activityAllowHost(host, reason, activityAlwaysMsgs)
+	case "undo":
+		a.activityAllowHost(host, reason, activityUndoMsgs)
+	case "problems":
+		a.showProblems()
+	}
+	// refresh / close / unknown -> back to the menu loop
+}
+
+func (a *App) activityAllowHost(host, reason string, m activityAllowMsgs) {
+	if host == "" {
+		return
+	}
+	if isIPLiteral(host) {
+		notify.Info("DenyOut", m.ip)
+		return
+	}
+	if reason != "" {
+		a.forgetKeep(host, reason)
+	}
+	if err := a.persistAlwaysHostFrom(host, "native"); err != nil {
+		notify.Info("DenyOut", m.fail+err.Error())
+		return
+	}
+	notify.Info("DenyOut", "Allowed this site: "+host)
 }
 
 func denialDetailText(e audit.Event) string {
@@ -459,251 +375,4 @@ func (a *App) helpAndProblems() {
 	}
 	notify.Info("DenyOut - Help", text)
 	a.showProblems()
-}
-
-// nativeDenialsChooserV2 returns host, reason code, action, and the selected event when known.
-// action: always|undo|details|refresh|close|problems
-func nativeDenialsChooserV2(events []audit.Event) (host, reason, action string, ev *audit.Event) {
-	switch runtime.GOOS {
-	case "linux":
-		if _, err := exec.LookPath("zenity"); err == nil {
-			return nativeDenialsChooserZenityV2(events)
-		}
-		h, act, e := nativeDenialsChooser(events)
-		return h, "", act, e
-	default:
-		h, act, e := nativeDenialsChooser(events)
-		return h, "", act, e
-	}
-}
-
-func nativeDenialsChooser(events []audit.Event) (selectedHost, action string, ev *audit.Event) {
-	switch runtime.GOOS {
-	case "linux":
-		if _, err := exec.LookPath("zenity"); err == nil {
-			h, _, act, e := nativeDenialsChooserZenityV2(events)
-			return h, act, e
-		}
-		if kdialog, err := exec.LookPath("kdialog"); err == nil {
-			items := make([]string, 0, len(events)*2)
-			byHost := map[string]*audit.Event{}
-			for i := len(events) - 1; i >= 0; i-- {
-				e := events[i]
-				host := e.Network.DestHost
-				if host == "" {
-					continue
-				}
-				urlStr := audit.TruncateMiddle(audit.DisplayURL(e.Network, e.HTTP), 64)
-				why := notify.HumanReasons(e.Reasons)
-				label := fmt.Sprintf("%s - %s", host, why)
-				if urlStr != "" {
-					label = fmt.Sprintf("%s - %s - %s", host, urlStr, why)
-				}
-				items = append(items, host, label)
-				if _, ok := byHost[host]; !ok {
-					evCopy := e
-					byHost[host] = &evCopy
-				}
-			}
-			if len(items) == 0 {
-				return "", "close", nil
-			}
-			args := append([]string{"--menu", "Recent denials - pick a row (URL shown in label)", "--title", "DenyOut - What was blocked"}, items...)
-			out, err := exec.Command(kdialog, args...).Output()
-			if err != nil {
-				return "", "close", nil
-			}
-			host := strings.TrimSpace(string(out))
-			return host, "details", byHost[host]
-		}
-	case "darwin":
-		var lines []string
-		hostByLine := map[string]string{}
-		evByLine := map[string]*audit.Event{}
-		for i := len(events) - 1; i >= 0 && len(lines) < 25; i-- {
-			e := events[i]
-			host := e.Network.DestHost
-			if host == "" {
-				continue
-			}
-			urlStr := audit.TruncateMiddle(audit.DisplayURL(e.Network, e.HTTP), 48)
-			why := notify.HumanReasons(e.Reasons)
-			line := fmt.Sprintf("%s - %s", host, why)
-			if urlStr != "" {
-				line = fmt.Sprintf("%s - %s - %s", host, urlStr, why)
-			}
-			// Escape quotes for AppleScript.
-			line = strings.ReplaceAll(line, `"`, `'`)
-			lines = append(lines, line)
-			hostByLine[line] = host
-			evCopy := e
-			evByLine[line] = &evCopy
-		}
-		if len(lines) == 0 {
-			return "", "close", nil
-		}
-		list := strings.Join(lines, `","`)
-		script := fmt.Sprintf(`set hostList to {"%s"}
-set chosen to choose from list hostList with prompt "Recent denials (host - URL - why). Open details?" OK button name "Details" cancel button name "Close"
-if chosen is false then
- return "CLOSE"
-end if
-return item 1 of chosen`, list)
-		out, err := exec.Command("osascript", "-e", script).Output()
-		if err != nil {
-			return "", "close", nil
-		}
-		s := strings.TrimSpace(string(out))
-		if s == "CLOSE" || s == "" {
-			return "", "close", nil
-		}
-		if h, ok := hostByLine[s]; ok {
-			return h, "details", evByLine[s]
-		}
-		return "", "close", nil
-	case "windows":
-		var b strings.Builder
-		b.WriteString("Recent denials:\n")
-		var firstHost string
-		var firstEv *audit.Event
-		n := 0
-		for i := len(events) - 1; i >= 0 && n < 15; i-- {
-			e := events[i]
-			host := e.Network.DestHost
-			if host == "" {
-				continue
-			}
-			if firstHost == "" {
-				firstHost = host
-				evCopy := e
-				firstEv = &evCopy
-			}
-			urlStr := audit.TruncateMiddle(audit.DisplayURL(e.Network, e.HTTP), 72)
-			why := notify.HumanReasons(e.Reasons)
-			if urlStr != "" {
-				fmt.Fprintf(&b, "- %s\n %s\n %s\n", host, urlStr, why)
-			} else {
-				fmt.Fprintf(&b, "- %s (%s)\n", host, why)
-			}
-			n++
-		}
-		msg := b.String() + "\n\nOpen details for first host " + firstHost + "?"
-		ps := fmt.Sprintf("Add-Type -AssemblyName PresentationFramework; $r = [System.Windows.MessageBox]::Show(%q, 'DenyOut - What was blocked', 'YesNo', 'Information'); if ($r -eq 'Yes') { 'details' } else { 'close' }", msg)
-		out, err := exec.Command("powershell", "-NoProfile", "-Command", ps).Output()
-		if err != nil {
-			return "", "close", nil
-		}
-		if strings.TrimSpace(string(out)) == "details" {
-			return firstHost, "details", firstEv
-		}
-	}
-	notify.Info("DenyOut", "No native list dialog available. See diagnostics folder for audit.jsonl.")
-	return "", "close", nil
-}
-
-func nativeDenialsChooserZenityV2(events []audit.Event) (selectedHost, reason, action string, ev *audit.Event) {
-	zenity, err := exec.LookPath("zenity")
-	if err != nil {
-		return "", "", "close", nil
-	}
-	args := []string{
-		"--list",
-		"--title=DenyOut - What was blocked",
-		"--text=Select a row. Secrets in URLs are redacted. Details shows the full request.",
-		"--column=#",
-		"--column=Time",
-		"--column=Host",
-		"--column=URL",
-		"--column=Why",
-		"--print-column=1",
-		"--width=920",
-		"--height=480",
-		"--ok-label=Details",
-		"--cancel-label=Back",
-		"--extra-button=Always allow",
-		"--extra-button=Undo",
-		"--extra-button=Refresh",
-	}
-	byIdx := map[string]*audit.Event{}
-	hostReason := map[string]string{}
-	row := 0
-	for i := len(events) - 1; i >= 0; i-- {
-		e := events[i]
-		host := e.Network.DestHost
-		if host == "" {
-			continue
-		}
-		row++
-		idx := fmt.Sprintf("%d", row)
-		ts := e.TS
-		if len(ts) >= 19 {
-			ts = ts[11:19]
-		}
-		if ts == "" {
-			ts = "-"
-		}
-		code := primaryPostBlockReason(e.Reasons)
-		if code == "" && len(e.Reasons) > 0 {
-			code = e.Reasons[0]
-		}
-		why := notify.HumanReasons(e.Reasons)
-		if why == "" {
-			why = "-"
-		}
-		if len(why) > 72 {
-			why = why[:69] + "..."
-		}
-		urlStr := audit.DisplayURL(e.Network, e.HTTP)
-		if urlStr == "" {
-			urlStr = host
-		}
-		urlStr = audit.TruncateMiddle(urlStr, 72)
-		args = append(args, idx, ts, host, urlStr, why)
-		evCopy := e
-		byIdx[idx] = &evCopy
-		if _, ok := hostReason[host]; !ok {
-			hostReason[host] = code
-		}
-	}
-	if len(byIdx) == 0 {
-		return "", "", "close", nil
-	}
-	cmd := exec.Command(zenity, args...)
-	out, err := cmd.CombinedOutput()
-	s := strings.TrimSpace(string(out))
-	if strings.Contains(s, "Refresh") {
-		return "", "", "refresh", nil
-	}
-	always := strings.Contains(s, "Always allow")
-	undo := strings.Contains(s, "Undo")
-	s = strings.ReplaceAll(s, "Always allow", "")
-	s = strings.ReplaceAll(s, "Undo", "")
-	s = strings.TrimSpace(s)
-	lines := strings.Split(s, "\n")
-	idx := strings.TrimSpace(lines[len(lines)-1])
-	sel := byIdx[idx]
-	if sel == nil {
-		if err != nil && !always && !undo {
-			return "", "", "close", nil
-		}
-		return "", "", "close", nil
-	}
-	host := sel.Network.DestHost
-	code := hostReason[host]
-	if code == "" {
-		code = primaryPostBlockReason(sel.Reasons)
-		if code == "" && len(sel.Reasons) > 0 {
-			code = sel.Reasons[0]
-		}
-	}
-	if always {
-		return host, code, "always", sel
-	}
-	if undo {
-		return host, code, "undo", sel
-	}
-	if err != nil {
-		return "", "", "close", nil
-	}
-	return host, code, "details", sel
 }
