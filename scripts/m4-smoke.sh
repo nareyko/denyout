@@ -52,9 +52,12 @@ fi
 # 3. run + HTTPS to a model host must be allowed by DenyOut (upstream 401/404 is fine)
 # shellcheck disable=SC2086
 out=$(run_curl https://api.anthropic.com 2>&1); rc=$?
+# curl exits 0 on any HTTP status (no -f), so exit 0 means the TLS handshake through the
+# intercept proxy and the upstream round trip both worked. The status code is shown when
+# the shell passed -w through intact (it does not reliably on Windows, so it is not required).
 code=$(printf '%s' "$out" | grep -Eo '[0-9]{3}$' | tail -1)
-if [ $rc -eq 0 ] && [ -n "$code" ] && [ "$code" != "000" ] && [ "$code" != "403" ]; then
-  row "run: HTTPS to api.anthropic.com" "allowed (HTTP ${code} from upstream)" "HTTP ${code}" 0
+if [ $rc -eq 0 ] && ! echo "$out" | grep -q 'DENY host=api.anthropic.com'; then
+  row "run: HTTPS to api.anthropic.com" "allowed (TLS intercept round trip)" "exit 0${code:+, HTTP ${code}}" 0
 else
   row "run: HTTPS to api.anthropic.com" "allowed through TLS intercept" "exit ${rc}: ${out}" 1
 fi
