@@ -1,0 +1,116 @@
+name: m4-smoke
+
+# Times the public install path (M4: install -> version -> run + HTTPS, <= 5 min) on
+# hosted Linux, macOS and Windows runners. No checkout of the source: it installs the
+# published release exactly as a user would. Run it on demand for a tag, and it runs
+# on every published release.
+#
+# Limits: a hosted runner is not a clean personal machine. It does not exercise
+# Gatekeeper / SmartScreen or a browser download, and "Protect this computer" is not
+# touched (CLI wrap path only).
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to install (empty = latest)"
+        required: false
+        default: ""
+  release:
+    types: [published]
+  pull_request:
+    # Edits to the smoke itself are tried on the PR that makes them (installs the latest release).
+    paths:
+      - .github/workflows/m4-smoke.yml
+      - scripts/m4-smoke.sh
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m4-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    env:
+      DENYOUT_TAG: ${{ github.event.inputs.tag || github.event.release.tag_name }}
+    steps:
+      # Only the smoke script is fetched from the repo; the product comes from the release.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/m4-smoke.sh
+          sparse-checkout-cone-mode: false
+
+      - name: Start clock
+        shell: bash
+        run: echo "M4_START=$(date +%s)" >> "$GITHUB_ENV"
+
+      - name: Install (Linux / macOS, public install.sh)
+        if: runner.os != 'Windows'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Resolve the tag with the job token: unauthenticated api.github.com calls from
+          # shared runner IPs are rate-limited (403) and made install.sh retry for minutes.
+          tag="${DENYOUT_TAG:-}"
+          [ -n "$tag" ] || tag=$(gh api repos/nareyko/denyout/releases/latest -q .tag_name)
+          export DENYOUT_VERSION="$tag"
+          curl -fsSL https://raw.githubusercontent.com/nareyko/denyout/main/install.sh | sh -s -- --server
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install (Windows, release zip + SHA256SUMS)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $repo = 'nareyko/denyout'
+          $tag = $env:DENYOUT_TAG
+          if (-not $tag) { $tag = (Invoke-RestMethod "https://api.github.com/repos/$repo/releases/latest" -Headers @{ Authorization = "Bearer $env:GH_TOKEN" }).tag_name }
+          $ver = $tag.TrimStart('v')
+          $zip = "denyout-cli_${ver}_windows_amd64.zip"
+          $base = "https://github.com/$repo/releases/download/$tag"
+          $dir = Join-Path $env:RUNNER_TEMP 'dl'
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          Invoke-WebRequest "$base/$zip" -OutFile "$dir\$zip"
+          Invoke-WebRequest "$base/SHA256SUMS" -OutFile "$dir\SHA256SUMS"
+          $want = ((Get-Content "$dir\SHA256SUMS" | Where-Object { $_ -match [regex]::Escape($zip) + '$' }) -split '\s+')[0]
+          $got = (Get-FileHash "$dir\$zip" -Algorithm SHA256).Hash.ToLower()
+          if ($want -ne $got) { throw "SHA256 mismatch for ${zip}: want $want got $got" }
+          "### Windows archive`n$zip sha256 $got" | Out-File -Append $env:GITHUB_STEP_SUMMARY
+          $dest = Join-Path $env:LOCALAPPDATA 'DenyOut'
+          Expand-Archive "$dir\$zip" -DestinationPath $dest -Force
+          $dest | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+
+      - name: Smoke checks
+        shell: bash
+        env:
+          M4_LABEL: ${{ matrix.os }}
+          # Windows curl.exe uses Schannel: it ignores CURL_CA_BUNDLE (SEC_E_UNTRUSTED_ROOT,
+          # seen in CI), so the session CA is passed with --cacert, and revocation checks
+          # are off because a session-CA leaf carries no revocation data.
+          M4_CACERT: ${{ runner.os == 'Windows' && '1' || '' }}
+          M4_CURL_FLAGS: ${{ runner.os == 'Windows' && '--ssl-no-revoke -sS -o NUL -m 30 -w %{http_code}' || '-sS -o /dev/null -m 30 -w %{http_code}' }}
+          M4_CURL: ${{ runner.os == 'Windows' && 'curl.exe' || 'curl' }}
+        run: bash scripts/m4-smoke.sh
+
+      - name: Windows documented command (PowerShell, no bash)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        # Exactly the command docs/install-windows.md gives (those docs are PowerShell). In
+        # cmd.exe the outer shell would expand %CURL_CA_BUNDLE% before denyout sets it
+        # (seen in CI: --cacert got an empty value), so the doc says to use PowerShell.
+        run: |
+          denyout-cli run -- cmd /c "curl.exe --ssl-no-revoke --cacert %CURL_CA_BUNDLE% -sS -o NUL https://api.anthropic.com"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

@@ -268,8 +268,7 @@ func (s *Server) serveIntercept(clientConn net.Conn, rv policy.RequestView, host
 			_ = misdirectedResponse().Write(tlsClient)
 			return
 		}
-		s.roundTripIntercept(tlsClient, req, host, portN, ips, start)
-		if req.Close {
+		if !s.roundTripIntercept(tlsClient, req, host, portN, ips, start) || req.Close {
 			return
 		}
 	}
@@ -281,7 +280,12 @@ func misdirectedResponse() *http.Response {
 		Header: make(http.Header), Body: io.NopCloser(strings.NewReader("host header does not match tunnel host\n"))}
 }
 
-func (s *Server) roundTripIntercept(client io.ReadWriteCloser, req *http.Request, host string, port int, ips []net.IP, start time.Time) {
+// roundTripIntercept handles one request on an intercepted connection. It returns
+// true only when a complete upstream response was relayed and the client
+// connection can serve another request. Every deny or error path returns false:
+// the caller then closes the connection, so a client that waits for the end of a
+// "Connection: close" body is released instead of hanging until its own timeout.
+func (s *Server) roundTripIntercept(client io.ReadWriteCloser, req *http.Request, host string, port int, ips []net.IP, start time.Time) bool {
 	rawURL := "https://" + host
 	if port != 443 {
 		rawURL = fmt.Sprintf("https://%s:%d", host, port)
@@ -320,7 +324,7 @@ func (s *Server) roundTripIntercept(client io.ReadWriteCloser, req *http.Request
 		resp.Header.Set("Content-Type", "text/plain; charset=utf-8")
 		resp.Header.Set("Connection", "close")
 		_ = resp.Write(client)
-		return
+		return false
 	}
 
 	ip, err := safeDialIP(host, ips, s.cfg.Engine.Cfg.AllowPrivate)
@@ -340,7 +344,7 @@ func (s *Server) roundTripIntercept(client io.ReadWriteCloser, req *http.Request
 			Body:       io.NopCloser(strings.NewReader(redactDenyMsg(deny) + "\n")),
 		}
 		_ = resp.Write(client)
-		return
+		return false
 	}
 	addr := net.JoinHostPort(ip.String(), fmt.Sprintf("%d", port))
 	raw, err := s.dialTCP(addr, 15*time.Second)
@@ -353,7 +357,7 @@ func (s *Server) roundTripIntercept(client io.ReadWriteCloser, req *http.Request
 			Body:       io.NopCloser(strings.NewReader("upstream dial failed\n")),
 		}
 		_ = resp.Write(client)
-		return
+		return false
 	}
 	up := tls.Client(raw, &tls.Config{
 		ServerName:         host,
@@ -363,7 +367,7 @@ func (s *Server) roundTripIntercept(client io.ReadWriteCloser, req *http.Request
 	_ = raw.SetDeadline(time.Now().Add(15 * time.Second))
 	if err := up.Handshake(); err != nil {
 		_ = raw.Close()
-		return
+		return false
 	}
 	_ = raw.SetDeadline(time.Time{})
 	defer up.Close()
@@ -372,15 +376,16 @@ func (s *Server) roundTripIntercept(client io.ReadWriteCloser, req *http.Request
 	outReq.URL = &url.URL{Scheme: "https", Host: host, Path: req.URL.Path, RawQuery: req.URL.RawQuery}
 	outReq.RequestURI = ""
 	if err := outReq.Write(up); err != nil {
-		return
+		return false
 	}
 	upResp, err := http.ReadResponse(bufio.NewReader(up), outReq)
 	if err != nil {
-		return
+		return false
 	}
 	defer upResp.Body.Close()
 	s.stripDeniedRedirect(upResp, start)
 	_ = upResp.Write(client)
+	return true
 }
 
 // stripDeniedRedirect re-evaluates absolute Location hosts (open-redirect / EchoLeak class).

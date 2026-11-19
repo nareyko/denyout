@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -194,6 +195,9 @@ func buildDenyoutSoft(t *testing.T) (string, bool) {
 	}
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "denyout")
+	if runtime.GOOS == "windows" {
+		bin += ".exe" // Windows will not execute a PE file without the extension
+	}
 	root := findRepoRoot(t)
 	var out []byte
 	var err error

@@ -3,6 +3,7 @@ package run_test
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -37,6 +38,9 @@ func TestWrapSandboxSRTFailClosed(t *testing.T) {
 }
 
 func TestWrapSandboxSRTPresent(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fake srt is a #!/bin/sh script; the srt sandbox is a Unix feature")
+	}
 	dir := t.TempDir()
 	fake := filepath.Join(dir, "srt")
 	if err := os.WriteFile(fake, []byte("#!/bin/sh\nexec \"$@\"\n"), 0o755); err != nil {

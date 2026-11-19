@@ -33,11 +33,21 @@ go run ./cmd/denyout-cli check 'https://evil.example/x?api_key=DENYOUT_CANARY_LA
 **Tray (compact):** Status - **Protect computer** - **My agents...** - **Off** - **Open DenyOut...** - **Quit**.
 Left-click opens Activity. **Agents only (whole PC)** lives under Settings -> Advanced (confirm). Full inventory: [`docs/07-desktop-ux.md`](docs/07-desktop-ux.md).
 
-Windows: download the zip from [Releases](https://github.com/nareyko/denyout/releases) and follow [`docs/install-windows.md`](docs/install-windows.md).
+Windows: download `denyout-cli_<version>_windows_amd64.zip` from [Releases](https://github.com/nareyko/denyout/releases) and follow [`docs/install-windows.md`](docs/install-windows.md).
 
 ## Status
 
-**Protect computer (Safe desktop)** is the primary desktop path. **My agents** wraps AI/tools. Admin failure stays Off (no silent Session). Remaining for the Dec 1 bet: timed **M4** install on three OS. Windows WinDivert bridge packaging.
+**Protect computer (Safe desktop)** is the primary desktop path. **My agents** wraps AI/tools. Admin failure stays Off (no silent Session). Remaining for the Dec 1 bet: timed **M4** install on three OS (the `m4-smoke` workflow measures it on hosted runners). See [Platform support](#platform-support).
+
+## Platform support
+
+| OS | `denyout-cli run` (wrap one command) | Protect this computer |
+| --- | --- | --- |
+| Linux (Ubuntu) | Supported, timed | Supported |
+| macOS | Timed in CI on a hosted runner (install to first protected run: seconds); not yet verified by hand on a Mac | Preview: not verified on a real Mac |
+| Windows | Timed in CI on a hosted runner, with `curl.exe --cacert` (the system curl does not trust the session CA otherwise, see `docs/install-windows.md`); not yet verified by hand | Not available (WinDivert bridge not packaged) |
+
+Release binaries are not signed with Developer ID or Authenticode (cosign proves provenance only), so macOS and Windows may show a warning on first run. See [known issues](docs/known-issues.md).
 
 **Language:** English only - **License:** Apache-2.0 - **Platforms:** Ubuntu, macOS, Windows.
 
