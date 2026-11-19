@@ -104,3 +104,9 @@ jobs:
           M4_CURL_FLAGS: ${{ runner.os == 'Windows' && '--ssl-no-revoke -sS -o NUL -m 30 -w %{http_code}' || '-sS -o /dev/null -m 30 -w %{http_code}' }}
           M4_CURL: ${{ runner.os == 'Windows' && 'curl.exe' || 'curl' }}
         run: bash scripts/m4-smoke.sh
+
+      - name: Windows documented command (cmd, no bash)
+        if: runner.os == 'Windows'
+        shell: cmd
+        # Exactly the command docs/install-windows.md gives, so the doc stays true.
+        run: denyout-cli run -- cmd /c "curl.exe --ssl-no-revoke --cacert %CURL_CA_BUNDLE% -sS -o NUL https://api.anthropic.com"

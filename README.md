@@ -44,8 +44,8 @@ Windows: download `denyout-cli_<version>_windows_amd64.zip` from [Releases](http
 | OS | `denyout-cli run` (wrap one command) | Protect this computer |
 | --- | --- | --- |
 | Linux (Ubuntu) | Supported, timed | Supported |
-| macOS | Not yet timed or verified (`m4-smoke` CI result pending) | Preview: not verified on a real Mac |
-| Windows | Not yet verified: system `curl.exe` does not trust the session CA unless given `--cacert` (see `docs/install-windows.md`) | Not available (WinDivert bridge not packaged) |
+| macOS | Timed in CI on a hosted runner (install to first protected run: seconds); not yet verified by hand on a Mac | Preview: not verified on a real Mac |
+| Windows | Timed in CI on a hosted runner, with `curl.exe --cacert` (the system curl does not trust the session CA otherwise, see `docs/install-windows.md`); not yet verified by hand | Not available (WinDivert bridge not packaged) |
 
 Release binaries are not signed with Developer ID or Authenticode (cosign proves provenance only), so macOS and Windows may show a warning on first run. See [known issues](docs/known-issues.md).
 

@@ -57,7 +57,7 @@ out=$(run_curl https://api.anthropic.com 2>&1); rc=$?
 # the shell passed -w through intact (it does not reliably on Windows, so it is not required).
 code=$(printf '%s' "$out" | grep -Eo '[0-9]{3}$' | tail -1)
 if [ $rc -eq 0 ] && ! echo "$out" | grep -q 'DENY host=api.anthropic.com'; then
-  row "run: HTTPS to api.anthropic.com" "allowed (TLS intercept round trip)" "exit 0${code:+, HTTP ${code}}" 0
+  row "run: HTTPS to api.anthropic.com" "allowed (TLS intercept round trip)" "exit 0${M4_CACERT:+}${code:+$([ -z "$M4_CACERT" ] && echo ", HTTP ${code}")}" 0
 else
   row "run: HTTPS to api.anthropic.com" "allowed through TLS intercept" "exit ${rc}: ${out}" 1
 fi

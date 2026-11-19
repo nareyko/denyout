@@ -46,12 +46,14 @@ The command-line tool is `denyout-cli.exe` (the zip contains no `denyout.exe`).
 denyout-cli version
 denyout-cli init
 denyout-cli check "https://evil.example/x?api_key=DENYOUT_CANARY_LAB"
-denyout-cli run -- curl.exe --ssl-no-revoke -I https://api.anthropic.com
+denyout-cli run -- cmd /c "curl.exe --ssl-no-revoke --cacert %CURL_CA_BUNDLE% -I https://api.anthropic.com"
 ```
 
 Expect the canary `check` to **deny**. Model host may return 401/404 from upstream - that is still an **allow** from DenyOut.
 
-`run` wraps one command: the child gets the proxy and the session CA through environment variables. Clients that ignore those variables are not trusted by the session CA. Windows `curl.exe` uses the system TLS stack (Schannel), which needs `--ssl-no-revoke` because the session CA issues certificates without revocation data.
+`run` wraps one command: the child gets the proxy and the session CA through environment variables (`CURL_CA_BUNDLE`, `SSL_CERT_FILE`, `NODE_EXTRA_CA_CERTS`, ...). Programs that read those variables (Node, Python `requests`, Git) trust the session CA by themselves.
+
+Windows `curl.exe` uses the system TLS stack (Schannel), which **ignores** `CURL_CA_BUNDLE`; without help it fails with `SEC_E_UNTRUSTED_ROOT`. That is why the command above passes `--cacert %CURL_CA_BUNDLE%` explicitly (`cmd /c` expands the variable inside the wrapped process) and `--ssl-no-revoke` (a session-CA certificate carries no revocation data). The same applies to other clients that use the Windows certificate store, such as PowerShell `Invoke-WebRequest`. DenyOut does not install its CA into the system store.
 
 ### What is not available on Windows yet
 
