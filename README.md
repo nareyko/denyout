@@ -43,7 +43,7 @@ Windows: download `denyout-cli_<version>_windows_amd64.zip` from [Releases](http
 
 | OS | `denyout-cli run` (wrap one command) | Protect this computer |
 | --- | --- | --- |
-| Linux (Ubuntu) | Supported, timed | Supported |
+| Linux (Ubuntu) | Supported, timed | Supported: install, Protect On/Off, deny and uninstall verified in Docker on a published release; the tray and window on a real desktop are not yet verified by hand |
 | macOS | Timed in CI on a hosted runner (install to first protected run: seconds); not yet verified by hand on a Mac | Preview: not verified on a real Mac |
 | Windows | Timed in CI on a hosted runner, with `curl.exe --cacert` (the system curl does not trust the session CA otherwise, see `docs/install-windows.md`); not yet verified by hand | Not available (WinDivert bridge not packaged) |
 
