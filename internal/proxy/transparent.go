@@ -139,11 +139,25 @@ func (s *Server) serveTransparentTLS(conn net.Conn, host string, port int) {
 		return
 	}
 	for {
+		_ = conn.SetReadDeadline(time.Now().Add(5 * time.Minute))
 		req, err := http.ReadRequest(br)
 		if err != nil {
 			return
 		}
-		s.roundTripIntercept(tlsClient, req, host, port, ips, start)
+		_ = conn.SetReadDeadline(time.Time{})
+		if !hostHeaderMatches(req.Host, host) {
+			// Same domain-fronting guard as the CONNECT path: policy was evaluated for the
+			// SNI host, a different Host header would reach a host that was never checked.
+			_ = misdirectedResponse().Write(tlsClient)
+			return
+		}
+		// A deny or error answer says "Connection: close"; the connection must really close,
+		// or a client waiting for the end of the body hangs (seen with Protect On: curl got
+		// the 403 and 65 body bytes, then timed out).
+		if !s.roundTripIntercept(tlsClient, req, host, port, ips, start) || req.Close {
+			drainRequestBody(conn, req)
+			return
+		}
 	}
 }
 
