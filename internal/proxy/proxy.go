@@ -387,21 +387,39 @@ func (s *Server) roundTripIntercept(client io.ReadWriteCloser, req *http.Request
 	outReq := req.Clone(context.Background())
 	outReq.URL = &url.URL{Scheme: "https", Host: host, Path: req.URL.Path, RawQuery: req.URL.RawQuery}
 	outReq.RequestURI = ""
-	if err := outReq.Write(up); err != nil {
+	// Read the response while the request is still being written: an upstream may answer
+	// (401, 413) before it has consumed a large body and then close. Writing first and
+	// reading after would fail on the write and lose that answer (seen on macOS/Windows,
+	// where the resulting RST also discards unread data).
+	type upResult struct {
+		resp *http.Response
+		err  error
+	}
+	respCh := make(chan upResult, 1)
+	go func() {
+		upBuf := bufio.NewReader(up)
+		r, rerr := http.ReadResponse(upBuf, outReq)
+		for rerr == nil && r.StatusCode >= 100 && r.StatusCode < 200 && r.StatusCode != http.StatusSwitchingProtocols {
+			r, rerr = http.ReadResponse(upBuf, outReq) // interim (100/103): the final response follows
+		}
+		respCh <- upResult{r, rerr}
+	}()
+	werr := outReq.Write(up)
+	if werr != nil {
+		// The upstream may have answered and closed; do not wait forever for more.
+		_ = up.SetReadDeadline(time.Now().Add(5 * time.Second))
+	}
+	res := <-respCh
+	if res.err != nil {
 		return false
 	}
-	upBuf := bufio.NewReader(up)
-	upResp, err := http.ReadResponse(upBuf, outReq)
-	for err == nil && upResp.StatusCode >= 100 && upResp.StatusCode < 200 && upResp.StatusCode != http.StatusSwitchingProtocols {
-		upResp, err = http.ReadResponse(upBuf, outReq) // interim (100/103): the final response follows
-	}
-	if err != nil {
-		return false
-	}
+	upResp := res.resp
 	defer upResp.Body.Close()
 	s.stripDeniedRedirect(upResp, start)
 	_ = upResp.Write(client)
-	return true
+	// Early answer: the upstream replied before the whole request body was sent. The
+	// client connection still has unread body bytes, so it cannot serve another request.
+	return werr == nil
 }
 
 // maxDrainBytes bounds how much of an unread request body is consumed before an
