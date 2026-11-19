@@ -1,0 +1,12 @@
+# M3 live run: ten prompts that need only the model host (no web search, no tools that
+# fetch URLs). One line = one agent run. Blank lines and # are ignored.
+Reply with the single word: ok
+What is 17 times 23? Answer with the number only.
+List three prime numbers greater than 100, comma separated.
+Translate "good morning" into French and Spanish, one line.
+Write a one-line Python expression that reverses a string s.
+Name the capital of Australia.
+Give a one-sentence definition of a hash table.
+What does the HTTP status code 404 mean? One short sentence.
+Rewrite this sentence in the passive voice: The cat chased the mouse.
+Count the vowels in the word "documentation" and answer with the number only.
