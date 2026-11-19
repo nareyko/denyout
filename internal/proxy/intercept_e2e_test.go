@@ -230,3 +230,66 @@ func readAudit(t *testing.T, path string) string {
 		time.Sleep(20 * time.Millisecond)
 	}
 }
+
+// A client that sends "Expect: 100-continue" (curl does this for POST bodies over
+// 1 MiB) waits for an interim "100 Continue" before it sends the body. The proxy must
+// answer it, and must not hand the upstream's interim 100 back as the final response.
+func TestInterceptExpectContinueLargeUpload(t *testing.T) {
+	client, base, hits, _ := startIntercept(t, interceptPolicy)
+	client.Transport.(*http.Transport).ExpectContinueTimeout = 5 * time.Second
+	client.Timeout = 8 * time.Second
+
+	body := strings.NewReader(strings.Repeat("x", 3<<20))
+	req, err := http.NewRequest(http.MethodPost, base+"/upload", body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Expect", "100-continue")
+	req.Header.Set("Content-Type", "application/octet-stream")
+
+	began := time.Now()
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("Expect: 100-continue upload failed after %s: %v", time.Since(began), err)
+	}
+	defer resp.Body.Close()
+	got, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK || string(got) != "upstream-ok" {
+		t.Fatalf("status=%d body=%q, want 200 upstream-ok", resp.StatusCode, got)
+	}
+	if hits.Load() != 1 {
+		t.Fatalf("upstream hits=%d, want 1", hits.Load())
+	}
+	// The client waits ExpectContinueTimeout (5s) for a 100 before sending anyway: a fast
+	// answer proves the proxy sent the interim 100 itself.
+	if took := time.Since(began); took > 3*time.Second {
+		t.Fatalf("upload took %s: the proxy did not answer Expect: 100-continue", took)
+	}
+}
+
+// A denied upload must end with a readable 403, not a connection reset: the proxy
+// has to consume (a bounded amount of) the body the client is still sending.
+func TestInterceptDenyLargeUploadIsNotReset(t *testing.T) {
+	client, base, hits, _ := startIntercept(t, interceptPolicy)
+	client.Timeout = 8 * time.Second
+
+	body := strings.NewReader(strings.Repeat("x", 3<<20))
+	req, err := http.NewRequest(http.MethodPost, base+"/upload?api_key=DENYOUT_CANARY_BIGPOST", body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/octet-stream")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("denied large upload surfaced as a transport error (reset?), want a 403: %v", err)
+	}
+	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, resp.Body)
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("status=%d, want 403", resp.StatusCode)
+	}
+	if hits.Load() != 0 {
+		t.Fatalf("canary upload reached upstream (%d hits)", hits.Load())
+	}
+}
