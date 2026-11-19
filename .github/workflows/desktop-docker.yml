@@ -21,6 +21,11 @@ on:
       - scripts/desktop-protect-docker-test.sh
       - scripts/docker/desktop-test.sh
       - scripts/docker/protect-test.sh
+      - scripts/release-security-docker-test.sh
+      - scripts/security-helper-regression-docker.sh
+      - scripts/docker/helper-exploits.sh
+      - scripts/upgrade-docker-test.sh
+      - scripts/docker/upgrade-test.sh
       - install.sh
 
 permissions:
@@ -33,7 +38,7 @@ concurrency:
 jobs:
   ubuntu:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 35
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -63,12 +68,18 @@ jobs:
       - name: Protect On/Off (D5, D6)
         run: sh scripts/desktop-protect-docker-test.sh "${{ steps.tag.outputs.tag }}" 2>&1 | tee protect.log
         shell: bash
+      - name: Helper exploits / tamper audit on the released binary (D6)
+        run: sh scripts/release-security-docker-test.sh "${{ steps.tag.outputs.tag }}" 2>&1 | tee security.log
+        shell: bash
+      - name: Upgrade from v0.4.13 with Protect On (D8)
+        run: sh scripts/upgrade-docker-test.sh v0.4.13 "${{ steps.tag.outputs.tag }}" 2>&1 | tee upgrade.log
+        shell: bash
       - name: Summary
         if: always()
         shell: bash
         run: |
           {
             echo '```'
-            grep -hE '^(FAIL|==.*(passed|failed)|desktop-docker-test)' desktop.log protect.log 2>/dev/null || true
+            grep -hE '^(FAIL|==.*(passed|failed)|desktop-docker-test|security-helper-regression|RESULT .*EXPLOITED)' desktop.log protect.log security.log upgrade.log 2>/dev/null || true
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
