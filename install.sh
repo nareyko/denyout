@@ -398,7 +398,21 @@ esac
 
 "${INSTALL_DIR}/denyout-cli" version || true
 if [ -x "${INSTALL_DIR}/denyout" ]; then
-  "${INSTALL_DIR}/denyout" --version || true
+  if gui_ver=$("${INSTALL_DIR}/denyout" --version 2>&1); then
+    echo "$gui_ver"
+  else
+    echo "$gui_ver" >&2
+    case "$gui_ver" in
+      *"error while loading shared libraries"*)
+        # The GUI links GTK3 + WebKitGTK at run time. Without them it cannot start, and
+        # leaving it in place makes `desktop --install` start a binary that dies at once.
+        echo "denyout install: note: the GUI (denyout) needs GTK 3 and WebKitGTK 4.1 and they are missing; it was not kept." >&2
+        echo "  Ubuntu/Debian: sudo apt-get install -y libgtk-3-0 libwebkit2gtk-4.1-0   then run this installer again." >&2
+        echo "  The CLI tray (denyout-cli desktop) still works without them." >&2
+        rm -f "${INSTALL_DIR}/denyout"
+        ;;
+    esac
+  fi
 fi
 
 echo "denyout install: done"
