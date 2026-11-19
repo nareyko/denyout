@@ -81,15 +81,29 @@ sha256_file() {
   fi
 }
 
-# curl_fetch dest url — retries on network / HTTP failures until success or give up.
+# curl_fetch dest url [optional] — retries on network / HTTP failures until success or give up.
 # Prints wait lines so a flaky GitHub is visible instead of a silent fail.
+# With a third argument "optional" the asset may legitimately not exist (the GUI archive and
+# signatures are not published for every OS/arch): a missing file (HTTP 404, or no such
+# file:// path) returns 1 at once and quietly instead of waiting through every retry.
 curl_fetch() {
   dest=$1
   url=$2
+  optional=${3:-}
   attempt=1
   delay=$FETCH_RETRY_SECS
   while [ "$attempt" -le "$FETCH_RETRIES" ]; do
-    if curl -fsSL --connect-timeout 15 --retry 0 -o "$dest" "$url"; then
+    if [ "$optional" = optional ]; then
+      code=$(curl -fsSL --connect-timeout 15 --retry 0 -o "$dest" -w '%{http_code}' "$url" 2>/dev/null) && rc=0 || rc=$?
+      if [ "$rc" -eq 0 ]; then
+        return 0
+      fi
+      rm -f "$dest" 2>/dev/null || true
+      # 22 = HTTP error (404 prints 404), 37 = file:// path missing
+      if [ "$rc" -eq 37 ] || { [ "$rc" -eq 22 ] && [ "$code" = 404 ]; }; then
+        return 1
+      fi
+    elif curl -fsSL --connect-timeout 15 --retry 0 -o "$dest" "$url"; then
       return 0
     fi
     rm -f "$dest" 2>/dev/null || true
@@ -123,7 +137,15 @@ resolve_version() {
     echo "$DENYOUT_VERSION"
     return
   fi
-  # Latest release tag via GitHub API (retried — API flaps are common).
+  # Latest release tag: the github.com /releases/latest redirect first (not subject to the
+  # unauthenticated API rate limit that shared or corporate IPs hit), the API as fallback.
+  final=$(curl -fsSLI --connect-timeout 15 --retry 0 -o /dev/null -w '%{url_effective}' "https://github.com/${REPO}/releases/latest" 2>/dev/null || true)
+  case "$final" in
+    */releases/tag/*)
+      tag=${final##*/releases/tag/}
+      case "$tag" in ''|*[!A-Za-z0-9._-]*|*..*|-*) ;; *) echo "$tag"; return ;; esac
+      ;;
+  esac
   api="https://api.github.com/repos/${REPO}/releases/latest"
   body=$(mktemp)
   if ! curl_fetch "$body" "$api"; then
@@ -203,8 +225,8 @@ verify_signature() {
   [ "$mode" = skip ] && { echo "denyout install: WARNING signature check skipped (checksum only)" >&2; return 0; }
   sig_ok=0
   if command -v cosign >/dev/null 2>&1 \
-     && curl_fetch "${TMP}/${SUMS}.sig" "${ASSET_BASE}/${SUMS}.sig" \
-     && curl_fetch "${TMP}/${SUMS}.pem" "${ASSET_BASE}/${SUMS}.pem"; then
+     && curl_fetch "${TMP}/${SUMS}.sig" "${ASSET_BASE}/${SUMS}.sig" optional \
+     && curl_fetch "${TMP}/${SUMS}.pem" "${ASSET_BASE}/${SUMS}.pem" optional; then
     if cosign verify-blob \
         --certificate "${TMP}/${SUMS}.pem" --signature "${TMP}/${SUMS}.sig" \
         --certificate-identity-regexp "^https://github.com/${REPO}/\.github/workflows/release\.yml@refs/tags/v" \
@@ -286,8 +308,8 @@ verify_gui_archive() {
   mode="${DENYOUT_VERIFY_SIG:-auto}"
   [ "$mode" = skip ] && return 0
   if command -v cosign >/dev/null 2>&1 \
-     && curl_fetch "${TMP}/${GUI_ARCHIVE}.sig" "${ASSET_BASE}/${GUI_ARCHIVE}.sig" \
-     && curl_fetch "${TMP}/${GUI_ARCHIVE}.pem" "${ASSET_BASE}/${GUI_ARCHIVE}.pem"; then
+     && curl_fetch "${TMP}/${GUI_ARCHIVE}.sig" "${ASSET_BASE}/${GUI_ARCHIVE}.sig" optional \
+     && curl_fetch "${TMP}/${GUI_ARCHIVE}.pem" "${ASSET_BASE}/${GUI_ARCHIVE}.pem" optional; then
     if cosign verify-blob \
         --certificate "${TMP}/${GUI_ARCHIVE}.pem" --signature "${TMP}/${GUI_ARCHIVE}.sig" \
         --certificate-identity-regexp "^https://github.com/${REPO}/\.github/workflows/release-desktop\.yml@refs/tags/v" \
@@ -307,7 +329,7 @@ verify_gui_archive() {
   return 0
 }
 
-if curl_fetch "${TMP}/${GUI_ARCHIVE}" "${ASSET_BASE}/${GUI_ARCHIVE}" && ! verify_gui_archive; then
+if curl_fetch "${TMP}/${GUI_ARCHIVE}" "${ASSET_BASE}/${GUI_ARCHIVE}" optional && ! verify_gui_archive; then
   echo "denyout install: note - skipping GUI (CLI tray still available)" >&2
 elif [ -f "${TMP}/${GUI_ARCHIVE}" ]; then
   tar -xzf "${TMP}/${GUI_ARCHIVE}" -C "$TMP"

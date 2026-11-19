@@ -18,6 +18,12 @@ echo "== require, no signature: must fail"
 if run DENYOUT_VERIFY_SIG=require | grep -q "signature required"; then echo "PASS require fails"; else echo "FAIL require"; exit 1; fi
 echo "== bad mode rejected"
 run DENYOUT_VERIFY_SIG=bogus | grep -q "must be auto|require|skip" && echo "PASS bad mode"
+echo "== missing GUI archive must not be retried (it is optional): fast, quiet, installs the CLI"
+rm -f /rel/denyout_v0.0.1_linux_$a.tar.gz /h/bin/denyout
+t0=$(date +%s)
+out=$(run DENYOUT_VERIFY_SIG=skip DENYOUT_FETCH_RETRIES=6 DENYOUT_FETCH_RETRY_SECS=10)
+t1=$(date +%s)
+[ $((t1 - t0)) -le 8 ] && echo "$out" | grep -q "checksum ok" && ! echo "$out" | grep -q "download failed" && echo "PASS missing GUI not retried ($((t1 - t0))s)" || { echo "FAIL missing GUI retried or slow ($((t1 - t0))s): $out"; exit 1; }
 echo "== GUI archive: auto without cosign installs with a note (require already fails at the CLI stage)"
 printf "#!/bin/sh\necho gui\n" > denyout; chmod +x denyout; tar -czf /rel/denyout_v0.0.1_linux_$a.tar.gz denyout
 rm -f /h/bin/denyout

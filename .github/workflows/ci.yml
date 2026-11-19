@@ -113,6 +113,19 @@ jobs:
           ./internal/proxy/...
           ./internal/run/...
           ./internal/accept/...
+      - name: M4 smoke on this commit's build (macOS / Windows)
+        # Same checks as the m4-smoke workflow, but on a binary built from this commit, so a
+        # change that breaks install -> run -> HTTPS is caught before a release exists.
+        shell: bash
+        env:
+          DENYOUT_BIN: ./denyout-cli
+          M4_LABEL: ${{ matrix.os }} (built from source)
+          M4_CACERT: ${{ runner.os == 'Windows' && '1' || '' }}
+          M4_CURL: ${{ runner.os == 'Windows' && 'curl.exe' || 'curl' }}
+          M4_CURL_FLAGS: ${{ runner.os == 'Windows' && '--ssl-no-revoke -sS -o NUL -m 30 -w %{http_code}' || '-sS -o /dev/null -m 30 -w %{http_code}' }}
+        run: |
+          # Needs the real network (api.anthropic.com); DENYOUT_TEST_NO_ELEVATE does not affect run.
+          M4_START=$(date +%s) bash scripts/m4-smoke.sh
       - name: HTTPS-intercept e2e must run, not skip
         shell: bash
         run: |
