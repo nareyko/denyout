@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **M3 on a real agent.** `scripts/m3-live-agent.sh` runs ten prompts through `denyout-cli run` with a real agent CLI (`M3_AGENT='claude -p'`), counts runs that hit a false deny or hang from the audit log, and uploads 2 MiB through the proxy. Prompts: `examples/m3/live-prompts.txt`.
+
 - **CI: `desktop-docker` workflow.** Runs the Ubuntu desktop install test and the Protect On/Off test against a published release in Docker. `release-desktop` dispatches it once the Linux GUI archive is attached; it also runs on edits to its own files and on demand (`workflow_dispatch` with a tag).
 
 - **Fixed: with Protect this computer On, a denied HTTPS request hung the client.** The transparent (nft redirect) path answered 403 with `Connection: close` but kept the connection open: `curl` got the status and the body, then timed out. It now closes after any deny or error, drains a bounded part of an unread upload (as the `run` path does since #88) and applies the same Host-header check as the CONNECT path (a Host that differs from the SNI host is answered 421). Found by the new Docker test `scripts/desktop-protect-docker-test.sh`, which installs a published release, switches Protect On and Off in a `NET_ADMIN` container and checks interception, deny, Off and teardown.
