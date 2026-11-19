@@ -18,6 +18,11 @@ on:
         default: ""
   release:
     types: [published]
+  pull_request:
+    # Edits to the smoke itself are tried on the PR that makes them (installs the latest release).
+    paths:
+      - .github/workflows/m4-smoke.yml
+      - scripts/m4-smoke.sh
 
 permissions:
   contents: read
