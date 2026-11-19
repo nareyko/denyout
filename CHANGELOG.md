@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Ubuntu desktop install: Docker test and a clearer failure.** New `scripts/desktop-docker-test.sh <tag>` installs a real release with `--desktop` in throw-away Ubuntu containers (non-root user, Xvfb, session bus) and checks the installer, GUI checksum, headless start, `desktop --install` side effects, re-install and `uninstall`. When GTK 3 / WebKitGTK 4.1 are missing, `install.sh` now says which packages to install and does not keep a GUI binary that cannot start (CLI tray still works); before, it printed `error while loading shared libraries` and `desktop --install` reported "started".
+
 - **GUI archive integrity.** `release-desktop` publishes a `.sha256` next to each GUI archive and `install.sh` verifies it; a mismatch skips the GUI and keeps the CLI install. Releases without `.sha256` keep the signature-only check.
 - **CI: wider M4 smoke.** `m4-smoke` also covers ubuntu-arm and macOS Intel, has a time-boxed macOS default (desktop) install job, and `release.yml` dispatches it for each tag.
 
