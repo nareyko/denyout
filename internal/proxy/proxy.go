@@ -269,6 +269,7 @@ func (s *Server) serveIntercept(clientConn net.Conn, rv policy.RequestView, host
 			return
 		}
 		if !s.roundTripIntercept(tlsClient, req, host, portN, ips, start) || req.Close {
+			drainRequestBody(clientConn, req)
 			return
 		}
 	}
@@ -291,6 +292,17 @@ func (s *Server) roundTripIntercept(client io.ReadWriteCloser, req *http.Request
 		rawURL = fmt.Sprintf("https://%s:%d", host, port)
 	}
 	rawURL += req.URL.RequestURI()
+
+	// Clients (curl for bodies over 1 MiB) send "Expect: 100-continue" and wait for an
+	// interim 100 before sending the body. The body is needed for scanning, so answer it
+	// here and do not forward the expectation: the upstream's own interim 100 would
+	// otherwise be relayed to the client as if it were the final response.
+	if strings.EqualFold(strings.TrimSpace(req.Header.Get("Expect")), "100-continue") {
+		req.Header.Del("Expect")
+		if _, err := io.WriteString(client, "HTTP/1.1 100 Continue\r\n\r\n"); err != nil {
+			return false
+		}
+	}
 
 	bodyMax := 65536
 	if s.cfg.Engine != nil && s.cfg.Engine.Cfg != nil {
@@ -375,17 +387,55 @@ func (s *Server) roundTripIntercept(client io.ReadWriteCloser, req *http.Request
 	outReq := req.Clone(context.Background())
 	outReq.URL = &url.URL{Scheme: "https", Host: host, Path: req.URL.Path, RawQuery: req.URL.RawQuery}
 	outReq.RequestURI = ""
-	if err := outReq.Write(up); err != nil {
+	// Read the response while the request is still being written: an upstream may answer
+	// (401, 413) before it has consumed a large body and then close. Writing first and
+	// reading after would fail on the write and lose that answer (seen on macOS/Windows,
+	// where the resulting RST also discards unread data).
+	type upResult struct {
+		resp *http.Response
+		err  error
+	}
+	respCh := make(chan upResult, 1)
+	go func() {
+		upBuf := bufio.NewReader(up)
+		r, rerr := http.ReadResponse(upBuf, outReq)
+		for rerr == nil && r.StatusCode >= 100 && r.StatusCode < 200 && r.StatusCode != http.StatusSwitchingProtocols {
+			r, rerr = http.ReadResponse(upBuf, outReq) // interim (100/103): the final response follows
+		}
+		respCh <- upResult{r, rerr}
+	}()
+	werr := outReq.Write(up)
+	if werr != nil {
+		// The upstream may have answered and closed; do not wait forever for more.
+		_ = up.SetReadDeadline(time.Now().Add(5 * time.Second))
+	}
+	res := <-respCh
+	if res.err != nil {
 		return false
 	}
-	upResp, err := http.ReadResponse(bufio.NewReader(up), outReq)
-	if err != nil {
-		return false
-	}
+	upResp := res.resp
 	defer upResp.Body.Close()
 	s.stripDeniedRedirect(upResp, start)
 	_ = upResp.Write(client)
-	return true
+	// Early answer: the upstream replied before the whole request body was sent. The
+	// client connection still has unread body bytes, so it cannot serve another request.
+	return werr == nil
+}
+
+// maxDrainBytes bounds how much of an unread request body is consumed before an
+// intercepted connection is closed.
+const maxDrainBytes = 8 << 20
+
+// drainRequestBody reads (a bounded amount of) the body the client is still sending
+// before the connection is closed. Closing a socket with unread data makes the kernel
+// send RST, and the client can then lose the 403 it was just sent. The deadline keeps a
+// slow sender from holding the connection.
+func drainRequestBody(conn net.Conn, req *http.Request) {
+	if req == nil || req.Body == nil || req.Body == http.NoBody {
+		return
+	}
+	_ = conn.SetReadDeadline(time.Now().Add(3 * time.Second))
+	_, _ = io.CopyN(io.Discard, req.Body, maxDrainBytes)
 }
 
 // stripDeniedRedirect re-evaluates absolute Location hosts (open-redirect / EchoLeak class).
