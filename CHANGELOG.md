@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **CI: `desktop-docker` workflow.** Runs the Ubuntu desktop install test and the Protect On/Off test against a published release in Docker. `release-desktop` dispatches it once the Linux GUI archive is attached; it also runs on edits to its own files and on demand (`workflow_dispatch` with a tag).
+
 - **Fixed: with Protect this computer On, a denied HTTPS request hung the client.** The transparent (nft redirect) path answered 403 with `Connection: close` but kept the connection open: `curl` got the status and the body, then timed out. It now closes after any deny or error, drains a bounded part of an unread upload (as the `run` path does since #88) and applies the same Host-header check as the CONNECT path (a Host that differs from the SNI host is answered 421). Found by the new Docker test `scripts/desktop-protect-docker-test.sh`, which installs a published release, switches Protect On and Off in a `NET_ADMIN` container and checks interception, deny, Off and teardown.
 
 - **Ubuntu desktop install: Docker test and a clearer failure.** New `scripts/desktop-docker-test.sh <tag>` installs a real release with `--desktop` in throw-away Ubuntu containers (non-root user, Xvfb, session bus) and checks the installer, GUI checksum, headless start, `desktop --install` side effects, re-install and `uninstall`. When GTK 3 / WebKitGTK 4.1 are missing, `install.sh` now says which packages to install and does not keep a GUI binary that cannot start (CLI tray still works); before, it printed `error while loading shared libraries` and `desktop --install` reported "started".
