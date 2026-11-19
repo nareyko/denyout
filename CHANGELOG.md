@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Upgrade tells you when it stops Protect.** If Protect this computer is On (its proxy is running), `install.sh` now ends with a clear notice: the upgrade stopped it, web traffic is unfiltered after about 10 seconds (default fail policy), and how to turn Protect on again. A fresh install prints nothing. Checked by the upgrade Docker test (v0.4.13 to a new release).
+
 - **Docker tests on the published release: upgrade and helper exploits.** `scripts/upgrade-docker-test.sh <old> <new>` upgrades v0.4.13 to a new release while Protect is On and checks there is no permanent blackhole, the new binary enforces, and Off/teardown are clean. `scripts/release-security-docker-test.sh <tag>` downloads the release binary, verifies it against `SHA256SUMS` and runs the helper exploit regression (T1-T8) on it instead of a fresh build. Both run in the `desktop-docker` workflow. Finding documented by the upgrade test: `install.sh` stops the running proxy on purpose, so with Protect On the redirect rules stay for about 10 s (a short outage), then the helper watchdog applies the fail policy (default: rules removed, web works unprotected until Protect is turned on again).
 
 - **M3 on a real agent.** `scripts/m3-live-agent.sh` runs ten prompts through `denyout-cli run` with a real agent CLI (`M3_AGENT='claude -p'`), counts runs that hit a false deny or hang from the audit log, and uploads 2 MiB through the proxy. Prompts: `examples/m3/live-prompts.txt`.

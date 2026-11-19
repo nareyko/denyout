@@ -285,6 +285,14 @@ mkdir -p "$INSTALL_DIR"
 
 # Stop old tray/proxyd/desktop before overwriting binaries (ETXTBSY / duplicate trays).
 # Hostguard rules are left for the new process to Apply once (no Remove+Apply).
+# A running Protect proxy means Protect this computer is On. Stopping it for the upgrade
+# leaves the redirect rules in place for ~10 s; then the helper watchdog applies the fail
+# policy (default: rules removed, web works WITHOUT protection). Tell the user at the end.
+PROTECT_WAS_ON=""
+if command -v pgrep >/dev/null 2>&1 && pgrep -f '[d]enyout-cli[[:space:]]+hostctl[[:space:]]+proxyd' >/dev/null 2>&1; then
+  PROTECT_WAS_ON=1
+  echo "denyout install: Protect this computer is On; the upgrade stops its proxy for a moment" >&2
+fi
 if command -v pkill >/dev/null 2>&1; then
   pkill -x denyout 2>/dev/null || true
   pkill -f '[d]enyout-cli[[:space:]]+desktop' 2>/dev/null || true
@@ -418,6 +426,17 @@ fi
 echo "denyout install: done"
 echo ""
 
+# protect_hint: printed last (before the mode-specific tail) so it is not lost in the output.
+protect_hint() {
+  [ -n "$PROTECT_WAS_ON" ] || return 0
+  echo "" >&2
+  echo "denyout install: !! Protect this computer was On and the upgrade stopped it." >&2
+  echo "  Within about 10 seconds web traffic is no longer filtered (default fail policy: keep the internet working)." >&2
+  echo "  Turn Protect on again: open DenyOut (tray) and choose Protect computer," >&2
+  echo "  or, on a server, restart your proxy: denyout-cli hostctl proxyd ... (then hostctl apply)." >&2
+  echo "" >&2
+}
+
 # --- Install mode: auto-detect Desktop vs Server; flags/env force ---
 # Priority: --desktop/--server > DENYOUT_INSTALL_MODE > DENYOUT_NO_DESKTOP > prompt > auto-detect
 
@@ -526,6 +545,8 @@ fi
 CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 mkdir -p "${CONFIG_HOME}/denyout"
 echo "$MODE" >"${CONFIG_HOME}/denyout/install-mode"
+
+protect_hint
 
 if [ "$MODE" = "server" ]; then
   echo ""
