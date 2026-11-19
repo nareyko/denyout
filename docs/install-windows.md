@@ -17,7 +17,7 @@ Get-FileHash .\denyout-cli_*_windows_amd64.zip -Algorithm SHA256
 # Compare Digest to the matching line in SHA256SUMS
 ```
 
-Do **not** run `denyout.exe` if the hash does not match.
+Do **not** run `denyout-cli.exe` if the hash does not match.
 
 ## 3. Extract onto PATH
 

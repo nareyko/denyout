@@ -11,7 +11,13 @@ BIN="${DENYOUT_BIN:-denyout-cli}"
 BUDGET="${M4_BUDGET_SECS:-300}"
 START="${M4_START:-$(date +%s)}"
 CURL="${M4_CURL:-curl}"
-CURL_FLAGS="${M4_CURL_FLAGS:--sS -o /dev/null -m 30 -w %{http_code}}"
+# Default kept in its own single-quoted variable: inside ${VAR:-...} the "}" of
+# %{http_code} would end the expansion and append a stray "}" to the flags.
+DEFAULT_CURL_FLAGS='-sS -o /dev/null -m 30 -w %{http_code}'
+CURL_FLAGS="${M4_CURL_FLAGS:-$DEFAULT_CURL_FLAGS}"
+# M4_CACERT=1: pass the session CA to curl explicitly (--cacert). Needed on Windows,
+# where curl.exe (Schannel) ignores CURL_CA_BUNDLE.
+export M4_CACERT="${M4_CACERT:-}"
 CANARY_URL='https://evil.example/pixel.png?api_key=DENYOUT_CANARY_LAB'
 
 fail=0
@@ -22,6 +28,13 @@ row() { # name expected actual ok(0|1)
   [ "$4" -eq 0 ] || { mark="FAIL"; fail=1; }
   rows="${rows}| $1 | $2 | $3 | ${mark} |
 "
+}
+
+# run_curl URL: run curl under `denyout-cli run`. bash -c keeps $CURL_CA_BUNDLE
+# (set by run for the child) expandable inside the child.
+run_curl() {
+  # shellcheck disable=SC2086
+  "$BIN" run -- bash -c 'c=$1; shift; if [ -n "$M4_CACERT" ]; then set -- --cacert "$CURL_CA_BUNDLE" "$@"; fi; exec "$c" "$@"' _ "$CURL" $CURL_FLAGS "$1"
 }
 
 # 1. version
@@ -38,7 +51,7 @@ fi
 
 # 3. run + HTTPS to a model host must be allowed by DenyOut (upstream 401/404 is fine)
 # shellcheck disable=SC2086
-out=$("$BIN" run -- $CURL $CURL_FLAGS https://api.anthropic.com 2>&1); rc=$?
+out=$(run_curl https://api.anthropic.com 2>&1); rc=$?
 code=$(printf '%s' "$out" | grep -Eo '[0-9]{3}$' | tail -1)
 if [ $rc -eq 0 ] && [ -n "$code" ] && [ "$code" != "000" ] && [ "$code" != "403" ]; then
   row "run: HTTPS to api.anthropic.com" "allowed (HTTP ${code} from upstream)" "HTTP ${code}" 0
@@ -47,10 +60,11 @@ else
 fi
 
 # 4. run + HTTPS to a non-model host must be denied by DenyOut
-# shellcheck disable=SC2086
-out=$("$BIN" run -- $CURL $CURL_FLAGS https://example.com 2>&1); rc=$?
-if echo "$out" | grep -qiE 'DENY|403|Forbidden|CONNECT'; then
-  row "run: HTTPS to example.com" "denied" "denied" 0
+out=$(run_curl https://example.com 2>&1); rc=$?
+# Must be a DenyOut deny of this host AND a failed client; the startup banner also
+# contains the word "deny", so match the event line, not the bare word.
+if [ $rc -ne 0 ] && echo "$out" | grep -q 'DENY host=example.com'; then
+  row "run: HTTPS to example.com" "denied by DenyOut" "denied" 0
 else
   row "run: HTTPS to example.com" "denied" "exit ${rc}: ${out}" 1
 fi

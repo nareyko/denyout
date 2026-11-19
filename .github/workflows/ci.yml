@@ -113,6 +113,12 @@ jobs:
           ./internal/proxy/...
           ./internal/run/...
           ./internal/accept/...
+      - name: HTTPS-intercept e2e must run, not skip
+        shell: bash
+        run: |
+          go test -count=1 -v -run 'TestIntercept' ./internal/proxy/ | tee intercept.out
+          if grep -q -- '--- SKIP' intercept.out; then echo "intercept e2e was skipped"; exit 1; fi
+          grep -q -- '--- PASS: TestInterceptDeniesCanary' intercept.out
       - name: Compile remaining test binaries (no run)
         shell: bash
         run: |

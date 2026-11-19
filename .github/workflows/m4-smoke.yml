@@ -27,6 +27,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: m4-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   smoke:
     strategy:
@@ -52,20 +56,28 @@ jobs:
       - name: Install (Linux / macOS, public install.sh)
         if: runner.os != 'Windows'
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          [ -n "${DENYOUT_TAG:-}" ] && export DENYOUT_VERSION="$DENYOUT_TAG"
+          # Resolve the tag with the job token: unauthenticated api.github.com calls from
+          # shared runner IPs are rate-limited (403) and made install.sh retry for minutes.
+          tag="${DENYOUT_TAG:-}"
+          [ -n "$tag" ] || tag=$(gh api repos/nareyko/denyout/releases/latest -q .tag_name)
+          export DENYOUT_VERSION="$tag"
           curl -fsSL https://raw.githubusercontent.com/nareyko/denyout/main/install.sh | sh -s -- --server
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Install (Windows, release zip + SHA256SUMS)
         if: runner.os == 'Windows'
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
           $repo = 'nareyko/denyout'
           $tag = $env:DENYOUT_TAG
-          if (-not $tag) { $tag = (Invoke-RestMethod "https://api.github.com/repos/$repo/releases/latest").tag_name }
+          if (-not $tag) { $tag = (Invoke-RestMethod "https://api.github.com/repos/$repo/releases/latest" -Headers @{ Authorization = "Bearer $env:GH_TOKEN" }).tag_name }
           $ver = $tag.TrimStart('v')
           $zip = "denyout-cli_${ver}_windows_amd64.zip"
           $base = "https://github.com/$repo/releases/download/$tag"
@@ -85,7 +97,10 @@ jobs:
         shell: bash
         env:
           M4_LABEL: ${{ matrix.os }}
-          # Windows ships curl.exe (Schannel); it needs revocation checks off for a MITM leaf.
-          M4_CURL_FLAGS: ${{ runner.os == 'Windows' && '--ssl-no-revoke -sS -o /dev/null -m 30 -w %{http_code}' || '-sS -o /dev/null -m 30 -w %{http_code}' }}
+          # Windows curl.exe uses Schannel: it ignores CURL_CA_BUNDLE (SEC_E_UNTRUSTED_ROOT,
+          # seen in CI), so the session CA is passed with --cacert, and revocation checks
+          # are off because a session-CA leaf carries no revocation data.
+          M4_CACERT: ${{ runner.os == 'Windows' && '1' || '' }}
+          M4_CURL_FLAGS: ${{ runner.os == 'Windows' && '--ssl-no-revoke -sS -o NUL -m 30 -w %{http_code}' || '-sS -o /dev/null -m 30 -w %{http_code}' }}
           M4_CURL: ${{ runner.os == 'Windows' && 'curl.exe' || 'curl' }}
         run: bash scripts/m4-smoke.sh

@@ -37,15 +37,15 @@ Windows: download `denyout-cli_<version>_windows_amd64.zip` from [Releases](http
 
 ## Status
 
-**Protect computer (Safe desktop)** is the primary desktop path. **My agents** wraps AI/tools. Admin failure stays Off (no silent Session). Remaining for the Dec 1 bet: timed **M4** install on three OS (the `m4-smoke` workflow times it on hosted runners). See [Platform support](#platform-support).
+**Protect computer (Safe desktop)** is the primary desktop path. **My agents** wraps AI/tools. Admin failure stays Off (no silent Session). Remaining for the Dec 1 bet: timed **M4** install on three OS (the `m4-smoke` workflow measures it on hosted runners). See [Platform support](#platform-support).
 
 ## Platform support
 
 | OS | `denyout-cli run` (wrap one command) | Protect this computer |
 | --- | --- | --- |
 | Linux (Ubuntu) | Supported, timed | Supported |
-| macOS | Timed by `m4-smoke` CI; not yet verified by hand on a Mac | Preview: not verified on a real Mac |
-| Windows | Timed by `m4-smoke` CI; not yet verified by hand | Not available (WinDivert bridge not packaged) |
+| macOS | Not yet timed or verified (`m4-smoke` CI result pending) | Preview: not verified on a real Mac |
+| Windows | Not yet verified: system `curl.exe` does not trust the session CA unless given `--cacert` (see `docs/install-windows.md`) | Not available (WinDivert bridge not packaged) |
 
 Release binaries are not signed with Developer ID or Authenticode (cosign proves provenance only), so macOS and Windows may show a warning on first run. See [known issues](docs/known-issues.md).
 
