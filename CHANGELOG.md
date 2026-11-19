@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **GUI archive integrity.** `release-desktop` publishes a `.sha256` next to each GUI archive and `install.sh` verifies it; a mismatch skips the GUI and keeps the CLI install. Releases without `.sha256` keep the signature-only check.
+- **CI: wider M4 smoke.** `m4-smoke` also covers ubuntu-arm and macOS Intel, has a time-boxed macOS default (desktop) install job, and `release.yml` dispatches it for each tag.
+
 - **Fixed: a denied request on an intercepted HTTPS connection could hang the client.** The proxy answered 403 with `Connection: close` but left the connection open, so clients that wait for the end of the body sat until their own timeout. Every deny or error path now closes the connection.
 - **Fixed: large uploads through the proxy.** `curl` sends `Expect: 100-continue` for POST bodies over 1 MiB; the proxy never answered it and relayed the upstream's interim `100` as the final response, so such uploads hung (30 s, 0 bytes). The proxy now sends the interim `100` itself and skips upstream `1xx` responses. A denied large upload also ended in a connection reset (curl exit 56) instead of the 403; the proxy now reads up to 8 MiB of the unread body (3 s limit) before closing.
 - **Faster, quieter install.** `install.sh` no longer retries a missing optional asset (the GUI archive and signatures do not exist for every OS/arch; a missing GUI archive cost about 3 minutes of retries, also with `--server`), and it finds the latest release through the `github.com/.../releases/latest` redirect before the rate-limited API.
