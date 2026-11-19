@@ -1,0 +1,74 @@
+name: desktop-docker
+
+# Ubuntu desktop install + Protect On/Off, against a PUBLISHED release, in throw-away
+# containers (nothing touches the runner's network). Plan: denyout-hq
+# docs/qa/ubuntu-desktop-docker-test-plan.md (D1-D3, D5, D6, D7).
+#
+# Proves: installs, starts headless, enforces, cleans up. Does not prove: tray/window on a
+# real GNOME or Wayland desktop, the polkit prompt, suspend/resume. Those stay a manual run.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to test (empty = newest release, prereleases included)"
+        required: false
+        default: ""
+  pull_request:
+    paths:
+      - .github/workflows/desktop-docker.yml
+      - scripts/desktop-docker-test.sh
+      - scripts/desktop-protect-docker-test.sh
+      - scripts/docker/desktop-test.sh
+      - scripts/docker/protect-test.sh
+      - install.sh
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-docker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ubuntu:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Resolve tag
+        id: tag
+        run: |
+          tag="${{ github.event.inputs.tag }}"
+          [ -n "$tag" ] || tag=$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=1" -q '.[0].tag_name')
+          [ -n "$tag" ] || { echo "no release found" >&2; exit 1; }
+          # release.yml (CLI archives) and release-desktop.yml (GUI) run in parallel: wait for both.
+          ver="${tag#v}"
+          for i in $(seq 1 40); do
+            names=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag}" -q '.assets[].name' 2>/dev/null || true)
+            echo "$names" | grep -qx "denyout-cli_${ver}_linux_amd64.tar.gz" \
+              && echo "$names" | grep -qx "SHA256SUMS" \
+              && echo "$names" | grep -qx "denyout_${tag}_linux_amd64.tar.gz" && break
+            echo "waiting for release assets ($i/40)"; sleep 15
+          done
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "### desktop-docker: $tag" >> "$GITHUB_STEP_SUMMARY"
+      - name: Desktop install (D1, D1b, D2, D3, D7)
+        run: sh scripts/desktop-docker-test.sh "${{ steps.tag.outputs.tag }}" 2>&1 | tee desktop.log
+        shell: bash
+      - name: Protect On/Off (D5, D6)
+        run: sh scripts/desktop-protect-docker-test.sh "${{ steps.tag.outputs.tag }}" 2>&1 | tee protect.log
+        shell: bash
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '```'
+            grep -hE '^(FAIL|==.*(passed|failed)|desktop-docker-test)' desktop.log protect.log 2>/dev/null || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

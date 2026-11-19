@@ -15,6 +15,7 @@ on:
 permissions:
   contents: write
   id-token: write # keyless cosign signing (Sigstore OIDC)
+  actions: write # dispatch desktop-docker once the Linux GUI archive is attached
 
 jobs:
   desktop:
@@ -128,3 +129,11 @@ jobs:
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # The Linux leg has just attached denyout_<tag>_linux_amd64.tar.gz: test the desktop
+      # install and Protect On/Off against it. (workflow_dispatch is allowed with GITHUB_TOKEN.)
+      - name: Dispatch desktop-docker for this tag
+        if: steps.meta.outputs.tag != '' && matrix.goos == 'linux'
+        shell: bash
+        run: gh workflow run desktop-docker.yml --repo "$GITHUB_REPOSITORY" -f tag="${{ steps.meta.outputs.tag }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
