@@ -1,0 +1,86 @@
+name: m4-smoke
+
+# Times the public install path (M4: install -> version -> run + HTTPS, <= 5 min) on
+# hosted Linux, macOS and Windows runners. No checkout of the source: it installs the
+# published release exactly as a user would. Run it on demand for a tag, and it runs
+# on every published release.
+#
+# Limits: a hosted runner is not a clean personal machine. It does not exercise
+# Gatekeeper / SmartScreen or a browser download, and "Protect this computer" is not
+# touched (CLI wrap path only).
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to install (empty = latest)"
+        required: false
+        default: ""
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    env:
+      DENYOUT_TAG: ${{ github.event.inputs.tag || github.event.release.tag_name }}
+    steps:
+      # Only the smoke script is fetched from the repo; the product comes from the release.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/m4-smoke.sh
+          sparse-checkout-cone-mode: false
+
+      - name: Start clock
+        shell: bash
+        run: echo "M4_START=$(date +%s)" >> "$GITHUB_ENV"
+
+      - name: Install (Linux / macOS, public install.sh)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -n "${DENYOUT_TAG:-}" ] && export DENYOUT_VERSION="$DENYOUT_TAG"
+          curl -fsSL https://raw.githubusercontent.com/nareyko/denyout/main/install.sh | sh -s -- --server
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install (Windows, release zip + SHA256SUMS)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $repo = 'nareyko/denyout'
+          $tag = $env:DENYOUT_TAG
+          if (-not $tag) { $tag = (Invoke-RestMethod "https://api.github.com/repos/$repo/releases/latest").tag_name }
+          $ver = $tag.TrimStart('v')
+          $zip = "denyout-cli_${ver}_windows_amd64.zip"
+          $base = "https://github.com/$repo/releases/download/$tag"
+          $dir = Join-Path $env:RUNNER_TEMP 'dl'
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          Invoke-WebRequest "$base/$zip" -OutFile "$dir\$zip"
+          Invoke-WebRequest "$base/SHA256SUMS" -OutFile "$dir\SHA256SUMS"
+          $want = ((Get-Content "$dir\SHA256SUMS" | Where-Object { $_ -match [regex]::Escape($zip) + '$' }) -split '\s+')[0]
+          $got = (Get-FileHash "$dir\$zip" -Algorithm SHA256).Hash.ToLower()
+          if ($want -ne $got) { throw "SHA256 mismatch for ${zip}: want $want got $got" }
+          "### Windows archive`n$zip sha256 $got" | Out-File -Append $env:GITHUB_STEP_SUMMARY
+          $dest = Join-Path $env:LOCALAPPDATA 'DenyOut'
+          Expand-Archive "$dir\$zip" -DestinationPath $dest -Force
+          $dest | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+
+      - name: Smoke checks
+        shell: bash
+        env:
+          M4_LABEL: ${{ matrix.os }}
+          # Windows ships curl.exe (Schannel); it needs revocation checks off for a MITM leaf.
+          M4_CURL_FLAGS: ${{ runner.os == 'Windows' && '--ssl-no-revoke -sS -o /dev/null -m 30 -w %{http_code}' || '-sS -o /dev/null -m 30 -w %{http_code}' }}
+          M4_CURL: ${{ runner.os == 'Windows' && 'curl.exe' || 'curl' }}
+        run: bash scripts/m4-smoke.sh

@@ -77,5 +77,4 @@ Plan:
 5. Submit the signed installer to Microsoft for SmartScreen reputation if using OV.
 6. Update `docs/install-windows.md` and `install.sh` equivalents once signed artifacts exist.
 
-Until these are done, macOS users must right-click Open (or clear quarantine) and Windows users see a
-SmartScreen warning. Both are expected and documented in the install guides.
+Until these are done, macOS may block the app until it is allowed under System Settings -> Privacy & Security (or the quarantine flag is cleared; `install.sh` downloads do not set it) and Windows users see a SmartScreen warning. The Windows warning is documented in `docs/install-windows.md`.

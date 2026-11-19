@@ -4,7 +4,7 @@ Short honest list. Full discussion: [GitHub Issues](https://github.com/nareyko/d
 
 ## Current
 
-1. **Windows packaging** for the Dec 1 install bet is still the hard path (WinDivert bridge packaging). Linux/macOS install scripts are ahead.
+1. **macOS and Windows are behind Linux.** `denyout-cli run` is the supported path on both. **Protect this computer** is unavailable on Windows (the WinDivert bridge is not packaged) and is preview on macOS: the pf redirect has not been verified on a real Mac, and it appends rules to `/etc/pf.conf` that Protect Off does not remove. Release binaries are unsigned (no Developer ID, no Authenticode), so Gatekeeper or SmartScreen may warn on first run.
 2. **Optional account sync** uses an interim API. Cloud sessions are not a substitute for local Protect. Settings sync needs a signed-in account. Protect does not.
 3. **Threat list refresh** can lag offline. Protect keeps the last good cache and stays usable.
 4. **Agents only (whole PC)** can break messengers and many sites - intentional confirm in Settings, Advanced. Prefer My agents for tools.
