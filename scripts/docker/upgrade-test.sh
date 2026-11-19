@@ -21,7 +21,8 @@ canary='https://example.com/pixel.png?api_key=DENYOUT_CANARY_UPGRADE'
 CAFILE_TRUST=""   # apply installs the session CA into the system trust store
 
 echo "== install OLD $OLD_TAG and turn Protect On"
-install_rel "$OLD_TAG" | grep -E "checksum ok|error|FAIL" | head -3
+first=$(install_rel "$OLD_TAG"); echo "$first" | grep -E "checksum ok|error|FAIL" | head -3
+echo "$first" | grep -q "Protect this computer was On" && bad "first install printed the Protect-was-On hint (Protect was not on)" || ok "first install: no Protect hint"
 v=$($BIN version 2>&1); echo "$v" | grep -q "${OLD_TAG#v}" && ok "old version installed: $v" || { bad "old version" "$v"; exit 1; }
 start_helper; start_proxy
 $BIN hostctl apply --port $PORT --ca $CA/ca.crt --uid 1000 >/tmp/apply.txt 2>&1 && has_table && ok "old: Protect On (rules present)" || { bad "old: apply failed" "$(cat /tmp/apply.txt)"; exit 1; }
@@ -29,7 +30,9 @@ code=$(as_owner "curl -sS -m 20 $CAFILE_TRUST -o /dev/null -w '%{http_code}' htt
 [ "$code" = 200 ] && ok "old: HTTPS through the proxy works (200)" || bad "old: HTTPS via proxy: $code"
 
 echo "== upgrade: install.sh overwrites the binaries while the OLD helper and proxy still run (what a user does)"
-out=$(install_rel "$NEW_TAG"); echo "$out" | grep -q "checksum ok" && ok "installer finished over a running install" || bad "upgrade install" "$out"
+out=$(install_rel "$NEW_TAG"); echo "$out" | grep -q "checksum ok" && ok "installer finished over a running install"
+echo "$out" | grep -q "Protect this computer was On and the upgrade stopped it" && ok "upgrade told the user Protect was stopped" || bad "no Protect hint on upgrade" "$(echo "$out" | tail -8)"
+echo "$out" | grep -q "Turn Protect on again" && ok "hint says how to turn Protect on again" || bad "hint has no remedy" || bad "upgrade install" "$out"
 v=$($BIN version 2>&1); echo "$v" | grep -q "${NEW_TAG#v}" && ok "binary is now: $v" || bad "binary not upgraded" "$v"
 has_table && ok "rules still present after the binary swap (no teardown on upgrade)" || bad "rules vanished on upgrade"
 # install.sh stops the running proxyd on purpose (install.sh: pkill ... hostctl proxyd) so the
