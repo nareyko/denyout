@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write
   id-token: write # keyless cosign signing (Sigstore OIDC)
+  actions: write # dispatch m4-smoke after publishing (events from GITHUB_TOKEN do not trigger `release: published`)
 
 jobs:
   goreleaser:
@@ -28,3 +29,9 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # A release published with GITHUB_TOKEN does not fire m4-smoke's `release` trigger,
+      # but an explicit workflow_dispatch is allowed. Evidence for M4 on every tag.
+      - name: Dispatch m4-smoke for this tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run m4-smoke.yml --repo "$GITHUB_REPOSITORY" -f tag="$GITHUB_REF_NAME"

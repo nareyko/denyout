@@ -36,7 +36,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-15, windows-latest]
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, macos-15-intel, windows-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     env:
@@ -114,3 +114,43 @@ jobs:
         run: |
           denyout-cli run -- cmd /c "curl.exe --ssl-no-revoke --cacert %CURL_CA_BUNDLE% -sS -o NUL https://api.anthropic.com"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+  # What a Mac user gets from the documented one-liner: no --server, so install.sh
+  # auto-detects Desktop and also installs the GUI archive and runs `desktop --install`.
+  # The headless runner may not support the GUI; this job checks the installer finishes in
+  # time and leaves a working CLI. It is the only coverage of that path before a manual run.
+  macos-default-install:
+    runs-on: macos-15
+    timeout-minutes: 8
+    env:
+      DENYOUT_TAG: ${{ github.event.inputs.tag || github.event.release.tag_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/m4-smoke.sh
+          sparse-checkout-cone-mode: false
+      - name: Install with default mode (time-boxed 120 s)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          tag="${DENYOUT_TAG:-}"
+          [ -n "$tag" ] || tag=$(gh api repos/nareyko/denyout/releases/latest -q .tag_name)
+          export DENYOUT_VERSION="$tag" DENYOUT_INSTALL_MODE=desktop
+          start=$(date +%s)
+          curl -fsSL https://raw.githubusercontent.com/nareyko/denyout/main/install.sh -o install.sh
+          # No `timeout` on macOS runners: bound it with a background watchdog.
+          sh install.sh </dev/null &
+          pid=$!
+          ( sleep 120; kill "$pid" 2>/dev/null ) & wd=$!
+          wait "$pid"; rc=$?
+          kill "$wd" 2>/dev/null || true
+          el=$(( $(date +%s) - start ))
+          echo "### macOS default (desktop) install
+          tag $tag, exit $rc, ${el}s" >> "$GITHUB_STEP_SUMMARY"
+          echo "installer exit=$rc after ${el}s"
+          # The CLI must be usable whatever happened to the GUI step.
+          "$HOME/.local/bin/denyout-cli" version
+          [ "$el" -le 120 ]

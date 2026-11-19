@@ -29,6 +29,17 @@ printf "#!/bin/sh\necho gui\n" > denyout; chmod +x denyout; tar -czf /rel/denyou
 rm -f /h/bin/denyout
 out=$(run DENYOUT_VERIFY_SIG=auto)
 echo "$out" | grep -q "denyout_v0.0.1_linux_$a.tar.gz signature not verified" && [ -e /h/bin/denyout ] && echo "PASS GUI auto note"
+echo "== GUI .sha256 present and correct: installed, checksum ok"
+(cd /rel && sha256sum denyout_v0.0.1_linux_$a.tar.gz > denyout_v0.0.1_linux_$a.tar.gz.sha256)
+rm -f /h/bin/denyout
+out=$(run DENYOUT_VERIFY_SIG=skip)
+echo "$out" | grep -q "GUI checksum ok" && [ -e /h/bin/denyout ] && echo "PASS GUI checksum ok"
+echo "== GUI tampered (.sha256 does not match): must NOT be installed"
+rm -f /h/bin/denyout; cp /rel/denyout_v0.0.1_linux_$a.tar.gz /w/gui.bak
+echo evil >> /rel/denyout_v0.0.1_linux_$a.tar.gz
+out=$(run DENYOUT_VERIFY_SIG=skip)
+echo "$out" | grep -q "SHA256 mismatch for denyout_v0.0.1" && [ ! -e /h/bin/denyout ] && echo "$out" | grep -q "checksum ok" && echo "PASS tampered GUI rejected, CLI still installed" || { echo "FAIL tampered GUI: $out"; exit 1; }
+cp /w/gui.bak /rel/denyout_v0.0.1_linux_$a.tar.gz; rm -f /rel/denyout_v0.0.1_linux_$a.tar.gz.sha256
 echo "== tampered archive: checksum mismatch"
 echo evil >> /rel/denyout-cli_0.0.1_linux_$a.tar.gz
 run DENYOUT_VERIFY_SIG=skip | grep -q "SHA256 mismatch" && echo "PASS tamper detected"
