@@ -53,7 +53,7 @@ Expect the canary `check` to **deny**. Model host may return 401/404 from upstre
 
 `run` wraps one command: the child gets the proxy and the session CA through environment variables (`CURL_CA_BUNDLE`, `SSL_CERT_FILE`, `NODE_EXTRA_CA_CERTS`, ...). Programs that read those variables (Node, Python `requests`, Git) trust the session CA by themselves.
 
-Windows `curl.exe` uses the system TLS stack (Schannel), which **ignores** `CURL_CA_BUNDLE`; without help it fails with `SEC_E_UNTRUSTED_ROOT`. That is why the command above passes `--cacert %CURL_CA_BUNDLE%` explicitly (`cmd /c` expands the variable inside the wrapped process) and `--ssl-no-revoke` (a session-CA certificate carries no revocation data). The same applies to other clients that use the Windows certificate store, such as PowerShell `Invoke-WebRequest`. DenyOut does not install its CA into the system store.
+Windows `curl.exe` uses the system TLS stack (Schannel), which **ignores** `CURL_CA_BUNDLE`; without help it fails with `SEC_E_UNTRUSTED_ROOT`. That is why the command above passes `--cacert %CURL_CA_BUNDLE%` explicitly (`cmd /c` expands the variable inside the wrapped process; run this from PowerShell, because in `cmd.exe` the variable is expanded before DenyOut sets it) and `--ssl-no-revoke` (a session-CA certificate carries no revocation data). The same applies to other clients that use the Windows certificate store, such as PowerShell `Invoke-WebRequest`. DenyOut does not install its CA into the system store.
 
 ### What is not available on Windows yet
 

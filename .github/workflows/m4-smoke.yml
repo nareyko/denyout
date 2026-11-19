@@ -105,8 +105,12 @@ jobs:
           M4_CURL: ${{ runner.os == 'Windows' && 'curl.exe' || 'curl' }}
         run: bash scripts/m4-smoke.sh
 
-      - name: Windows documented command (cmd, no bash)
+      - name: Windows documented command (PowerShell, no bash)
         if: runner.os == 'Windows'
-        shell: cmd
-        # Exactly the command docs/install-windows.md gives, so the doc stays true.
-        run: denyout-cli run -- cmd /c "curl.exe --ssl-no-revoke --cacert %CURL_CA_BUNDLE% -sS -o NUL https://api.anthropic.com"
+        shell: pwsh
+        # Exactly the command docs/install-windows.md gives (those docs are PowerShell). In
+        # cmd.exe the outer shell would expand %CURL_CA_BUNDLE% before denyout sets it
+        # (seen in CI: --cacert got an empty value), so the doc says to use PowerShell.
+        run: |
+          denyout-cli run -- cmd /c "curl.exe --ssl-no-revoke --cacert %CURL_CA_BUNDLE% -sS -o NUL https://api.anthropic.com"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
