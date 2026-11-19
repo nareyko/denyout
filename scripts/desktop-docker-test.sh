@@ -4,12 +4,12 @@
 # throw-away containers. Needs Docker and outbound internet (installs a real release).
 #
 #   sh scripts/desktop-docker-test.sh [tag]        # default: latest prerelease-or-release tag
-#   DENYOUT_DOCKER_IMAGE=ubuntu:24.04 sh scripts/desktop-docker-test.sh v0.4.14-rc2
+#   DESKTOP_TEST_IMAGE=ubuntu:24.04 sh scripts/desktop-docker-test.sh v0.4.14-rc2
 #
 # Plan: denyout-hq docs/qa/ubuntu-desktop-docker-test-plan.md (D1, D1b, D2, D3, D7).
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
-IMAGE="${DENYOUT_DOCKER_IMAGE:-ubuntu:24.04}"
+IMAGE="${DESKTOP_TEST_IMAGE:-ubuntu:24.04}"
 TAG="${1:-${DENYOUT_VERSION:-}}"
 [ -n "$TAG" ] || { echo "usage: $0 <tag, e.g. v0.4.14-rc2>" >&2; exit 2; }
 FAIL=0
