@@ -329,7 +329,25 @@ verify_gui_archive() {
   return 0
 }
 
-if curl_fetch "${TMP}/${GUI_ARCHIVE}" "${ASSET_BASE}/${GUI_ARCHIVE}" optional && ! verify_gui_archive; then
+# verify_gui_checksum: the release publishes <archive>.sha256 next to each GUI archive
+# (release-desktop.yml). Older releases have none: then only the signature check applies.
+# A mismatch always blocks the GUI, whatever DENYOUT_VERIFY_SIG says.
+verify_gui_checksum() {
+  if ! curl_fetch "${TMP}/${GUI_ARCHIVE}.sha256" "${ASSET_BASE}/${GUI_ARCHIVE}.sha256" optional; then
+    echo "denyout install: note: no ${GUI_ARCHIVE}.sha256 published (older release); GUI checksum not verified" >&2
+    return 0
+  fi
+  want=$(awk '{print $1; exit}' "${TMP}/${GUI_ARCHIVE}.sha256")
+  got=$(sha256_file "${TMP}/${GUI_ARCHIVE}")
+  if [ -z "$want" ] || [ "$want" != "$got" ]; then
+    echo "denyout install: SHA256 mismatch for ${GUI_ARCHIVE} - GUI not installed" >&2
+    return 1
+  fi
+  echo "denyout install: GUI checksum ok"
+  return 0
+}
+
+if curl_fetch "${TMP}/${GUI_ARCHIVE}" "${ASSET_BASE}/${GUI_ARCHIVE}" optional && ! { verify_gui_checksum && verify_gui_archive; }; then
   echo "denyout install: note - skipping GUI (CLI tray still available)" >&2
 elif [ -f "${TMP}/${GUI_ARCHIVE}" ]; then
   tar -xzf "${TMP}/${GUI_ARCHIVE}" -C "$TMP"
@@ -348,7 +366,7 @@ elif [ -f "${TMP}/${GUI_ARCHIVE}" ]; then
     echo "denyout install: note - ${GUI_ARCHIVE} has no denyout binary (CLI tray still available)" >&2
   fi
 else
-  echo "denyout install: note - denyout GUI still unreachable after ${FETCH_RETRIES} tries (CLI tray still available)" >&2
+  echo "denyout install: note - no GUI archive for ${os}/${arch} in this release (CLI tray still available)" >&2
 fi
 
 # Warn about other denyout binaries on PATH (do not delete system copies).

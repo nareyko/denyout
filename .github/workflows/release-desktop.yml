@@ -96,6 +96,13 @@ jobs:
             -o "$BIN" ./cmd/denyout
           mkdir -p dist
           tar -czf "dist/${ARCHIVE}" "$BIN"
+          # Per-archive checksum (one file per matrix leg: no shared SHA256SUMS to race on).
+          # install.sh verifies it before installing the GUI.
+          if command -v sha256sum >/dev/null 2>&1; then
+            (cd dist && sha256sum "${ARCHIVE}" > "${ARCHIVE}.sha256")
+          else
+            (cd dist && shasum -a 256 "${ARCHIVE}" > "${ARCHIVE}.sha256")
+          fi
         shell: bash
       - name: Install cosign
         if: steps.meta.outputs.tag != ''
