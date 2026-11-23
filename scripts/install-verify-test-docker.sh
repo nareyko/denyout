@@ -13,11 +13,11 @@ tar -czf /rel/denyout-cli_0.0.1_linux_$a.tar.gz denyout-cli
 run() { env HOME=/h DENYOUT_INSTALL_DIR=/h/bin DENYOUT_INSTALL_MODE=server DENYOUT_VERSION=v0.0.1 DENYOUT_BASE_URL=file:///rel DENYOUT_FETCH_RETRIES=1 "$@" sh /install.sh 2>&1; }
 mkdir -p /h
 echo "== auto, no cosign: installs with an honest note"
-run DENYOUT_VERIFY_SIG=auto | grep -E "signature not verified|checksum ok"
+run DENYOUT_VERIFY_SIG=auto | grep -E "signature not verified|checksum ok" || { echo "FAIL auto note"; exit 1; }
 echo "== require, no signature: must fail"
 if run DENYOUT_VERIFY_SIG=require | grep -q "signature required"; then echo "PASS require fails"; else echo "FAIL require"; exit 1; fi
 echo "== bad mode rejected"
-run DENYOUT_VERIFY_SIG=bogus | grep -q "must be auto|require|skip" && echo "PASS bad mode"
+run DENYOUT_VERIFY_SIG=bogus | grep -q "must be auto|require|skip" && echo "PASS bad mode" || { echo "FAIL bad mode"; exit 1; }
 echo "== missing GUI archive must not be retried (it is optional): fast, quiet, installs the CLI"
 rm -f /rel/denyout_v0.0.1_linux_$a.tar.gz /h/bin/denyout
 t0=$(date +%s)
@@ -28,12 +28,12 @@ echo "== GUI archive: auto without cosign installs with a note (require already 
 printf "#!/bin/sh\necho gui\n" > denyout; chmod +x denyout; tar -czf /rel/denyout_v0.0.1_linux_$a.tar.gz denyout
 rm -f /h/bin/denyout
 out=$(run DENYOUT_VERIFY_SIG=auto)
-echo "$out" | grep -q "denyout_v0.0.1_linux_$a.tar.gz signature not verified" && [ -e /h/bin/denyout ] && echo "PASS GUI auto note"
+echo "$out" | grep -q "denyout_v0.0.1_linux_$a.tar.gz signature not verified" && [ -e /h/bin/denyout ] && echo "PASS GUI auto note" || { echo "FAIL GUI auto note: $out"; exit 1; }
 echo "== GUI .sha256 present and correct: installed, checksum ok"
 (cd /rel && sha256sum denyout_v0.0.1_linux_$a.tar.gz > denyout_v0.0.1_linux_$a.tar.gz.sha256)
 rm -f /h/bin/denyout
 out=$(run DENYOUT_VERIFY_SIG=skip)
-echo "$out" | grep -q "GUI checksum ok" && [ -e /h/bin/denyout ] && echo "PASS GUI checksum ok"
+echo "$out" | grep -q "GUI checksum ok" && [ -e /h/bin/denyout ] && echo "PASS GUI checksum ok" || { echo "FAIL GUI checksum: $out"; exit 1; }
 echo "== GUI tampered (.sha256 does not match): must NOT be installed"
 rm -f /h/bin/denyout; cp /rel/denyout_v0.0.1_linux_$a.tar.gz /w/gui.bak
 echo evil >> /rel/denyout_v0.0.1_linux_$a.tar.gz
@@ -42,10 +42,10 @@ echo "$out" | grep -q "SHA256 mismatch for denyout_v0.0.1" && [ ! -e /h/bin/deny
 cp /w/gui.bak /rel/denyout_v0.0.1_linux_$a.tar.gz; rm -f /rel/denyout_v0.0.1_linux_$a.tar.gz.sha256
 echo "== tampered archive: checksum mismatch"
 echo evil >> /rel/denyout-cli_0.0.1_linux_$a.tar.gz
-run DENYOUT_VERIFY_SIG=skip | grep -q "SHA256 mismatch" && echo "PASS tamper detected"
+run DENYOUT_VERIFY_SIG=skip | grep -q "SHA256 mismatch" && echo "PASS tamper detected" || { echo "FAIL tamper"; exit 1; }
 echo "== http BASE_URL rejected"
-env HOME=/h DENYOUT_VERSION=v0.0.1 DENYOUT_BASE_URL=http://evil.example sh /install.sh 2>&1 | grep -q "must be https" && echo "PASS http base rejected"
+env HOME=/h DENYOUT_VERSION=v0.0.1 DENYOUT_BASE_URL=http://evil.example sh /install.sh 2>&1 | grep -q "must be https" && echo "PASS http base rejected" || { echo "FAIL http base"; exit 1; }
 echo "== path-injection tag rejected"
-env HOME=/h DENYOUT_VERSION="../x" sh /install.sh 2>&1 | grep -q "invalid version" && echo "PASS bad tag rejected"
+env HOME=/h DENYOUT_VERSION="../x" sh /install.sh 2>&1 | grep -q "invalid version" && echo "PASS bad tag rejected" || { echo "FAIL bad tag"; exit 1; }
 echo install-verify-test: OK
-' 2>&1 | grep -v "^debconf"
+' 2>&1

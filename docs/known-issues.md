@@ -16,6 +16,8 @@ Short honest list. Full discussion: [GitHub Issues](https://github.com/nareyko/d
 
 10. **Residual (see [security review](security-review-2026-11.md)):** no IPv6 inside the TUN data plane itself (IPv6 stays on the nft redirect path), DNS and non-80/443 TCP are not covered, Sigstore signature verification in `install.sh` needs `cosign` installed, `srt` sandbox does not restrict file reads by default.
 
+11. **WebSocket and other `Upgrade` requests through MITM** are answered 501 (the proxy does not tunnel upgraded connections). Plain HTTPS works; tools that need a WebSocket on a non-passthrough host will fail under `run` or Protect. Add the host to TLS passthrough if you need it.
+
 ## Reporting
 
 Prefer GitHub Issues with OS, DenyOut version (`denyout version` or `denyout-cli version`), and whether Protect or wrap was on. Do not paste real secrets or full audit URLs.

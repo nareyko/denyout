@@ -1,6 +1,7 @@
 package proxy_test
 
 import (
+	"bufio"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -65,6 +66,12 @@ func privateIPv4(t *testing.T) string {
 // TLS upstream. policyFmt is a policy with one %s for the upstream IP.
 func startIntercept(t *testing.T, policyFmt string) (client *http.Client, upstreamURL string, hits *atomic.Int64, auditPath string) {
 	t.Helper()
+	return startInterceptH(t, policyFmt, nil)
+}
+
+// startInterceptH is startIntercept with a custom upstream handler (nil = "upstream-ok").
+func startInterceptH(t *testing.T, policyFmt string, handler http.HandlerFunc) (client *http.Client, upstreamURL string, hits *atomic.Int64, auditPath string) {
+	t.Helper()
 	ip := privateIPv4(t)
 	cfg, err := policy.LoadBytes([]byte(fmt.Sprintf(policyFmt, ip)))
 	if err != nil {
@@ -76,9 +83,12 @@ func startIntercept(t *testing.T, policyFmt string) (client *http.Client, upstre
 	if err != nil {
 		t.Skipf("cannot listen on %s: %v", ip, err)
 	}
+	if handler == nil {
+		handler = func(w http.ResponseWriter, r *http.Request) { _, _ = io.WriteString(w, "upstream-ok") }
+	}
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hits.Add(1)
-		_, _ = io.WriteString(w, "upstream-ok")
+		handler(w, r)
 	}))
 	upstream.Listener = ln
 	upstream.StartTLS()
@@ -291,5 +301,182 @@ func TestInterceptDenyLargeUploadIsNotReset(t *testing.T) {
 	}
 	if hits.Load() != 0 {
 		t.Fatalf("canary upload reached upstream (%d hits)", hits.Load())
+	}
+}
+
+// An upstream response with neither Content-Length nor chunking ends only when the
+// connection closes (HTTP/1.0 style). The proxy must close the client connection after
+// relaying it, or the client waits for an EOF that never comes.
+func TestInterceptEOFDelimitedResponseEndsTheBody(t *testing.T) {
+	client, base, _, _ := startInterceptH(t, interceptPolicy, func(w http.ResponseWriter, r *http.Request) {
+		c, _, err := w.(http.Hijacker).Hijack()
+		if err != nil {
+			return
+		}
+		_, _ = io.WriteString(c, "HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nraw-body")
+		_ = c.Close()
+	})
+	client.Timeout = 4 * time.Second
+
+	began := time.Now()
+	resp, err := client.Get(base + "/eof")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	body, rerr := io.ReadAll(resp.Body)
+	if rerr != nil || string(body) != "raw-body" {
+		t.Fatalf("body=%q err=%v after %s: the proxy kept the connection open after an EOF-delimited response", body, rerr, time.Since(began))
+	}
+	if took := time.Since(began); took > 2*time.Second {
+		t.Fatalf("took %s to see the end of an EOF-delimited body", took)
+	}
+}
+
+// A client that sends headers and then stops (or a silent upstream) must not hold the
+// connection and its goroutines forever.
+func TestInterceptStalledRequestBodyIsDropped(t *testing.T) {
+	defer proxy.SetIdleForTest(5*time.Second, 400*time.Millisecond, 5*time.Second)()
+	client, base, _, _ := startInterceptH(t, interceptPolicy, nil)
+	tr := client.Transport.(*http.Transport)
+
+	// Raw request: Content-Length promises 1000 bytes, none follow.
+	u, _ := url.Parse(base)
+	proxyURL, _ := tr.Proxy(nil)
+	pc, err := net.Dial("tcp", proxyURL.Host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pc.Close()
+	_, _ = fmt.Fprintf(pc, "CONNECT %s HTTP/1.1\r\nHost: %s\r\n\r\n", u.Host, u.Host)
+	br := bufio.NewReader(pc)
+	line, _ := br.ReadString('\n')
+	if !strings.Contains(line, "200") {
+		t.Fatalf("CONNECT: %q", line)
+	}
+	for {
+		l, _ := br.ReadString('\n')
+		if l == "\r\n" || l == "" {
+			break
+		}
+	}
+	tcfg := tr.TLSClientConfig.Clone()
+	tcfg.ServerName = ""
+	tcfg.InsecureSkipVerify = true // the leaf is for the IP; trust is checked by the other tests
+	tc := tls.Client(pc, tcfg)
+	if err := tc.Handshake(); err != nil {
+		t.Fatalf("handshake: %v", err)
+	}
+	_, _ = fmt.Fprintf(tc, "POST /stall HTTP/1.1\r\nHost: %s\r\nContent-Length: 1000\r\n\r\n", u.Host)
+
+	began := time.Now()
+	buf := make([]byte, 1)
+	_, rerr := tc.Read(buf)
+	if rerr == nil {
+		t.Fatalf("expected the proxy to drop the stalled connection, got data")
+	}
+	if took := time.Since(began); took > 4*time.Second {
+		t.Fatalf("stalled body held the connection for %s (idle limit was 400ms + 2s early-answer window)", took)
+	}
+}
+
+type countingReader struct {
+	n    int64
+	max  int64
+	sent *atomic.Int64
+}
+
+func (c *countingReader) Read(p []byte) (int, error) {
+	if c.n >= c.max {
+		return 0, io.EOF
+	}
+	k := int64(len(p))
+	if c.max-c.n < k {
+		k = c.max - c.n
+	}
+	for i := int64(0); i < k; i++ {
+		p[i] = 'x'
+	}
+	c.n += k
+	c.sent.Store(c.n)
+	return int(k), nil
+}
+
+// When the upstream answers before the upload ends (401/413), the proxy may only consume a
+// bounded amount of the rest. With a non-scannable content type it used to pull the whole body
+// through (Request.Write closes a server-side body by draining it).
+func TestInterceptEarlyAnswerDoesNotPullWholeUpload(t *testing.T) {
+	client, base, _, _ := startInterceptH(t, interceptPolicy, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized) // answers without reading the body
+	})
+	client.Timeout = 20 * time.Second
+	const total = 64 << 20
+	var sent atomic.Int64
+	body := &countingReader{max: total, sent: &sent}
+	req, _ := http.NewRequest(http.MethodPost, base+"/video", body)
+	req.ContentLength = total
+	req.Header.Set("Content-Type", "video/mp4")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		// A transport error is acceptable only if the client was cut off well before the end.
+		if sent.Load() >= total {
+			t.Fatalf("whole upload (%d MiB) was consumed before the early answer was relayed: %v", total>>20, err)
+		}
+		return
+	}
+	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, resp.Body)
+	time.Sleep(300 * time.Millisecond)
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("status=%d, want the upstream's 401", resp.StatusCode)
+	}
+	if got := sent.Load(); got >= total {
+		t.Fatalf("proxy consumed the whole %d MiB upload after an early answer (drain bound is %d MiB)", total>>20, 8)
+	}
+}
+
+// WebSocket upgrades are not relayed after interception; the client must get a clear 501
+// instead of a 101 followed by a dead connection.
+func TestInterceptWebSocketUpgradeIsRefused(t *testing.T) {
+	client, base, hits, _ := startInterceptH(t, interceptPolicy, nil)
+	req, _ := http.NewRequest(http.MethodGet, base+"/ws", nil)
+	req.Header.Set("Connection", "Upgrade")
+	req.Header.Set("Upgrade", "websocket")
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("upgrade request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, resp.Body)
+	if resp.StatusCode != http.StatusNotImplemented {
+		t.Fatalf("status=%d, want 501", resp.StatusCode)
+	}
+	if hits.Load() != 0 {
+		t.Fatalf("upgrade request reached the upstream (%d)", hits.Load())
+	}
+}
+
+func TestHostHeaderMatches(t *testing.T) {
+	cases := []struct {
+		hdr, host string
+		want      bool
+	}{
+		{"example.com", "example.com", true},
+		{"EXAMPLE.com:443", "example.com", true},
+		{"example.com.", "example.com", true},
+		{"example.com", "example.com.", true},
+		{"", "example.com", true},
+		{"[::1]", "::1", true},
+		{"[::1]:8443", "::1", true},
+		{"::1", "::1", true},
+		{"evil.example", "example.com", false},
+		{"example.com.evil.example", "example.com", false},
+		{"example.com@evil.example", "example.com", false},
+	}
+	for _, c := range cases {
+		if got := proxy.HostHeaderMatchesForTest(c.hdr, c.host); got != c.want {
+			t.Errorf("hostHeaderMatches(%q,%q)=%v want %v", c.hdr, c.host, got, c.want)
+		}
 	}
 }
