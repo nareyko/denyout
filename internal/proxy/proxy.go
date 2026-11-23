@@ -220,56 +220,63 @@ func (s *Server) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 		s.logDecision(rv, d, start)
 		return
 	}
-	s.serveIntercept(clientConn, rv, host, portN, ips, start)
+	s.serveIntercept(clientConn, rv, host, portN, func() []net.IP { return ips }, start)
 }
 
-// serveIntercept terminates the client's TLS with a per-host leaf and serves
-// its requests through roundTripIntercept until the client or server closes.
-func (s *Server) serveIntercept(clientConn net.Conn, rv policy.RequestView, host string, portN int, ips []net.IP, start time.Time) {
+// serveIntercept terminates the client's TLS with a per-host leaf and serves its requests
+// through roundTripIntercept until the client or server closes. It is shared by the CONNECT
+// path and the transparent (nft redirect) path. ipsFn resolves the destination IPs; the
+// transparent path calls it after the handshake so a slow resolver cannot delay ServerHello.
+func (s *Server) serveIntercept(conn net.Conn, rv policy.RequestView, host string, portN int, ipsFn func() []net.IP, start time.Time) {
 	if s.cfg.CA == nil {
-		_ = clientConn.Close()
+		_ = conn.Close()
 		return
 	}
 	leaf, err := s.cfg.CA.Leaf(host)
 	if err != nil {
 		s.logMitmError(rv, "mitm_leaf_error", start)
-		_ = clientConn.Close()
+		_ = conn.Close()
 		return
 	}
-	tlsClient := tls.Server(clientConn, &tls.Config{
+	ic := newIdleConn(conn, clientRequestIdle)
+	tlsClient := tls.Server(ic, &tls.Config{
 		Certificates: []tls.Certificate{leaf},
 		MinVersion:   tls.VersionTLS12,
 	})
-	_ = clientConn.SetDeadline(time.Now().Add(15 * time.Second)) // slowloris: bound the handshake
+	_ = ic.SetDeadline(time.Now().Add(15 * time.Second)) // slowloris: bound the handshake
 	if err := tlsClient.Handshake(); err != nil {
 		s.logMitmError(rv, "mitm_handshake_failed", start)
 		_ = tlsClient.Close()
 		return
 	}
-	_ = clientConn.SetDeadline(time.Time{})
+	_ = ic.SetDeadline(time.Time{})
 	defer tlsClient.Close()
 
+	ips := ipsFn()
 	br := bufio.NewReader(tlsClient)
 	if peek, perr := br.Peek(24); perr == nil && isHTTP2ClientPreface(peek) {
+		// HTTP/2 after interception is not supported (clients that speak only h2).
 		s.logMitmError(rv, "mitm_http2_unsupported", start)
 		return
 	}
 	for {
-		// Idle/slow-header protection per request; cleared once the request line+headers arrived.
-		_ = clientConn.SetReadDeadline(time.Now().Add(5 * time.Minute))
+		// Waiting for the next request: long idle allowed. Once it started, the client has to
+		// keep moving (headers, then body) or the connection is dropped.
+		ic.SetIdle(clientRequestIdle)
 		req, err := http.ReadRequest(br)
 		if err != nil {
 			return
 		}
-		_ = clientConn.SetReadDeadline(time.Time{})
+		ic.SetIdle(clientBodyIdle)
 		if !hostHeaderMatches(req.Host, host) {
 			// Domain fronting: policy was evaluated for the CONNECT/SNI host, so a
 			// different Host header would reach a host that was never checked.
 			_ = misdirectedResponse().Write(tlsClient)
+			drainRequestBody(ic, req)
 			return
 		}
 		if !s.roundTripIntercept(tlsClient, req, host, portN, ips, start) || req.Close {
-			drainRequestBody(clientConn, req)
+			drainRequestBody(ic, req)
 			return
 		}
 	}
@@ -326,16 +333,14 @@ func (s *Server) roundTripIntercept(client io.ReadWriteCloser, req *http.Request
 	d := s.cfg.Engine.Evaluate(rv)
 	s.logDecision(rv, d, start)
 	if d.Verdict == "deny" {
-		resp := &http.Response{
-			StatusCode: http.StatusForbidden,
-			ProtoMajor: 1,
-			ProtoMinor: 1,
-			Header:     make(http.Header),
-			Body:       io.NopCloser(strings.NewReader(redactDenyMsg(d) + "\n")),
-		}
-		resp.Header.Set("Content-Type", "text/plain; charset=utf-8")
-		resp.Header.Set("Connection", "close")
-		_ = resp.Write(client)
+		writeSimple(client, http.StatusForbidden, redactDenyMsg(d)+"\n")
+		return false
+	}
+	// WebSocket (and other Upgrade) after interception is not relayed: say so instead of
+	// answering 101 and then parsing frames as HTTP (a silently dead connection).
+	if strings.EqualFold(strings.TrimSpace(req.Header.Get("Upgrade")), "websocket") {
+		s.logMitmError(rv, "mitm_upgrade_unsupported", start)
+		writeSimple(client, http.StatusNotImplemented, "WebSocket through TLS interception is not supported\n")
 		return false
 	}
 
@@ -348,45 +353,38 @@ func (s *Server) roundTripIntercept(client io.ReadWriteCloser, req *http.Request
 		deny := policy.Decision{Verdict: "deny", Reasons: []string{reason}}
 		rv.DestIPs = ips
 		s.logDecision(rv, deny, start)
-		resp := &http.Response{
-			StatusCode: http.StatusForbidden,
-			ProtoMajor: 1,
-			ProtoMinor: 1,
-			Header:     make(http.Header),
-			Body:       io.NopCloser(strings.NewReader(redactDenyMsg(deny) + "\n")),
-		}
-		_ = resp.Write(client)
+		writeSimple(client, http.StatusForbidden, redactDenyMsg(deny)+"\n")
 		return false
 	}
 	addr := net.JoinHostPort(ip.String(), fmt.Sprintf("%d", port))
 	raw, err := s.dialTCP(addr, 15*time.Second)
 	if err != nil {
-		resp := &http.Response{
-			StatusCode: http.StatusBadGateway,
-			ProtoMajor: 1,
-			ProtoMinor: 1,
-			Header:     make(http.Header),
-			Body:       io.NopCloser(strings.NewReader("upstream dial failed\n")),
-		}
-		_ = resp.Write(client)
+		writeSimple(client, http.StatusBadGateway, "upstream dial failed\n")
 		return false
 	}
-	up := tls.Client(raw, &tls.Config{
+	rawIdle := newIdleConn(raw, upstreamIdle)
+	up := tls.Client(rawIdle, &tls.Config{
 		ServerName:         host,
 		MinVersion:         tls.VersionTLS12,
 		InsecureSkipVerify: s.cfg.InsecureSkipVerify,
 	})
-	_ = raw.SetDeadline(time.Now().Add(15 * time.Second))
+	_ = rawIdle.SetDeadline(time.Now().Add(15 * time.Second))
 	if err := up.Handshake(); err != nil {
 		_ = raw.Close()
 		return false
 	}
-	_ = raw.SetDeadline(time.Time{})
+	_ = rawIdle.SetDeadline(time.Time{})
 	defer up.Close()
 
 	outReq := req.Clone(context.Background())
 	outReq.URL = &url.URL{Scheme: "https", Host: host, Path: req.URL.Path, RawQuery: req.URL.RawQuery}
 	outReq.RequestURI = ""
+	// Request.Write closes the body, and closing a server-side body reads the rest of it.
+	// When the upstream answers early (401/413) that would pull the whole upload through the
+	// proxy and bypass maxDrainBytes. A no-op Close leaves the leftover to drainRequestBody.
+	if outReq.Body != nil && outReq.Body != http.NoBody {
+		outReq.Body = io.NopCloser(outReq.Body)
+	}
 	// Read the response while the request is still being written: an upstream may answer
 	// (401, 413) before it has consumed a large body and then close. Writing first and
 	// reading after would fail on the write and lose that answer (seen on macOS/Windows,
@@ -406,21 +404,39 @@ func (s *Server) roundTripIntercept(client io.ReadWriteCloser, req *http.Request
 	}()
 	werr := outReq.Write(up)
 	if werr != nil {
-		// The upstream may have answered and closed; do not wait forever for more.
-		_ = up.SetReadDeadline(time.Now().Add(5 * time.Second))
+		// The upstream may have answered and closed; a stalled or vanished client must not
+		// keep this goroutine waiting for more.
+		_ = up.SetReadDeadline(time.Now().Add(earlyAnswerWait))
 	}
 	res := <-respCh
 	if res.err != nil {
 		return false
 	}
+	// The short read bound above was for finding an early answer; the body may be slow.
+	_ = up.SetReadDeadline(time.Time{})
 	upResp := res.resp
 	defer upResp.Body.Close()
 	s.stripDeniedRedirect(upResp, start)
 	_ = upResp.Write(client)
-	// Early answer: the upstream replied before the whole request body was sent. The
-	// client connection still has unread body bytes, so it cannot serve another request.
-	return werr == nil
+	// The connection can serve another request only if the response was length-delimited
+	// and the upstream did not ask to close. An EOF-delimited body (HTTP/1.0, or 1.1 with
+	// neither Content-Length nor chunked) ends only when the connection closes: keeping it
+	// open leaves the client waiting for an EOF that never comes. An early answer (the
+	// upstream replied before the whole request body was sent) leaves unread body bytes.
+	return werr == nil && !upResp.Close && upResp.StatusCode != http.StatusSwitchingProtocols && !eofDelimited(req, upResp)
 }
+
+// eofDelimited reports whether the response body ends only when the connection closes.
+func eofDelimited(req *http.Request, resp *http.Response) bool {
+	if req.Method == http.MethodHead || resp.StatusCode/100 == 1 ||
+		resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusNotModified {
+		return false
+	}
+	return resp.ContentLength < 0 && len(resp.TransferEncoding) == 0
+}
+
+// earlyAnswerWait is how long to look for an upstream answer after writing the request failed.
+const earlyAnswerWait = 2 * time.Second
 
 // maxDrainBytes bounds how much of an unread request body is consumed before an
 // intercepted connection is closed.

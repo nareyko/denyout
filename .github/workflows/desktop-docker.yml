@@ -32,8 +32,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: desktop-docker-${{ github.ref }}
-  cancel-in-progress: true
+  group: desktop-docker-${{ github.event.inputs.tag || github.ref }}
+  cancel-in-progress: false
 
 jobs:
   ubuntu:
@@ -47,8 +47,11 @@ jobs:
           persist-credentials: false
       - name: Resolve tag
         id: tag
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
         run: |
-          tag="${{ github.event.inputs.tag }}"
+          tag="$INPUT_TAG"
+          case "$tag" in *[!A-Za-z0-9._-]*) echo "invalid tag" >&2; exit 1;; esac
           [ -n "$tag" ] || tag=$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=1" -q '.[0].tag_name')
           [ -n "$tag" ] || { echo "no release found" >&2; exit 1; }
           # release.yml (CLI archives) and release-desktop.yml (GUI) run in parallel: wait for both.

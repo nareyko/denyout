@@ -2,7 +2,6 @@ package proxy
 
 import (
 	"bufio"
-	"crypto/tls"
 	"encoding/binary"
 	"fmt"
 	"github.com/nareyko/denyout/internal/inspect"
@@ -22,6 +21,8 @@ func (s *Server) serveTransparentOn(ln net.Listener) {
 			if s.isClosed() {
 				return
 			}
+			// e.g. EMFILE: do not spin a CPU core on a failing Accept.
+			time.Sleep(50 * time.Millisecond)
 			continue
 		}
 		go s.handleTransparent(conn)
@@ -80,7 +81,9 @@ func (s *Server) handleTransparent(conn net.Conn) {
 	port := 80
 	if h, p, err := net.SplitHostPort(host); err == nil {
 		host = h
-		fmt.Sscanf(p, "%d", &port)
+		if _, serr := fmt.Sscanf(p, "%d", &port); serr != nil || port < 1 || port > 65535 {
+			return
+		}
 	}
 	_ = conn.SetDeadline(time.Time{})
 	s.handleTransparentHTTP(&prefixConn{r: br, Conn: conn}, req, host, port)
@@ -116,49 +119,9 @@ func (s *Server) serveTransparentTLS(conn net.Conn, host string, port int) {
 		s.logDecision(rv, d, start)
 		return
 	}
-	leaf, err := s.cfg.CA.Leaf(host)
-	if err != nil {
-		s.logMitmError(rv, "mitm_leaf_error", start)
-		return
-	}
-	tlsClient := tls.Server(conn, &tls.Config{
-		Certificates: []tls.Certificate{leaf},
-		MinVersion:   tls.VersionTLS12,
-	})
-	if err := tlsClient.Handshake(); err != nil {
-		s.logMitmError(rv, "mitm_handshake_failed", start)
-		_ = tlsClient.Close()
-		return
-	}
-	defer tlsClient.Close()
-	ips, _ := lookupIPs(host)
-	br := bufio.NewReader(tlsClient)
-	if peek, perr := br.Peek(24); perr == nil && isHTTP2ClientPreface(peek) {
-		// HTTP/2 after MITM is not supported yet — would previously fail with no audit line.
-		s.logMitmError(rv, "mitm_http2_unsupported", start)
-		return
-	}
-	for {
-		_ = conn.SetReadDeadline(time.Now().Add(5 * time.Minute))
-		req, err := http.ReadRequest(br)
-		if err != nil {
-			return
-		}
-		_ = conn.SetReadDeadline(time.Time{})
-		if !hostHeaderMatches(req.Host, host) {
-			// Same domain-fronting guard as the CONNECT path: policy was evaluated for the
-			// SNI host, a different Host header would reach a host that was never checked.
-			_ = misdirectedResponse().Write(tlsClient)
-			return
-		}
-		// A deny or error answer says "Connection: close"; the connection must really close,
-		// or a client waiting for the end of the body hangs (seen with Protect On: curl got
-		// the 403 and 65 body bytes, then timed out).
-		if !s.roundTripIntercept(tlsClient, req, host, port, ips, start) || req.Close {
-			drainRequestBody(conn, req)
-			return
-		}
-	}
+	// Same terminate-and-relay loop as the CONNECT path (handshake bound, Host check,
+	// idle limits, close-and-drain on deny/error). DNS runs after the handshake.
+	s.serveIntercept(conn, rv, host, port, func() []net.IP { ips, _ := lookupIPs(host); return ips }, start)
 }
 
 func (s *Server) handleTransparentHTTP(conn net.Conn, req *http.Request, host string, port int) {
@@ -189,24 +152,34 @@ func (s *Server) handleTransparentHTTP(conn net.Conn, req *http.Request, host st
 	d := s.cfg.Engine.Evaluate(rv)
 	if d.Verdict == "deny" {
 		s.logDecision(rv, d, start)
-		fmt.Fprintf(conn, "HTTP/1.1 403 Forbidden\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n%s\n", redactDenyMsg(d))
+		writeSimple(conn, http.StatusForbidden, redactDenyMsg(d)+"\n")
+		drainRequestBody(conn, req) // a large upload must still end in a readable 403, not an RST
 		return
 	}
 	// Dial the validated IP (never re-resolve the name: DNS-rebinding TOCTOU).
 	dialIP, derr := safeDialIP(host, ips, s.cfg.Engine.Cfg.AllowPrivate)
 	if derr != nil {
-		fmt.Fprintf(conn, "HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n")
+		s.logDecision(rv, policy.Decision{Verdict: "error", Reasons: []string{"upstream_unsafe_ip"}}, start)
+		writeSimple(conn, http.StatusBadGateway, "upstream address refused\n")
 		return
 	}
 	out, err := s.dialTCP(net.JoinHostPort(dialIP.String(), fmt.Sprintf("%d", port)), 10*time.Second)
 	if err != nil {
+		s.logDecision(rv, policy.Decision{Verdict: "error", Reasons: []string{"upstream_dial_failed"}}, start)
+		writeSimple(conn, http.StatusBadGateway, "upstream dial failed\n")
 		return
 	}
 	defer out.Close()
-	if err := req.Write(out); err != nil {
+	// One request per connection: the upstream closes after its response, so io.Copy ends
+	// instead of pinning this goroutine on a keep-alive upstream.
+	req.Close = true
+	upstream := newIdleConn(out, upstreamIdle)
+	if err := req.Write(upstream); err != nil {
+		s.logDecision(rv, policy.Decision{Verdict: "error", Reasons: []string{"upstream_write_failed"}}, start)
+		writeSimple(conn, http.StatusBadGateway, "upstream write failed\n")
 		return
 	}
-	_, _ = io.Copy(conn, out)
+	_, _ = io.Copy(conn, upstream)
 	s.logDecision(rv, d, start)
 }
 

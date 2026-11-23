@@ -28,8 +28,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: m4-smoke-${{ github.ref }}
-  cancel-in-progress: true
+  group: m4-smoke-${{ github.event.inputs.tag || github.event.release.tag_name || github.ref }}
+  cancel-in-progress: false
 
 jobs:
   smoke:
