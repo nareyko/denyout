@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.4.15 - Install reliability, proxy hardening, release tests (2026-11-24)
+
+Release candidates: v0.4.14-rc1 to rc4 and v0.4.15-rc1. Platform status (Ubuntu supported, macOS Preview, Windows Preview, Protect not available on Windows) is in the release notes.
 
 - **Proxy hardening (code review).** One shared intercept loop now serves both the CONNECT and the transparent path. Idle timeouts on client and upstream connections (a stalled peer no longer pins a goroutine forever), correct handling of EOF-delimited responses (the connection is not reused), `Upgrade: websocket` answered 501 instead of silently hanging, an early upstream answer to a stalled upload is delivered within 2 s, port-range check and accept backoff on the transparent listener. New end-to-end tests for each.
 - **CI hygiene.** `install-verify-test-docker.sh` now fails the job when a check fails (the trailing pipe hid the exit code); `m4-smoke` and `desktop-docker` no longer cancel each other across tags (concurrency per tag); the dispatched tag is passed through `env` and validated.
