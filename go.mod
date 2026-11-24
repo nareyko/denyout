@@ -9,7 +9,7 @@ require (
 	github.com/quic-go/quic-go v0.65.0
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 	github.com/wailsapp/wails/v2 v2.17.1
-	golang.org/x/net v0.62.0
+	golang.org/x/net v0.63.0
 	golang.zx2c4.com/wireguard v0.0.0-20261024220952-b3bc704ef0ee
 	gopkg.in/yaml.v3 v3.0.1
 	gvisor.dev/gvisor v0.0.0-20250503011706-39ed1f5ac29c
