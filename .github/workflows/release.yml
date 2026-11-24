@@ -20,7 +20,7 @@ jobs:
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version: "1.27.4"
-      - uses: sigstore/cosign-installer@dc72c7d5c4d10cd6bcb8cf6e3fd625a9e5e537da # v3.7.0
+      - uses: sigstore/cosign-installer@7e8b541eb2e61bf99390e1afd4be13a184e9ebc5 # v3.10.1
         with:
           # cosign 2.4 (installer default) cannot verify the sigstore bundle that current goreleaser
           # releases ship: v0.4.14-rc1 failed with "bundle does not contain cert". Pin a newer 2.x.
